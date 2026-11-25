@@ -447,3 +447,93 @@ the diagnostics.
 Changelog, version 1.0.0, promote to production (or keep private), tag `v1.0.0`.
 
 **Done when** 1.0.0 is published.
+
+### m7-phone-architecture: Phone app architecture and shared Android adapters
+- milestone: M7
+- labels: area:mobile, type:task
+- depends: m6-release-1-0
+- issue: 41
+
+ADR for the full phone app: which Android adapters move from `:wear` to a shared Android module
+(GATT adapter, recording service base, journal storage, permissions), how the phone and the watch avoid
+recording the same run twice, and how a BLE sensor is handed over between phone and watch (one BLE
+connection at a time). Update `docs/ARCHITECTURE.md`.
+
+**Done when** the ADR is accepted and the shared module builds for both apps.
+
+### m7-phone-recording: Run recording on the phone
+- milestone: M7
+- labels: area:mobile, type:feature, reliability
+- depends: m7-phone-architecture
+- issue: 42
+
+Foreground service (`location|health|connectedDevice`) on the phone with the same `RecordingEngine`,
+journal and crash recovery as the watch. Location from the phone GNSS (fused provider only as fallback).
+Same invariants R1–R8, same replay and chaos tests run against the phone adapters.
+
+**Done when** `CrashRecoveryReplayTest` runs for the phone and a run survives a force stop on the phone.
+
+### m7-phone-ble: BLE sensors on the phone
+- milestone: M7
+- labels: area:mobile, area:ble, type:feature, reliability
+- depends: m7-phone-architecture
+- issue: 43
+
+Reuse `:core:ble` and the shared GATT adapter on the phone: HR strap, footpod, Stryd, auto-reconnect,
+fallback, sensor log. Pairing screen on the phone. Detect when the watch already holds the sensor.
+
+**Done when** a 1 h phone run with a strap has no HR gap > 10 s except intentional dropouts.
+
+### m7-phone-run-ui: Phone run screens and audio cues
+- milestone: M7
+- labels: area:mobile, area:ui, type:feature
+- depends: m7-phone-recording
+- issue: 44
+
+Run screen with configurable fields, lock-screen notification with live data and controls, voice/audio
+cues for laps and alerts, start/pause/lap/stop with confirmation.
+
+**Done when** a full run can be done with the phone in the pocket using notification controls and audio cues.
+
+### m7-phone-history-analysis: Phone history and analysis
+- milestone: M7
+- labels: area:mobile, area:dynamics, type:feature
+- depends: m5-post-run-analysis, m7-phone-recording
+- issue: 45
+
+History of watch and phone runs in one list, run detail with map-free charts (pace, HR, cadence,
+elevation, power, dynamics), laps table, comparison of two runs and trends per week.
+
+**Done when** the owner can compare two runs and see weekly trends on the phone.
+
+### m7-watch-config-from-phone: Configure the watch from the phone
+- milestone: M7
+- labels: area:mobile, area:wear, type:feature
+- depends: m7-phone-architecture, m3-data-screens, m3-autolap-intervals
+- issue: 46
+
+Edit data screens, interval workouts, zones and sensor priorities on the phone and send them to the
+watch over the Data Layer, with versioning so a run in progress is never changed.
+
+**Done when** a layout and a workout edited on the phone appear on the watch at the next run.
+
+### m7-phone-field-validation: Field validation of the phone app
+- milestone: M7
+- labels: field-test
+- depends: m7-phone-run-ui, m7-phone-ble
+- issue: 47
+
+Owner runs F1–F3 from `docs/FIELD_TESTING.md` with the phone only (watch off), 10 runs in total.
+
+**Done when** 10 phone-only runs with 0 lost; every failure has a `field-report` issue.
+
+### m7-phone-release: Phone app release
+- milestone: M7
+- labels: area:release, type:task
+- depends: m7-phone-field-validation, m7-phone-history-analysis
+- issue: 48
+
+Store listing and data safety update for the phone features, closed testing, then release 1.1
+(watch + phone).
+
+**Done when** 1.1 with the full phone app is published.

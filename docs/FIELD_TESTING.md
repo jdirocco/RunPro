@@ -5,6 +5,8 @@ Agents cannot run on the watch. Field tests are done by the owner; the results c
 
 ## Before a test run
 
+Watch setup step by step (in Italian, for the owner): `docs/it/CONFIGURAZIONE_OROLOGIO.md`.
+
 1. Install the build from the PR (`./gradlew :wear:installDebug` with the watch on Wi-Fi ADB) or from Play internal testing.
 2. Check: RunPro not in "Sleeping apps", background activity allowed, Location on.
 3. Make sure the strap is **not** connected to the phone, Samsung Health or Gear Tracker at the same time.
