@@ -166,8 +166,26 @@ Notes:
 
 ### `./rp check`: local quality gate
 
-Runs `./gradlew check --continue` (unit, replay and chaos tests, ktlint, detekt, lint). Before issue #1
-there is no Gradle project and it only prints a notice.
+Runs `./gradlew check --continue`: JVM tests, local Android UI tests, ktlint, detekt and Android lint.
+Replay and chaos tests join this gate as their issues are implemented.
+
+For the Gradle skeleton, install JDK 21 and Android SDK platform 37.0 with build-tools 37.0.0. Point
+`ANDROID_HOME` at the SDK, or create an ignored `local.properties` containing `sdk.dir=/path/to/sdk`.
+No globally installed Gradle is needed. The first build downloads Gradle and Maven dependencies.
+
+```
+$ java -version                              # must report Java 21
+$ sdkmanager "platforms;android-37.0" "build-tools;37.0.0" "platform-tools"
+$ ./rp check                                 # all nine modules + root build-script formatting
+$ ./gradlew :wear:assembleDebug               # wear/build/outputs/apk/debug/wear-debug.apk
+$ ./gradlew :core:model:test :tools:replay:test # JVM tests without a watch or emulator
+$ ./gradlew ktlintFormat                      # format Kotlin and Gradle Kotlin scripts
+```
+
+The JVM modules share build contract tests from `build-support/src/test/kotlin`: they verify Java 21
+and that Android framework classes are absent. The watch launcher has a Robolectric Compose test on
+API 30. This does not replace a physical install or field testing. The phone module is an empty APK
+placeholder with no launcher activity. See `docs/adr/0002-gradle-build-foundation.md` for version choices.
 
 ### `./rp pr`: open the pull request
 
