@@ -79,3 +79,12 @@ Length-prefixed protobuf records with CRC32: `RunStarted`, `Sample(batch)`, `Lap
 `SourceSwitch`, `SensorEvent`, `RunStopped`. A reader stops at the first corrupt record and keeps everything
 before it. On app start, any journal without `RunStopped` is offered for recovery (and auto-recovered if the
 service was killed during a run).
+
+## Recording engine (`:core:recording`)
+
+- `RecordingStateMachine` is pure and deterministic: phases (Idle → Preparing → Running ⇄ Paused → Stopped,
+  Reset back to Idle), run events, manual laps and totals (elapsed, timer, moving time, distance, average and
+  max HR, average pace, cadence, ascent and descent). Inputs carry their own monotonic timestamps; samples
+  are judged by their timestamp against the run timeline, so late batched samples still count.
+- `RecordingEngine` runs it on its own thread (R6): `submit` never blocks, and the state is published as a
+  `StateFlow<RunState>` that never waits for the UI. Design and defaults: ADR 0005.
