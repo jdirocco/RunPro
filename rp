@@ -7,9 +7,10 @@ Commands:
   start <N> [--worktree]
                       assign issue N, mark it In Progress, create branch issue-<N>-<slug>
                       (--worktree: in ../RunPro-worktrees/<branch> instead of this checkout)
-  agent [N|next] [claude|codex] [--model M] [--headless] [--worktree] [--prompt TEXT] [--dry-run] [-- ARGS]
+  agent [N|next] [claude|codex] [--model M] [--auto] [--headless] [--worktree] [--prompt TEXT] [--dry-run] [-- ARGS]
                       start issue N (default: next ready) and launch a coding agent on it.
                       Runner and model default to plan/config.json "agents" (model null = tool default).
+                      --auto: the agent never asks for confirmation and opens the PR itself.
                       ARGS after -- go to the agent CLI unchanged.
   check               run the local quality gate (./gradlew check, or a notice if no Gradle yet)
   pr                  push the branch and open a PR that closes the issue
@@ -286,9 +287,32 @@ def cmd_start(args):
 
 AGENT_DEFAULTS = {
     "default_runner": "claude",
-    "claude": {"model": None, "headless_args": ["--permission-mode", "auto"]},
-    "codex": {"model": None, "headless_args": ["-s", "workspace-write"]},
+    "claude": {
+        "model": None,
+        "headless_args": ["--permission-mode", "auto"],
+        "auto_args": ["--permission-mode", "bypassPermissions"],
+    },
+    "codex": {
+        "model": None,
+        # Codex always runs in its workspace-write sandbox, with network (Gradle, gh, git push) and
+        # write access to .git (commits) and the build caches.
+        "sandbox_writable_roots": [".git", "~/.gradle", "~/.m2", "~/.android", "~/.konan"],
+        "network_access": True,
+        "headless_args": [],
+        "auto_args": ["-a", "never"],
+    },
 }
+
+
+def codex_sandbox_args(acfg):
+    roots = []
+    for p in acfg["codex"]["sandbox_writable_roots"]:
+        p = os.path.expanduser(p)
+        roots.append(p if os.path.isabs(p) else os.path.join(ROOT, p))
+    args = ["-s", "workspace-write", "-c", "sandbox_workspace_write.writable_roots=" + json.dumps(roots)]
+    if acfg["codex"].get("network_access"):
+        args += ["-c", "sandbox_workspace_write.network_access=true"]
+    return args
 
 
 def agent_config():
@@ -300,7 +324,7 @@ def agent_config():
     return out
 
 
-def agent_prompt(n, title, branch, headless, extra):
+def agent_prompt(n, title, branch, headless, extra, auto=False):
     lines = [
         f"You are working on RunPro issue #{n}: {title}.",
         f"The issue is already started and you are on branch {branch}. Do not run ./rp start again.",
@@ -311,7 +335,12 @@ def agent_prompt(n, title, branch, headless, extra):
         "If you need the owner (a run on the watch, a decision, credentials): comment on the issue,",
         "add the label needs-owner, and stop.",
     ]
-    if headless:
+    if auto:
+        lines.append("You run in autonomous mode: never ask the user for confirmation and never wait for input. "
+                     "When ./rp check passes, run ./rp pr yourself to push and open the PR. Never merge. "
+                     "If you cannot finish, run ./rp handoff with what was done, what is next and open "
+                     "problems, then stop.")
+    elif headless:
         lines.append("Do not push and do not open a PR. When you finish or stop, run "
                      "./rp handoff with what was done, what is next and open problems.")
     else:
@@ -332,7 +361,7 @@ def cmd_agent(args):
     for a in it:
         if a in ("--runner", "--model", "--prompt"):
             opts[a[2:]] = next(it, None)
-        elif a in ("--headless", "--worktree", "--dry-run"):
+        elif a in ("--headless", "--worktree", "--dry-run", "--auto"):
             flags.add(a[2:])
         elif a in ("claude", "codex") and opts["runner"] is None:
             opts["runner"] = a
@@ -360,24 +389,33 @@ def cmd_agent(args):
     else:
         title, branch, cwd = start_issue(n, worktree="worktree" in flags)
 
-    prompt = agent_prompt(n, title, branch, headless, opts["prompt"])
+    auto = "auto" in flags
+    prompt = agent_prompt(n, title, branch, headless, opts["prompt"], auto=auto)
     if runner == "claude":
         cmd = ["claude"]
         if model:
             cmd += ["--model", model]
+        if auto:
+            cmd += acfg["claude"]["auto_args"]
+        elif headless:
+            cmd += acfg["claude"]["headless_args"]
         if headless:
-            cmd += acfg["claude"]["headless_args"] + ["-p"]
+            cmd += ["-p"]
         cmd += extra_cli + [prompt]
     else:
         cmd = ["codex"]
+        if auto and not headless:
+            cmd += acfg["codex"]["auto_args"]  # approval policy is a top-level option
         if headless:
             cmd += ["exec"] + acfg["codex"]["headless_args"]
+        cmd += codex_sandbox_args(acfg)
         if model:
             cmd += ["-m", model]
         cmd += ["-C", cwd] + extra_cli + [prompt]
 
+    mode = ("headless" if headless else "interactive") + (" + auto (no confirmations)" if auto else "")
     print(f"# #{n} {title}")
-    print(f"# runner={runner} model={model or '(tool default)'} mode={'headless' if headless else 'interactive'} cwd={cwd}")
+    print(f"# runner={runner} model={model or '(tool default)'} mode={mode} cwd={cwd}")
     if "dry-run" in flags:
         print(" ".join(c if " " not in c and "\n" not in c else repr(c) for c in cmd))
         return

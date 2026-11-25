@@ -73,7 +73,7 @@ With `--worktree` the branch is created in `../RunPro-worktrees/<branch>` and th
 ### `./rp agent`: launch Claude Code or Codex on an issue
 
 ```
-./rp agent [N|next] [claude|codex] [--model M] [--headless] [--worktree] [--prompt TEXT] [--dry-run] [-- ARGS]
+./rp agent [N|next] [claude|codex] [--model M] [--auto] [--headless] [--worktree] [--prompt TEXT] [--dry-run] [-- ARGS]
 ```
 
 It does `./rp start` for you (assign, branch, In Progress), then launches the agent CLI with a prompt that
@@ -85,7 +85,8 @@ tells it which issue and branch it is on and to follow `AGENTS.md`. Both CLIs re
 | `N` / `next` | `next` | Issue to work on; `next` = first ready issue |
 | `claude` / `codex` (or `--runner`) | `agents.default_runner` in `plan/config.json` (`claude`) | Which agent CLI |
 | `--model M` | `agents.<runner>.model` in `plan/config.json`; `null` = the CLI's own default | Model passed as `claude --model M` or `codex -m M` |
-| `--headless` | off (interactive) | `claude -p` / `codex exec`, with `headless_args` from the config (`--permission-mode auto` / `-s workspace-write`). The agent commits but does not push; it ends with `./rp handoff` |
+| `--auto` | off | Autonomous mode: the agent never asks you anything (see below). It pushes and opens the PR itself with `./rp pr`; it never merges |
+| `--headless` | off (interactive) | `claude -p` / `codex exec`: no chat, the agent runs to the end and exits. Without `--auto` it commits but does not push and ends with `./rp handoff` |
 | `--worktree` | off | Work in `../RunPro-worktrees/<branch>` |
 | `--prompt TEXT` | none | Extra instructions appended to the prompt |
 | `--dry-run` | off | Print the command without starting the issue or the agent |
@@ -98,11 +99,13 @@ $ ./rp agent                                   # next ready issue, Claude Code, 
 $ ./rp agent 16 codex                          # issue #16 with Codex, default model
 $ ./rp agent 16 claude --model opus            # Claude Code with a chosen model
 $ ./rp agent next codex --model gpt-5.5 --headless --worktree
+$ ./rp agent 1 claude --auto                  # works without asking, opens the PR
+$ ./rp agent next codex --auto --headless --worktree   # fully unattended
 $ ./rp agent 4 --prompt "Use kotlinx.serialization for the trace" -- --add-dir ../traces
 $ ./rp agent 3 codex --dry-run
 # #3 Core domain model
 # runner=codex model=(tool default) mode=interactive cwd=/Users/juridirocco/development/RunPro
-codex -C /Users/juridirocco/development/RunPro 'You are working on RunPro issue #3: ...'
+codex -s workspace-write -c 'sandbox_workspace_write.writable_roots=[...]' -c sandbox_workspace_write.network_access=true -C /Users/juridirocco/development/RunPro 'You are working on RunPro issue #3: ...'
 ```
 
 Change the defaults in `plan/config.json`:
@@ -110,23 +113,79 @@ Change the defaults in `plan/config.json`:
 ```json
 "agents": {
   "default_runner": "claude",
-  "claude": { "model": null, "headless_args": ["--permission-mode", "auto"] },
-  "codex":  { "model": null, "headless_args": ["-s", "workspace-write"] }
+  "claude": {
+    "model": null,
+    "headless_args": ["--permission-mode", "auto"],
+    "auto_args": ["--permission-mode", "bypassPermissions"]
+  },
+  "codex": {
+    "model": null,
+    "sandbox_writable_roots": [".git", "~/.gradle", "~/.m2", "~/.android", "~/.konan"],
+    "network_access": true,
+    "headless_args": [],
+    "auto_args": ["-a", "never"]
+  }
 }
 ```
 
+#### Autonomous mode (`--auto`)
+
+The agent works without asking for any authorisation and without waiting for you:
+
+| Runner | What `--auto` does |
+|---|---|
+| Claude Code | `--permission-mode bypassPermissions`: every tool call is allowed, no prompts |
+| Codex | `-a never` (interactive) or `codex exec` (headless, never asks): no approval prompts. Commands still run in the Codex sandbox (see below) |
+
+The prompt also changes: the agent must not ask questions, opens the PR with `./rp pr` when `./rp check`
+passes, never merges, and writes `./rp handoff` if it cannot finish. Your control point is the PR review.
+
+Safety:
+
+- Use `--worktree` with `--auto`, so the agent works in its own folder and cannot disturb your checkout.
+- Claude Code with `bypassPermissions` has no sandbox: it can run any command as your user. Use it only on
+  this repository, and do not keep secrets (keystores, Strava secrets) in the folder.
+- To make Claude less permissive, set `claude.auto_args` to `["--permission-mode", "auto"]`
+  (a classifier blocks risky actions instead of asking you).
+
+#### Codex sandbox
+
+Codex always runs with `-s workspace-write` plus:
+
+- write access to `sandbox_workspace_write.writable_roots` = the repository `.git` (otherwise commits fail:
+  the sandbox protects `.git`) and the build caches (`~/.gradle`, `~/.m2`, `~/.android`, `~/.konan`);
+- network access (`network_access: true`) for Gradle dependencies, `gh` and `git push`.
+
+Edit these in `plan/config.json`. To drop the sandbox completely (not recommended), set
+`codex.auto_args` to `["--dangerously-bypass-approvals-and-sandbox"]`.
+
 Notes:
 
-- Codex in `workspace-write` blocks network access by default, so a headless Codex run cannot call `gh`
-  (for example to comment on the issue). It leaves its notes in `docs/HANDOFF.md` instead; you open the
-  PR with `./rp pr`.
 - After a headless run: read `docs/HANDOFF.md`, `git log`, then `./rp check` and `./rp pr` from the
   branch (or its worktree).
 
 ### `./rp check`: local quality gate
 
-Runs `./gradlew check --continue` (unit, replay and chaos tests, ktlint, detekt, lint). Before issue #1
-there is no Gradle project and it only prints a notice.
+Runs `./gradlew check --continue`: JVM tests, local Android UI tests, ktlint, detekt and Android lint.
+Replay and chaos tests join this gate as their issues are implemented.
+
+For the Gradle skeleton, install JDK 21 and Android SDK platform 37.0 with build-tools 37.0.0. Point
+`ANDROID_HOME` at the SDK, or create an ignored `local.properties` containing `sdk.dir=/path/to/sdk`.
+No globally installed Gradle is needed. The first build downloads Gradle and Maven dependencies.
+
+```
+$ java -version                              # must report Java 21
+$ sdkmanager "platforms;android-37.0" "build-tools;37.0.0" "platform-tools"
+$ ./rp check                                 # all nine modules + root build-script formatting
+$ ./gradlew :wear:assembleDebug               # wear/build/outputs/apk/debug/wear-debug.apk
+$ ./gradlew :core:model:test :tools:replay:test # JVM tests without a watch or emulator
+$ ./gradlew ktlintFormat                      # format Kotlin and Gradle Kotlin scripts
+```
+
+The JVM modules share build contract tests from `build-support/src/test/kotlin`: they verify Java 21
+and that Android framework classes are absent. The watch launcher has a Robolectric Compose test on
+API 30. This does not replace a physical install or field testing. The phone module is an empty APK
+placeholder with no launcher activity. See `docs/adr/0002-gradle-build-foundation.md` for version choices.
 
 ### `./rp pr`: open the pull request
 

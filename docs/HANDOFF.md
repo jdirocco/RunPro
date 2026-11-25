@@ -6,3 +6,7 @@ what was done, what is next, open problems.
 ## 2026-11-25 · main
 
 Plan, harness and backlog created. GitHub issues, milestones and the Project are synced. Next: `./rp next` (M0).
+
+## 2026-11-25 14:01 · issue-1-gradle-multi-module-project-skeleton
+
+Done: issue #1 adds all nine Gradle modules, pinned wrapper/catalog, JDK 21, API 37, Wear Compose RunPro launcher, empty mobile app, ktlint/detekt and build ADR/setup docs. Validation: ./rp check passes (14 JVM contract checks and 1 Robolectric UI test, plus static analysis/lint); :wear:assembleDebug and :mobile:assembleDebug pass. Next: owner approval to run ./rp pr, then review/merge. No implementation blockers. Physical Galaxy Watch 5 Pro install remains issue #6 and was not attempted. Local SDK is /private/tmp/runpro-android-sdk via ignored local.properties; configure a persistent SDK per docs/GUIDE.md for later sessions.

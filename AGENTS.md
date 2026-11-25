@@ -20,6 +20,9 @@ Read `docs/GUIDE.md` (how the harness works), `docs/PLAN.md`, `docs/ARCHITECTURE
 If the work needs the owner (testing on the watch, a decision, credentials), comment on the issue,
 add the label `needs-owner`, and stop. Never guess field results.
 
+In autonomous mode (`./rp agent --auto`, stated in your prompt) never ask for confirmation: run `./rp pr`
+yourself when `./rp check` passes, never merge, and use `./rp handoff` if you cannot finish.
+
 ## Rules
 
 - The invariants R1–R8 in `docs/RELIABILITY.md` are not negotiable. A PR that touches recording, journal,
