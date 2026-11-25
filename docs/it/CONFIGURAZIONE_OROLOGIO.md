@@ -81,12 +81,13 @@ Dalla cartella del progetto `/Users/juridirocco/development/RunPro`:
 ./rp install
 ```
 
-(Disponibile quando la issue #6 è chiusa. Fino ad allora: `./gradlew :wear:installDebug`.)
+Compila `:wear` e lo installa sull'orologio collegato. Controlla prima che il dispositivo sia autorizzato e che sia
+davvero un orologio Wear OS.
 
-Se hai anche un telefono collegato con adb, indica l'orologio:
+Se hai anche un telefono collegato con adb, indica l'orologio (come argomento o con `ANDROID_SERIAL`):
 
 ```bash
-ANDROID_SERIAL=192.168.1.42:41567 ./gradlew :wear:installDebug
+./rp install 192.168.1.42:41567
 ```
 
 RunPro compare nell'elenco app dell'orologio.

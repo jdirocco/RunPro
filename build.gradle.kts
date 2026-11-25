@@ -15,6 +15,16 @@ ktlint {
     version.set(libs.versions.ktlint.engine)
 }
 
+val harnessTest = tasks.register<Exec>("harnessTest") {
+    group = "verification"
+    description = "Tests the rp harness without a watch or Android SDK."
+    commandLine("python3", "-B", "-m", "unittest", "discover", "-s", "tests", "-v")
+}
+
+tasks.named("check") {
+    dependsOn(harnessTest)
+}
+
 subprojects {
     // Parent grouping projects (:core and :tools) have no sources or build logic.
     if (buildFile.exists()) {
