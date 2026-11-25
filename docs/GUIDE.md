@@ -69,7 +69,8 @@ It refuses to run with uncommitted changes. It updates `main`, creates (or reuse
 the issue to you, adds `status:in-progress` and moves the card to In Progress.
 
 With `--worktree` the branch is created in `../RunPro-worktrees/<branch>` and this checkout is left alone
-(use it for parallel work).
+(use it for parallel work). `git worktree add` does not carry ignored files, so `./rp` copies this
+checkout's `local.properties` (the `sdk.dir` line) into the new worktree; an existing one is kept.
 
 ### `./rp agent`: launch Claude Code or Codex on an issue
 
@@ -181,6 +182,13 @@ Replay and chaos tests join this gate as their issues are implemented.
 
 For the Gradle skeleton, install JDK 21 and Android SDK platform 37.0 with build-tools 37.0.0. Point
 `ANDROID_HOME` at the SDK, or create an ignored `local.properties` containing `sdk.dir=/path/to/sdk`.
+In a worktree without `local.properties` and with neither `ANDROID_HOME` nor `ANDROID_SDK_ROOT` set,
+`./rp check` first copies the file from the main checkout (this fixes worktrees created before #52):
+
+```
+$ cd ../RunPro-worktrees/issue-3-core-domain-model && ./rp check
+Copied local.properties from the main checkout to .../issue-3-core-domain-model/local.properties
+```
 No globally installed Gradle is needed. The first build downloads Gradle and Maven dependencies.
 
 ```
