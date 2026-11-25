@@ -166,7 +166,7 @@ Notes:
 
 ### `./rp check`: local quality gate
 
-Runs `./gradlew check --continue`: JVM tests, local Android UI tests, ktlint, detekt and Android lint.
+Runs `./gradlew check --continue`: Python harness tests, JVM tests, local Android UI tests, ktlint, detekt and Android lint.
 Replay and chaos tests join this gate as their issues are implemented.
 
 For the Gradle skeleton, install JDK 21 and Android SDK platform 37.0 with build-tools 37.0.0. Point
@@ -179,6 +179,7 @@ $ sdkmanager "platforms;android-37.0" "build-tools;37.0.0" "platform-tools"
 $ ./rp check                                 # all nine modules + root build-script formatting
 $ ./gradlew :wear:assembleDebug               # wear/build/outputs/apk/debug/wear-debug.apk
 $ ./gradlew :core:model:test :tools:replay:test # JVM tests without a watch or emulator
+$ python3 -B -m unittest discover -s tests -v  # harness tests without an SDK or device
 $ ./gradlew ktlintFormat                      # format Kotlin and Gradle Kotlin scripts
 ```
 
@@ -216,10 +217,22 @@ $ ./rp handoff "Journal writer done, reader missing corrupt-tail test. Next: CRC
 
 Appends a dated entry to `docs/HANDOFF.md` with the current branch.
 
-### `./rp install`: put the build on the watch
+### `./rp install [SERIAL]`: put the build on the watch
 
-Builds `:wear` and installs it with `adb` on the watch connected over Wi-Fi ADB (setup comes with issue #6,
-`docs/WATCH_SETUP.md`).
+Follow [WATCH_SETUP.md](WATCH_SETUP.md) to enable developer options, pair, and connect the Galaxy Watch
+5 Pro over Wi-Fi ADB. Put SDK `platform-tools` on `PATH`. Once connected:
+
+```sh
+./rp install                                 # use the sole connected ADB device
+ANDROID_SERIAL=192.0.2.10:39517 ./rp install   # select the watch when a phone is also connected
+./rp install 192.0.2.10:39517                 # explicit serial overrides ANDROID_SERIAL
+```
+
+Use your watch's serial from `adb devices -l` in place of the example. The command rejects ambiguous,
+offline, unauthorized and non-watch targets before building. It builds `:wear:assembleDebug` and installs
+`wear/build/outputs/apk/debug/wear-debug.apk` with `adb -s SERIAL install -r`, retaining app data.
+Finish any active workout before installing. Confirm `Success` and open RunPro on the watch; the
+physical acceptance check and troubleshooting steps are in [WATCH_SETUP.md](WATCH_SETUP.md).
 
 ### `./rp sync`: push new backlog items to GitHub
 
