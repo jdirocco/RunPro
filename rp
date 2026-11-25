@@ -38,6 +38,7 @@ MILESTONES = {
     "M4": "M4 Export and sync",
     "M5": "M5 Running analysis",
     "M6": "M6 Release",
+    "M7": "M7 Phone app",
 }
 LABELS = {
     "type:task": "c5def5", "type:feature": "a2eeef", "type:docs": "0075ca", "bug": "d73a4a",

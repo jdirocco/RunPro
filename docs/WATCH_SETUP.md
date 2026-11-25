@@ -2,7 +2,8 @@
 
 Use this guide to connect a Wear OS watch over Wi-Fi ADB and install the RunPro debug build.
 Run terminal commands from the repository root (or the issue worktree). Addresses and ports below
-are examples: replace them with the values displayed on your watch.
+are examples: replace them with the values displayed on your watch. The owner's step-by-step version, in
+Italian, is [docs/it/CONFIGURAZIONE_OROLOGIO.md](it/CONFIGURAZIONE_OROLOGIO.md): keep the two consistent.
 
 ## Development computer
 

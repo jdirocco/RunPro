@@ -9,12 +9,13 @@ Everything runs from the repository root: `/Users/juridirocco/development/RunPro
 |---|---|---|
 | `./rp` | repo root | CLI that wraps git + GitHub: status, next task, start, launch an agent (Claude Code or Codex), check, PR, handoff, install |
 | Backlog | GitHub issues (seeded from `plan/backlog.md`) | One issue = one branch = one PR |
-| Milestones | GitHub milestones M0–M6 | Release phases (see `docs/PLAN.md`) |
+| Milestones | GitHub milestones M0–M7, with due dates | Release phases (see `docs/PLAN.md`) |
 | Board | https://github.com/users/jdirocco/projects/1 | Todo / In Progress / Done |
 | Agent rules | `AGENTS.md` (loaded by Claude Code through `CLAUDE.md`) | The loop and the rules every agent follows |
 | Skill | `.claude/skills/runpro-task/` | "Take the next task" in one sentence |
 | Invariants | `docs/RELIABILITY.md` | R1–R8: what can never break |
 | Field tests | `docs/FIELD_TESTING.md` + "Field report" issue template | Your runs on the watch, fed back to agents |
+| Watch setup (Italian) | `docs/it/CONFIGURAZIONE_OROLOGIO.md` | Developer options, Wi-Fi ADB, install, permissions, battery, strap |
 | Handoff log | `docs/HANDOFF.md` | Notes between sessions |
 | CI | `.github/workflows/ci.yml` | Runs on every push to `main` and every PR: `./gradlew check :wear:assembleDebug` (tests, ktlint, detekt, lint). Artifacts: `wear-debug-apk` and `reports` (14 days) |
 
