@@ -16,7 +16,7 @@ Everything runs from the repository root: `/Users/juridirocco/development/RunPro
 | Invariants | `docs/RELIABILITY.md` | R1–R8: what can never break |
 | Field tests | `docs/FIELD_TESTING.md` + "Field report" issue template | Your runs on the watch, fed back to agents |
 | Handoff log | `docs/HANDOFF.md` | Notes between sessions |
-| CI | `.github/workflows/ci.yml` | Runs on every push and PR |
+| CI | `.github/workflows/ci.yml` | Runs on every push to `main` and every PR: `./gradlew check :wear:assembleDebug` (tests, ktlint, detekt, lint). Artifacts: `wear-debug-apk` and `reports` (14 days) |
 
 ## 2. Roles
 
@@ -186,6 +186,16 @@ The JVM modules share build contract tests from `build-support/src/test/kotlin`:
 and that Android framework classes are absent. The watch launcher has a Robolectric Compose test on
 API 30. This does not replace a physical install or field testing. The phone module is an empty APK
 placeholder with no launcher activity. See `docs/adr/0002-gradle-build-foundation.md` for version choices.
+
+CI runs the same gate plus `:wear:assembleDebug` on every PR and push to `main`. When it fails, open the
+`reports` artifact (test, ktlint, detekt and lint reports). To try a PR build on the watch without
+building locally:
+
+```
+$ gh run list --branch issue-2-ci-on-github-actions --limit 1   # find the run id
+$ gh run download <run-id> -n wear-debug-apk -D /tmp/runpro-apk
+$ adb install -r /tmp/runpro-apk/wear-debug.apk
+```
 
 ### `./rp pr`: open the pull request
 
