@@ -13,13 +13,26 @@
       "headless_args": [
         "--permission-mode",
         "auto"
+      ],
+      "auto_args": [
+        "--permission-mode",
+        "bypassPermissions"
       ]
     },
     "codex": {
       "model": null,
-      "headless_args": [
-        "-s",
-        "workspace-write"
+      "sandbox_writable_roots": [
+        ".git",
+        "~/.gradle",
+        "~/.m2",
+        "~/.android",
+        "~/.konan"
+      ],
+      "network_access": true,
+      "headless_args": [],
+      "auto_args": [
+        "-a",
+        "never"
       ]
     }
   }
