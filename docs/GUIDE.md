@@ -1,13 +1,13 @@
 # RunPro harness guide
 
-How to drive RunPro development with coding agents (Claude Code or others) and the `./rp` harness.
+How to drive RunPro development with coding agents (Claude Code or Codex) and the `./rp` harness.
 Everything runs from the repository root: `/Users/juridirocco/development/RunPro`.
 
 ## 1. The pieces
 
 | Piece | Where | What it is for |
 |---|---|---|
-| `./rp` | repo root | CLI that wraps git + GitHub: status, next task, start, check, PR, handoff, install |
+| `./rp` | repo root | CLI that wraps git + GitHub: status, next task, start, launch an agent (Claude Code or Codex), check, PR, handoff, install |
 | Backlog | GitHub issues (seeded from `plan/backlog.md`) | One issue = one branch = one PR |
 | Milestones | GitHub milestones M0–M6 | Release phases (see `docs/PLAN.md`) |
 | Board | https://github.com/users/jdirocco/projects/1 | Todo / In Progress / Done |
@@ -67,6 +67,62 @@ On branch issue-1-gradle-multi-module-project-skeleton. Issue #1 is In Progress.
 It refuses to run with uncommitted changes. It updates `main`, creates (or reuses) the branch, assigns
 the issue to you, adds `status:in-progress` and moves the card to In Progress.
 
+With `--worktree` the branch is created in `../RunPro-worktrees/<branch>` and this checkout is left alone
+(use it for parallel work).
+
+### `./rp agent`: launch Claude Code or Codex on an issue
+
+```
+./rp agent [N|next] [claude|codex] [--model M] [--headless] [--worktree] [--prompt TEXT] [--dry-run] [-- ARGS]
+```
+
+It does `./rp start` for you (assign, branch, In Progress), then launches the agent CLI with a prompt that
+tells it which issue and branch it is on and to follow `AGENTS.md`. Both CLIs read `AGENTS.md`
+(Claude Code through `CLAUDE.md`).
+
+| Option | Default | Effect |
+|---|---|---|
+| `N` / `next` | `next` | Issue to work on; `next` = first ready issue |
+| `claude` / `codex` (or `--runner`) | `agents.default_runner` in `plan/config.json` (`claude`) | Which agent CLI |
+| `--model M` | `agents.<runner>.model` in `plan/config.json`; `null` = the CLI's own default | Model passed as `claude --model M` or `codex -m M` |
+| `--headless` | off (interactive) | `claude -p` / `codex exec`, with `headless_args` from the config (`--permission-mode auto` / `-s workspace-write`). The agent commits but does not push; it ends with `./rp handoff` |
+| `--worktree` | off | Work in `../RunPro-worktrees/<branch>` |
+| `--prompt TEXT` | none | Extra instructions appended to the prompt |
+| `--dry-run` | off | Print the command without starting the issue or the agent |
+| `-- ARGS` | none | Passed unchanged to the agent CLI |
+
+Examples:
+
+```
+$ ./rp agent                                   # next ready issue, Claude Code, default model, interactive
+$ ./rp agent 16 codex                          # issue #16 with Codex, default model
+$ ./rp agent 16 claude --model opus            # Claude Code with a chosen model
+$ ./rp agent next codex --model gpt-5.5 --headless --worktree
+$ ./rp agent 4 --prompt "Use kotlinx.serialization for the trace" -- --add-dir ../traces
+$ ./rp agent 3 codex --dry-run
+# #3 Core domain model
+# runner=codex model=(tool default) mode=interactive cwd=/Users/juridirocco/development/RunPro
+codex -C /Users/juridirocco/development/RunPro 'You are working on RunPro issue #3: ...'
+```
+
+Change the defaults in `plan/config.json`:
+
+```json
+"agents": {
+  "default_runner": "claude",
+  "claude": { "model": null, "headless_args": ["--permission-mode", "auto"] },
+  "codex":  { "model": null, "headless_args": ["-s", "workspace-write"] }
+}
+```
+
+Notes:
+
+- Codex in `workspace-write` blocks network access by default, so a headless Codex run cannot call `gh`
+  (for example to comment on the issue). It leaves its notes in `docs/HANDOFF.md` instead; you open the
+  PR with `./rp pr`.
+- After a headless run: read `docs/HANDOFF.md`, `git log`, then `./rp check` and `./rp pr` from the
+  branch (or its worktree).
+
 ### `./rp check`: local quality gate
 
 Runs `./gradlew check --continue` (unit, replay and chaos tests, ktlint, detekt, lint). Before issue #1
@@ -123,20 +179,29 @@ For a single task, `gh issue create` (or the "Task" template on GitHub) is enoug
 
 ### A. Let an agent take the next task
 
-Open Claude Code in `/Users/juridirocco/development/RunPro` and say:
+From the terminal, with either agent:
 
-> Take the next RunPro task.
+```
+$ ./rp agent              # Claude Code
+$ ./rp agent codex        # Codex
+```
 
-The `runpro-task` skill runs `./rp status`, `./rp next`, `./rp start N`, implements with tests, runs
-`./rp check`, asks before `./rp pr`, and reports the PR link. You review and merge on GitHub.
-
-To pick a specific issue: "Work on RunPro issue #16".
+Or open Claude Code in `/Users/juridirocco/development/RunPro` and say "Take the next RunPro task"
+(the `runpro-task` skill does the same loop). Either way the agent implements with tests, runs
+`./rp check`, asks before `./rp pr`, and you review and merge on GitHub.
 
 ### B. Several agents in parallel
 
 Only on issues with no dependency on each other and in different modules (for example #3 `:core:model`
-and #6 watch setup docs). Use one git worktree or one Claude Code session with its own worktree per issue,
-so branches do not collide.
+and #6 watch setup docs). Give each one its own worktree, in separate terminals:
+
+```
+$ ./rp agent 3 claude --worktree
+$ ./rp agent 6 codex --worktree
+```
+
+Each works in `../RunPro-worktrees/<branch>`. When done, run `./rp pr` inside that folder, and after the
+merge remove it with `git worktree remove ../RunPro-worktrees/<branch>`.
 
 ### C. A field test
 

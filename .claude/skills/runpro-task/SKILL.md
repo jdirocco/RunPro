@@ -8,6 +8,6 @@ description: Work on the next RunPro issue end to end with the ./rp harness. Use
 3. Plan the change in a few steps; tests first for `:core:*` code (replay/chaos tests for reliability work).
 4. Implement. Keep the PR to this issue only; open new issues for anything else found.
 5. `./rp check` until green. Commit `<summary> (#N)` with no Co-Authored-By trailer.
-6. Ask the user before `./rp pr` (it pushes). Then report the PR link.
+6. Ask the user before `./rp pr` (it pushes). Then report the PR link. To hand an issue to Codex instead, the user runs `./rp agent <N> codex`.
 7. If the work needs the watch or a decision: comment on the issue, label `needs-owner`, stop.
 8. If you stop with work left: `./rp handoff "done / next / open problems"`.

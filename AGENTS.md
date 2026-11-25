@@ -1,5 +1,8 @@
 # Instructions for coding agents: RunPro
 
+These instructions apply to every agent (Claude Code, Codex, others). `./rp agent` launches Claude Code or
+Codex on an issue and already runs `./rp start` for you: in that case skip step 3.
+
 RunPro is a running-only Wear OS app (target device: Galaxy Watch 5 Pro) whose first priority is
 reliability: it must never lose a workout and must keep external BLE sensors working.
 Read `docs/GUIDE.md` (how the harness works), `docs/PLAN.md`, `docs/ARCHITECTURE.md` and `docs/RELIABILITY.md` before your first task.

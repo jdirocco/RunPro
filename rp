@@ -4,7 +4,13 @@
 Commands:
   status              milestones, work in progress, open PRs, next tasks
   next                the next ready issue (open, unassigned, dependencies closed)
-  start <N>           assign issue N, mark it In Progress, create branch issue-<N>-<slug>
+  start <N> [--worktree]
+                      assign issue N, mark it In Progress, create branch issue-<N>-<slug>
+                      (--worktree: in ../RunPro-worktrees/<branch> instead of this checkout)
+  agent [N|next] [claude|codex] [--model M] [--headless] [--worktree] [--prompt TEXT] [--dry-run] [-- ARGS]
+                      start issue N (default: next ready) and launch a coding agent on it.
+                      Runner and model default to plan/config.json "agents" (model null = tool default).
+                      ARGS after -- go to the agent CLI unchanged.
   check               run the local quality gate (./gradlew check, or a notice if no Gradle yet)
   pr                  push the branch and open a PR that closes the issue
   handoff "<text>"    append a handoff note to docs/HANDOFF.md
@@ -236,26 +242,147 @@ def slugify(s):
     return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")[:40].rstrip("-")
 
 
-def cmd_start(args):
-    if not args:
-        sys.exit("usage: ./rp start <issue>")
-    n = int(args[0].lstrip("#"))
+WORKTREES = os.path.join(os.path.dirname(ROOT), os.path.basename(ROOT) + "-worktrees")
+
+
+def start_issue(n, worktree=False):
+    """Mark issue N In Progress and prepare its branch. Returns (title, branch, working dir)."""
     r = repo()
     issue = gh_json(["issue", "view", str(n), "-R", r, "--json", "title,state"])
     if issue["state"] != "OPEN":
         sys.exit(f"#{n} is not open")
     branch = f"issue-{n}-{slugify(issue['title'])}"
-    if sh(["git", "status", "--porcelain"]):
-        sys.exit("working tree not clean; commit or stash first")
     sh(["git", "fetch", "origin"], check=False)
-    sh(["git", "checkout", "main"])
-    sh(["git", "pull", "--ff-only"], check=False)
     exists = sh(["git", "branch", "--list", branch])
-    sh(["git", "checkout", branch] if exists else ["git", "checkout", "-b", branch])
+    base = "origin/main" if sh(["git", "rev-parse", "--verify", "-q", "origin/main"], check=False) else "main"
+    if worktree:
+        cwd = os.path.join(WORKTREES, branch)
+        if not os.path.isdir(cwd):
+            os.makedirs(WORKTREES, exist_ok=True)
+            sh(["git", "worktree", "add", cwd, branch] if exists else
+               ["git", "worktree", "add", "-b", branch, cwd, base])
+    else:
+        cwd = ROOT
+        current = sh(["git", "rev-parse", "--abbrev-ref", "HEAD"])
+        if current != branch:
+            if sh(["git", "status", "--porcelain"]):
+                sys.exit("working tree not clean; commit or stash first (or use --worktree)")
+            sh(["git", "checkout", branch] if exists else ["git", "checkout", "-b", branch, base])
     sh(["gh", "issue", "edit", str(n), "-R", r, "--add-assignee", "@me", "--add-label", "status:in-progress"])
     project_set_status(n, "In Progress")
-    print(f"On branch {branch}. Issue #{n} is In Progress.")
+    return issue["title"], branch, cwd
+
+
+def cmd_start(args):
+    if not args:
+        sys.exit("usage: ./rp start <issue> [--worktree]")
+    n = int(args[0].lstrip("#"))
+    _, branch, cwd = start_issue(n, worktree="--worktree" in args)
+    print(f"On branch {branch} in {cwd}. Issue #{n} is In Progress.")
     print(f"Read it: gh issue view {n}")
+
+
+# ---------- agents ----------
+
+AGENT_DEFAULTS = {
+    "default_runner": "claude",
+    "claude": {"model": None, "headless_args": ["--permission-mode", "auto"]},
+    "codex": {"model": None, "headless_args": ["-s", "workspace-write"]},
+}
+
+
+def agent_config():
+    cfg = load_config().get("agents", {})
+    out = json.loads(json.dumps(AGENT_DEFAULTS))
+    out["default_runner"] = cfg.get("default_runner", out["default_runner"])
+    for runner in ("claude", "codex"):
+        out[runner].update(cfg.get(runner, {}))
+    return out
+
+
+def agent_prompt(n, title, branch, headless, extra):
+    lines = [
+        f"You are working on RunPro issue #{n}: {title}.",
+        f"The issue is already started and you are on branch {branch}. Do not run ./rp start again.",
+        "Follow AGENTS.md (the loop and the rules) and docs/GUIDE.md.",
+        f"Read the issue with `gh issue view {n}` and the docs it points to.",
+        "Implement it with tests (tests first for :core:* code), run ./rp check until it passes,",
+        f"and commit with a message ending in (#{n}). No Co-Authored-By trailer.",
+        "If you need the owner (a run on the watch, a decision, credentials): comment on the issue,",
+        "add the label needs-owner, and stop.",
+    ]
+    if headless:
+        lines.append("Do not push and do not open a PR. When you finish or stop, run "
+                     "./rp handoff with what was done, what is next and open problems.")
+    else:
+        lines.append("Ask me before running ./rp pr (it pushes and opens the PR).")
+    if extra:
+        lines.append(f"Additional instructions: {extra}")
+    return "\n".join(lines)
+
+
+def cmd_agent(args):
+    extra_cli = []
+    if "--" in args:
+        i = args.index("--")
+        args, extra_cli = args[:i], args[i + 1:]
+    opts = {"runner": None, "model": None, "prompt": None}
+    flags, target = set(), None
+    it = iter(args)
+    for a in it:
+        if a in ("--runner", "--model", "--prompt"):
+            opts[a[2:]] = next(it, None)
+        elif a in ("--headless", "--worktree", "--dry-run"):
+            flags.add(a[2:])
+        elif a in ("claude", "codex") and opts["runner"] is None:
+            opts["runner"] = a
+        else:
+            target = a
+    acfg = agent_config()
+    runner = opts["runner"] or acfg["default_runner"]
+    if runner not in ("claude", "codex"):
+        sys.exit("runner must be claude or codex")
+    model = opts["model"] or acfg[runner].get("model")
+    headless = "headless" in flags
+
+    if target in (None, "next"):
+        ready = ready_issues()
+        if not ready:
+            sys.exit("No ready issue (see ./rp status).")
+        n = ready[0]["number"]
+    else:
+        n = int(target.lstrip("#"))
+
+    if "dry-run" in flags:
+        title = gh_json(["issue", "view", str(n), "-R", repo(), "--json", "title"])["title"]
+        branch = f"issue-{n}-{slugify(title)}"
+        cwd = os.path.join(WORKTREES, branch) if "worktree" in flags else ROOT
+    else:
+        title, branch, cwd = start_issue(n, worktree="worktree" in flags)
+
+    prompt = agent_prompt(n, title, branch, headless, opts["prompt"])
+    if runner == "claude":
+        cmd = ["claude"]
+        if model:
+            cmd += ["--model", model]
+        if headless:
+            cmd += acfg["claude"]["headless_args"] + ["-p"]
+        cmd += extra_cli + [prompt]
+    else:
+        cmd = ["codex"]
+        if headless:
+            cmd += ["exec"] + acfg["codex"]["headless_args"]
+        if model:
+            cmd += ["-m", model]
+        cmd += ["-C", cwd] + extra_cli + [prompt]
+
+    print(f"# #{n} {title}")
+    print(f"# runner={runner} model={model or '(tool default)'} mode={'headless' if headless else 'interactive'} cwd={cwd}")
+    if "dry-run" in flags:
+        print(" ".join(c if " " not in c and "\n" not in c else repr(c) for c in cmd))
+        return
+    r = subprocess.run(cmd, cwd=cwd)
+    sys.exit(r.returncode)
 
 
 def cmd_check(_args):
@@ -309,7 +436,7 @@ def cmd_install(_args):
 
 
 COMMANDS = {"status": cmd_status, "next": cmd_next, "start": cmd_start, "check": cmd_check,
-            "pr": cmd_pr, "handoff": cmd_handoff, "install": cmd_install, "sync": cmd_sync}
+            "pr": cmd_pr, "agent": cmd_agent, "handoff": cmd_handoff, "install": cmd_install, "sync": cmd_sync}
 
 if __name__ == "__main__":
     if len(sys.argv) < 2 or sys.argv[1] not in COMMANDS:

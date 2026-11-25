@@ -5,5 +5,22 @@
     "number": 1,
     "id": "PVT_kwHOAG83Hc4BtKWh",
     "url": "https://github.com/users/jdirocco/projects/1"
+  },
+  "agents": {
+    "default_runner": "claude",
+    "claude": {
+      "model": null,
+      "headless_args": [
+        "--permission-mode",
+        "auto"
+      ]
+    },
+    "codex": {
+      "model": null,
+      "headless_args": [
+        "-s",
+        "workspace-write"
+      ]
+    }
   }
 }
