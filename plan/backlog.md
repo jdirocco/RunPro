@@ -20,7 +20,7 @@ Format of a block:
 ### m0-gradle-skeleton: Gradle multi-module project skeleton
 - milestone: M0
 - labels: area:build, type:task
-- issue:
+- issue: 1
 
 Create the Gradle project described in `docs/ARCHITECTURE.md`.
 
@@ -37,7 +37,7 @@ Create the Gradle project described in `docs/ARCHITECTURE.md`.
 - milestone: M0
 - labels: area:build, type:task
 - depends: m0-gradle-skeleton
-- issue:
+- issue: 2
 
 Turn on the Gradle steps already in `.github/workflows/ci.yml` (they run when `gradlew` exists): unit
 tests, ktlint, detekt, Android lint, `:wear:assembleDebug`. Upload the debug APK and test reports as artifacts.
@@ -48,7 +48,7 @@ tests, ktlint, detekt, Android lint, `:wear:assembleDebug`. Upload the debug APK
 - milestone: M0
 - labels: area:core, type:task
 - depends: m0-gradle-skeleton
-- issue:
+- issue: 3
 
 `:core:model`: `Sample` (timestamped, typed metric + source id), `Metric` enum (HR, location, distance,
 speed, cadence, power, elevation, accel…), `SourceId`, `Run`, `Lap`, `RunEvent` (pause, resume, lap,
@@ -60,7 +60,7 @@ source switch, sensor connected/lost), units. Monotonic time (elapsedRealtimeNan
 - milestone: M0
 - labels: area:testing, type:task
 - depends: m0-model
-- issue:
+- issue: 4
 
 `:tools:replay`: a line-based (JSONL, gzip) trace of timestamped sensor samples and BLE/GPS events.
 A `Replayer` feeds a trace into `SensorSource` fakes at real or accelerated speed. Add 3 synthetic traces
@@ -72,7 +72,7 @@ to `testdata/traces/` (30 min easy run, intervals, strap dropout).
 - milestone: M0
 - labels: area:testing, type:task
 - depends: m0-trace-format
-- issue:
+- issue: 5
 
 Wrap a trace with injected faults: process death at time t (engine torn down, restarted from journal),
 BLE disconnect / GATT 133 / silent stall, GPS loss, clock jump, storage full. Faults are declared in the
@@ -83,7 +83,7 @@ test so every reliability test (see `docs/RELIABILITY.md`) can reuse them.
 ### m0-watch-dev-setup: Watch development setup and install script
 - milestone: M0
 - labels: area:build, type:docs
-- issue:
+- issue: 6
 
 Document Wi-Fi ADB on the Galaxy Watch 5 Pro (developer options, pairing, `adb connect`) in
 `docs/WATCH_SETUP.md` and add `./rp install` that builds and installs `:wear` on the connected watch.
@@ -94,7 +94,7 @@ Document Wi-Fi ADB on the Galaxy Watch 5 Pro (developer options, pairing, `adb c
 - milestone: M1
 - labels: area:core, type:feature, reliability
 - depends: m0-model
-- issue:
+- issue: 7
 
 States: Idle → Preparing → Running ⇄ Paused → Stopped. Manual laps. Totals: elapsed and moving time,
 distance, avg/max HR, avg pace, cadence, ascent. Engine is pure Kotlin, runs on its own dispatcher (R6),
@@ -106,7 +106,7 @@ exposes `StateFlow<RunState>`.
 - milestone: M1
 - labels: area:core, type:feature, reliability
 - depends: m0-model
-- issue:
+- issue: 8
 
 `:core:journal` as described in `docs/ARCHITECTURE.md`: length-prefixed records with CRC32, flush every
 second, fsync every 5 s, reader stops at the first corrupt record. Tests: truncated file, corrupt tail,
@@ -118,7 +118,7 @@ R1 start latency.
 - milestone: M1
 - labels: area:core, type:feature, reliability
 - depends: m1-journal, m1-engine-state-machine, m0-chaos
-- issue:
+- issue: 9
 
 On start, find journals without `RunStopped`, rebuild engine state, resume recording (if the service was
 killed during a run) or offer to save. Covers R2.
@@ -129,7 +129,7 @@ killed during a run) or offer to save. Covers R2.
 - milestone: M1
 - labels: area:wear, type:feature, reliability
 - depends: m0-gradle-skeleton
-- issue:
+- issue: 10
 
 Foreground service with types `health|location|connectedDevice`, Ongoing Activity, notification.
 Permission flow: location (fine + background if needed), body sensors, BLE scan/connect, notifications,
@@ -142,7 +142,7 @@ The service restarts recording after being killed (START_STICKY + recovery).
 - milestone: M1
 - labels: area:wear, area:sensors, type:feature
 - depends: m1-foreground-service, m1-engine-state-machine
-- issue:
+- issue: 11
 
 `ExerciseClient` for `RUNNING`: capabilities check, `prepareExercise` warm-up (GPS fix and HR ready
 indicators), start/pause/resume/end, data types: location, distance, speed, HR, steps-per-minute,
@@ -155,7 +155,7 @@ Use the Health Services synthetic data provider on the emulator for an instrumen
 - milestone: M1
 - labels: area:wear, area:ui, type:feature
 - depends: m1-health-services
-- issue:
+- issue: 12
 
 Start screen with GPS and HR readiness, one run screen (time, distance, pace, HR), pause/resume, lap,
 stop with confirmation (no accidental stop), summary screen. Large fonts, round screen.
@@ -166,7 +166,7 @@ stop with confirmation (no accidental stop), summary screen. Large fonts, round 
 - milestone: M1
 - labels: area:core, type:feature, reliability
 - depends: m1-journal
-- issue:
+- issue: 13
 
 Warn at 15 % battery, end and save cleanly at 3 % (R7). Check free space before start; warn under 50 MB.
 
@@ -176,7 +176,7 @@ Warn at 15 % battery, end and save cleanly at 3 % (R7). Check free space before 
 - milestone: M1
 - labels: field-test
 - depends: m1-basic-ui, m1-recovery
-- issue:
+- issue: 14
 
 Owner runs scenarios F1, F3, F4 from `docs/FIELD_TESTING.md`, 10 runs in total, with forced kills.
 
@@ -186,7 +186,7 @@ Owner runs scenarios F1, F3, F4 from `docs/FIELD_TESTING.md`, 10 runs in total, 
 - milestone: M2
 - labels: area:ble, type:feature
 - depends: m0-model
-- issue:
+- issue: 15
 
 `:core:ble` parsers: Heart Rate Measurement (0x2A37, uint8/uint16, RR intervals, contact status),
 RSC Measurement (0x2A53: speed, cadence, stride length, distance, walk/run), Cycling Power Measurement
@@ -198,7 +198,7 @@ RSC Measurement (0x2A53: speed, cadence, stride length, distance, walk/run), Cyc
 - milestone: M2
 - labels: area:ble, type:feature, reliability
 - depends: m2-ble-parsers, m0-chaos
-- issue:
+- issue: 16
 
 The state machine in `docs/ARCHITECTURE.md` behind a `GattPort` interface: serial operation queue with
 timeouts, watchdog (no data 5 s → resubscribe → reconnect), close-before-reconnect, backoff 1/2/4/8 s
@@ -211,7 +211,7 @@ silent stalls and slow service discovery.
 - milestone: M2
 - labels: area:ble, area:wear, type:feature, reliability
 - depends: m2-gatt-state-machine, m1-foreground-service
-- issue:
+- issue: 17
 
 Real `GattPort` with `BluetoothGatt`: `TRANSPORT_LE`, `autoConnect=true` after the first connection,
 CompanionDeviceManager association to keep background rights, bond state checks, refresh of the GATT
@@ -223,7 +223,7 @@ cache on repeated failures. Runs inside `RecordingService`.
 - milestone: M2
 - labels: area:ble, area:ui, type:feature
 - depends: m2-android-gatt-adapter
-- issue:
+- issue: 18
 
 Screen to scan, add, rename and remove sensors (filter by service UUID), show battery and signal. Per
 metric source priority (e.g. HR: strap → wrist; cadence: footpod → watch; distance: GPS or footpod).
@@ -235,7 +235,7 @@ Warn when the sensor seems connected to another device.
 - milestone: M2
 - labels: area:core, type:feature, reliability
 - depends: m1-engine-state-machine, m2-gatt-state-machine
-- issue:
+- issue: 19
 
 Per-metric priority lists, stale timeouts, automatic fallback and return, `SourceSwitch` events in the
 journal (R4, R5). UI shows the active source (strap icon vs wrist icon).
@@ -246,7 +246,7 @@ journal (R4, R5). UI shows the active source (strap icon vs wrist icon).
 - milestone: M2
 - labels: area:ble, area:wear, type:feature
 - depends: m2-android-gatt-adapter
-- issue:
+- issue: 20
 
 Live view of every source (state, last sample age, RSSI, reconnect count). Rolling sensor log on disk.
 "Record debug trace" setting records a replay trace of the run. Export logs and trace to the phone.
@@ -257,7 +257,7 @@ Live view of every source (state, last sample age, RSSI, reconnect count). Rolli
 - milestone: M2
 - labels: area:ble, type:feature
 - depends: m2-android-gatt-adapter
-- issue:
+- issue: 21
 
 Running power (CPS), speed/cadence/distance (RSC), and Stryd extra metrics if available (form power,
 ground time, vertical oscillation, leg spring stiffness) via its custom characteristics.
@@ -268,7 +268,7 @@ ground time, vertical oscillation, leg spring stiffness) via its custom characte
 - milestone: M2
 - labels: field-test
 - depends: m2-source-arbitration, m2-diagnostics
-- issue:
+- issue: 22
 
 Owner runs F2 and F5 with their strap (and F6 with a footpod if available). Compare with Gear Tracker on
 the same route if possible.
@@ -279,7 +279,7 @@ the same route if possible.
 - milestone: M3
 - labels: area:ui, type:feature
 - depends: m1-basic-ui
-- issue:
+- issue: 23
 
 Field catalogue (time, lap time, distance, pace current/avg/lap, HR, HR zone, cadence, power, elevation,
 clock, battery). Layouts with 1–5 fields, several pages, rotary bezel to change page. Configured on the
@@ -291,7 +291,7 @@ watch (later also on the phone).
 - milestone: M3
 - labels: area:core, area:ui, type:feature
 - depends: m1-engine-state-machine
-- issue:
+- issue: 24
 
 Auto-lap by distance (default 1 km) with a lap summary popup. Simple interval workouts (warm-up, N × work
 / recovery by time or distance, cool-down) with countdowns and haptics.
@@ -302,7 +302,7 @@ Auto-lap by distance (default 1 km) with a lap summary popup. Simple interval wo
 - milestone: M3
 - labels: area:core, area:ui, type:feature
 - depends: m3-data-screens
-- issue:
+- issue: 25
 
 HR zones (from max HR or LTHR), pace zones. Alerts with vibration patterns: HR high/low, pace out of range,
 sensor lost / back, GPS lost / back. Alerts are rate-limited.
@@ -313,7 +313,7 @@ sensor lost / back, GPS lost / back. Alerts are rate-limited.
 - milestone: M3
 - labels: area:wear, area:ui, type:feature
 - depends: m3-data-screens
-- issue:
+- issue: 26
 
 Ambient mode with reduced updates, Ongoing Activity chip on the watch face, tile to start a run.
 Measure battery use with GPS + strap; target < 8 %/h on the Galaxy Watch 5 Pro.
@@ -324,7 +324,7 @@ Measure battery use with GPS + strap; target < 8 %/h on the Galaxy Watch 5 Pro.
 - milestone: M3
 - labels: area:ui, type:feature
 - depends: m1-basic-ui
-- issue:
+- issue: 27
 
 Units, max/resting HR, weight, auto-pause (off by default), countdown, debug trace toggle.
 
@@ -334,7 +334,7 @@ Units, max/resting HR, weight, auto-pause (off by default), countdown, debug tra
 - milestone: M4
 - labels: area:core, type:feature, reliability
 - depends: m1-journal
-- issue:
+- issue: 28
 
 `:core:fit`: journal → FIT activity file (session, laps, records, events incl. source switches, device info
 of the sensors). Decode the written file and compare with the journal before marking the run exported (R3).
@@ -345,7 +345,7 @@ of the sensors). Decode the written file and compare with the journal before mar
 - milestone: M4
 - labels: area:ui, type:feature
 - depends: m4-fit-export
-- issue:
+- issue: 29
 
 List of runs with sync state, run detail (summary, laps), retry export, delete (with confirmation).
 
@@ -355,7 +355,7 @@ List of runs with sync state, run detail (summary, laps), retry export, delete (
 - milestone: M4
 - labels: area:mobile, type:feature, reliability
 - depends: m4-fit-export
-- issue:
+- issue: 30
 
 `:mobile` app receives FIT files through the Wearable Data Layer (`ChannelClient`), stores them, sends an
 ack; the watch keeps the journal until the ack arrives. Retries when the phone comes back in range.
@@ -366,7 +366,7 @@ ack; the watch keeps the journal until the ack arrives. Retries when the phone c
 - milestone: M4
 - labels: area:mobile, type:feature
 - depends: m4-phone-companion
-- issue:
+- issue: 31
 
 OAuth on the phone, upload FIT, poll upload status, show the link. Auto-upload option. Activity type Run.
 
@@ -376,7 +376,7 @@ OAuth on the phone, upload FIT, poll upload status, show the link. Auto-upload o
 - milestone: M4
 - labels: area:mobile, type:feature
 - depends: m4-phone-companion
-- issue:
+- issue: 32
 
 Write `ExerciseSessionRecord` (running) with route, HR series, distance, steps, laps to Health Connect.
 
@@ -386,7 +386,7 @@ Write `ExerciseSessionRecord` (running) with route, HR series, distance, steps, 
 - milestone: M5
 - labels: area:dynamics, area:wear, type:feature
 - depends: m1-foreground-service, m0-trace-format
-- issue:
+- issue: 33
 
 Record the accelerometer (and gyroscope if useful) at 50 Hz during runs into the trace and a compact
 journal stream. Measure the battery cost.
@@ -397,7 +397,7 @@ journal stream. Measure the battery cost.
 - milestone: M5
 - labels: area:dynamics, type:feature
 - depends: m5-imu-capture
-- issue:
+- issue: 34
 
 Pure Kotlin estimators from wrist IMU: cadence, stride length (with GPS speed), vertical oscillation,
 ground contact time, asymmetry, regularity. Validate against the reference runs; document error and
@@ -409,7 +409,7 @@ tolerances in `docs/DYNAMICS.md`. Values are shown as estimates.
 - milestone: M5
 - labels: area:dynamics, area:ui, type:feature
 - depends: m5-dynamics-estimators, m4-history
-- issue:
+- issue: 35
 
 Watch: summary of dynamics per run and per lap with simple ratings. Phone: charts of pace, HR, cadence,
 dynamics over the run. Dynamics also written to the FIT file as developer fields.
@@ -420,7 +420,7 @@ dynamics over the run. Dynamics also written to the FIT file as developer fields
 - milestone: M6
 - labels: area:release, type:task
 - depends: m4-strava
-- issue:
+- issue: 36
 
 App signing, internal testing track for `:wear` and `:mobile`, privacy policy, data safety form,
 health permissions declaration, store listing. Release workflow in GitHub Actions on tags.
@@ -431,7 +431,7 @@ health permissions declaration, store listing. Release workflow in GitHub Action
 - milestone: M6
 - labels: field-test, reliability
 - depends: m6-play-console, m2-field-validation
-- issue:
+- issue: 37
 
 Daily use for two weeks as the only running app. Local crash log (no third-party analytics) exported with
 the diagnostics.
@@ -442,7 +442,7 @@ the diagnostics.
 - milestone: M6
 - labels: area:release, type:task
 - depends: m6-beta-soak
-- issue:
+- issue: 38
 
 Changelog, version 1.0.0, promote to production (or keep private), tag `v1.0.0`.
 
