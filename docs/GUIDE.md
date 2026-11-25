@@ -155,9 +155,18 @@ Codex always runs with `-s workspace-write` plus:
 
 - write access to `sandbox_workspace_write.writable_roots` = the repository `.git` (otherwise commits fail:
   the sandbox protects `.git`) and the build caches (`~/.gradle`, `~/.m2`, `~/.android`, `~/.konan`);
+- with `--worktree`, also the worktree's own git dir (`.git/worktrees/<branch>`). Codex reads the worktree's
+  `.git` file and makes that directory read-only even though it lies under `.git`, so without it `git add`
+  fails with `index.lock: Operation not permitted`. `./rp agent` adds it at launch; `--dry-run` shows it:
+  ```
+  $ ./rp agent 6 codex --worktree --dry-run
+  codex -s workspace-write -c 'sandbox_workspace_write.writable_roots=[".../RunPro/.git", ...,
+    ".../RunPro/.git/worktrees/issue-6-watch-development-setup-and-install-scri"]' ...
+  ```
 - network access (`network_access: true`) for Gradle dependencies, `gh` and `git push`.
 
-Edit these in `plan/config.json`. To drop the sandbox completely (not recommended), set
+Agents use the `gh` CLI for issue comments and labels: in `-a never` mode a GitHub connector/MCP tool is
+rejected because it needs an approval. Edit these in `plan/config.json`. To drop the sandbox completely (not recommended), set
 `codex.auto_args` to `["--dangerously-bypass-approvals-and-sandbox"]`.
 
 Notes:
