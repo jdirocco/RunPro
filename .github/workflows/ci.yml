@@ -4,32 +4,55 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # One run per branch/PR: a new push cancels the outdated run (never on main).
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   build:
+    name: Check and assemble
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+
       - name: Check rp harness
         run: python3 -m py_compile rp
-      - name: Detect Gradle project
-        id: gradle
-        run: echo "present=$([ -f gradlew ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-      - uses: actions/setup-java@v4
-        if: steps.gradle.outputs.present == 'true'
+
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "21"
-      - uses: gradle/actions/setup-gradle@v4
-        if: steps.gradle.outputs.present == 'true'
-      - name: Check
-        if: steps.gradle.outputs.present == 'true'
+
+      # Validates the Gradle wrapper JAR and caches Gradle downloads and build outputs.
+      # Pinned to v5 (MIT): v6 moves caching into a proprietary component with separate terms of use.
+      - uses: gradle/actions/setup-gradle@v5
+
+      # `check` = unit + replay tests, ktlint, detekt and Android lint on every module (same gate as ./rp check).
+      - name: Check (tests, ktlint, detekt, lint) and assemble the Wear debug APK
         run: ./gradlew check :wear:assembleDebug --continue
-      - name: Upload APK and reports
-        if: steps.gradle.outputs.present == 'true' && always()
-        uses: actions/upload-artifact@v4
+
+      - name: Upload Wear debug APK
+        uses: actions/upload-artifact@v7
         with:
-          name: build-outputs
+          name: wear-debug-apk
+          path: wear/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload test and analysis reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: reports
           path: |
-            wear/build/outputs/apk/debug/*.apk
             **/build/reports/
+            **/build/test-results/
+          if-no-files-found: warn
+          retention-days: 14
