@@ -296,7 +296,8 @@ AGENT_DEFAULTS = {
     "codex": {
         "model": None,
         # Codex always runs in its workspace-write sandbox, with network (Gradle, gh, git push) and
-        # write access to .git (commits) and the build caches.
+        # write access to .git (commits) and the build caches. With --worktree the worktree's own git
+        # dir (.git/worktrees/<name>) is added at launch: Codex protects it otherwise.
         "sandbox_writable_roots": [".git", "~/.gradle", "~/.m2", "~/.android", "~/.konan"],
         "network_access": True,
         "headless_args": [],
@@ -305,11 +306,34 @@ AGENT_DEFAULTS = {
 }
 
 
-def codex_sandbox_args(acfg):
+def worktree_git_dir(cwd):
+    """The per-worktree git dir (.git/worktrees/<name>) of a linked worktree, or None.
+
+    Codex resolves the `.git` file of its working directory and makes that git dir read-only, even when
+    it lies under a writable root, so a linked worktree's own git dir must be listed explicitly."""
+    if not os.path.isfile(os.path.join(cwd, ".git")):
+        return None
+    r = subprocess.run(["git", "rev-parse", "--absolute-git-dir"], cwd=cwd, text=True, capture_output=True)
+    return (r.stdout.strip() or None) if r.returncode == 0 else None
+
+
+def git_common_dir():
+    """The repository's shared .git directory, also when ./rp runs from a linked worktree."""
+    r = subprocess.run(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"], cwd=ROOT,
+                       text=True, capture_output=True)
+    return r.stdout.strip() if r.returncode == 0 and r.stdout.strip() else os.path.join(ROOT, ".git")
+
+
+def codex_sandbox_args(acfg, cwd=ROOT):
     roots = []
     for p in acfg["codex"]["sandbox_writable_roots"]:
         p = os.path.expanduser(p)
+        if p == ".git":
+            p = git_common_dir()
         roots.append(p if os.path.isabs(p) else os.path.join(ROOT, p))
+    git_dir = worktree_git_dir(cwd)
+    if git_dir and git_dir not in roots:
+        roots.append(git_dir)
     args = ["-s", "workspace-write", "-c", "sandbox_workspace_write.writable_roots=" + json.dumps(roots)]
     if acfg["codex"].get("network_access"):
         args += ["-c", "sandbox_workspace_write.network_access=true"]
@@ -335,6 +359,7 @@ def agent_prompt(n, title, branch, headless, extra, auto=False):
         f"and commit with a message ending in (#{n}). No Co-Authored-By trailer.",
         "If you need the owner (a run on the watch, a decision, credentials): comment on the issue,",
         "add the label needs-owner, and stop.",
+        "Use the gh CLI for GitHub (issue comments, labels, PRs), not a GitHub connector or MCP tool.",
     ]
     if auto:
         lines.append("You run in autonomous mode: never ask the user for confirmation and never wait for input. "
@@ -409,7 +434,7 @@ def cmd_agent(args):
             cmd += acfg["codex"]["auto_args"]  # approval policy is a top-level option
         if headless:
             cmd += ["exec"] + acfg["codex"]["headless_args"]
-        cmd += codex_sandbox_args(acfg)
+        cmd += codex_sandbox_args(acfg, cwd)
         if model:
             cmd += ["-m", model]
         cmd += ["-C", cwd] + extra_cli + [prompt]
