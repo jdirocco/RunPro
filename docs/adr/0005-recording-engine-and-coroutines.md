@@ -1,4 +1,4 @@
-# ADR 0004: Recording engine design and kotlinx.coroutines
+# ADR 0005: Recording engine design and kotlinx.coroutines
 
 - Status: proposed (accepted when issue #7 is merged)
 - Date: 2026-11-25
