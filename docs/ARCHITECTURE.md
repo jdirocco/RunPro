@@ -42,6 +42,15 @@ SensorManager accelerometer ────┘                           │       
 - Source arbitration: per metric a priority list (e.g. HR: strap → wrist). A source is *stale* after a
   timeout; the engine switches to the next one and writes a source-switch event (R5).
 
+## Recording engine (`:core:recording`)
+
+- `RecordingStateMachine` is pure and deterministic: phases (Idle → Preparing → Running ⇄ Paused → Stopped,
+  Reset back to Idle), run events, manual laps and totals (elapsed, timer, moving time, distance, average and
+  max HR, average pace, cadence, ascent and descent). Inputs carry their own monotonic timestamps; samples
+  are judged by their timestamp against the run timeline, so late batched samples still count.
+- `RecordingEngine` runs it on its own thread (R6): `submit` never blocks, and the state is published as a
+  `StateFlow<RunState>` that never waits for the UI. Design and defaults: ADR 0004.
+
 ## BLE connection state machine
 
 ```
