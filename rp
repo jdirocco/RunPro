@@ -21,6 +21,7 @@ Commands:
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from datetime import datetime
@@ -263,6 +264,7 @@ def start_issue(n, worktree=False):
             os.makedirs(WORKTREES, exist_ok=True)
             sh(["git", "worktree", "add", cwd, branch] if exists else
                ["git", "worktree", "add", "-b", branch, cwd, base])
+        ensure_local_properties(cwd)
     else:
         cwd = ROOT
         current = sh(["git", "rev-parse", "--abbrev-ref", "HEAD"])
@@ -322,6 +324,20 @@ def git_common_dir():
     r = subprocess.run(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"], cwd=ROOT,
                        text=True, capture_output=True)
     return r.stdout.strip() if r.returncode == 0 and r.stdout.strip() else os.path.join(ROOT, ".git")
+
+
+def ensure_local_properties(cwd):
+    """Copy the main checkout's ignored local.properties (sdk.dir) into the linked worktree `cwd`.
+
+    `git worktree add` does not carry ignored files, so Gradle in a new worktree fails with "SDK location
+    not found" unless ANDROID_HOME is set. An existing file is never overwritten. Returns the copied path,
+    or None when nothing was copied."""
+    dest = os.path.join(cwd, "local.properties")
+    src = os.path.join(os.path.dirname(git_common_dir()), "local.properties")
+    if os.path.exists(dest) or not os.path.isfile(src) or os.path.realpath(src) == os.path.realpath(dest):
+        return None
+    shutil.copyfile(src, dest)
+    return dest
 
 
 def codex_sandbox_args(acfg, cwd=ROOT):
@@ -451,6 +467,10 @@ def cmd_agent(args):
 
 def cmd_check(_args):
     if os.path.exists(os.path.join(ROOT, "gradlew")):
+        if not (os.environ.get("ANDROID_HOME") or os.environ.get("ANDROID_SDK_ROOT")):
+            copied = ensure_local_properties(ROOT)  # worktrees created before ./rp copied it
+            if copied:
+                print(f"Copied local.properties from the main checkout to {copied}", flush=True)
         r = subprocess.run(["./gradlew", "check", "--continue"], cwd=ROOT)
         sys.exit(r.returncode)
     print("No Gradle project yet (see the m0-gradle-skeleton issue). Nothing to check.")
