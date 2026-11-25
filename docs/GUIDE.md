@@ -9,12 +9,13 @@ Everything runs from the repository root: `/Users/juridirocco/development/RunPro
 |---|---|---|
 | `./rp` | repo root | CLI that wraps git + GitHub: status, next task, start, launch an agent (Claude Code or Codex), check, PR, handoff, install |
 | Backlog | GitHub issues (seeded from `plan/backlog.md`) | One issue = one branch = one PR |
-| Milestones | GitHub milestones M0–M6 | Release phases (see `docs/PLAN.md`) |
+| Milestones | GitHub milestones M0–M7, with due dates | Release phases (see `docs/PLAN.md`) |
 | Board | https://github.com/users/jdirocco/projects/1 | Todo / In Progress / Done |
 | Agent rules | `AGENTS.md` (loaded by Claude Code through `CLAUDE.md`) | The loop and the rules every agent follows |
 | Skill | `.claude/skills/runpro-task/` | "Take the next task" in one sentence |
 | Invariants | `docs/RELIABILITY.md` | R1–R8: what can never break |
 | Field tests | `docs/FIELD_TESTING.md` + "Field report" issue template | Your runs on the watch, fed back to agents |
+| Watch setup (Italian) | `docs/it/CONFIGURAZIONE_OROLOGIO.md` | Developer options, Wi-Fi ADB, install, permissions, battery, strap |
 | Handoff log | `docs/HANDOFF.md` | Notes between sessions |
 | CI | `.github/workflows/ci.yml` | Runs on every push to `main` and every PR: `./gradlew check :wear:assembleDebug` (tests, ktlint, detekt, lint). Artifacts: `wear-debug-apk` and `reports` (14 days) |
 
@@ -85,7 +86,8 @@ It refuses to run with uncommitted changes. It updates `main`, creates (or reuse
 the issue to you, adds `status:in-progress` and moves the card to In Progress.
 
 With `--worktree` the branch is created in `../RunPro-worktrees/<branch>` and this checkout is left alone
-(use it for parallel work).
+(use it for parallel work). `git worktree add` does not carry ignored files, so `./rp` copies this
+checkout's `local.properties` (the `sdk.dir` line) into the new worktree; an existing one is kept.
 
 ### `./rp agent`: launch Claude Code or Codex on an issue
 
@@ -171,9 +173,18 @@ Codex always runs with `-s workspace-write` plus:
 
 - write access to `sandbox_workspace_write.writable_roots` = the repository `.git` (otherwise commits fail:
   the sandbox protects `.git`) and the build caches (`~/.gradle`, `~/.m2`, `~/.android`, `~/.konan`);
+- with `--worktree`, also the worktree's own git dir (`.git/worktrees/<branch>`). Codex reads the worktree's
+  `.git` file and makes that directory read-only even though it lies under `.git`, so without it `git add`
+  fails with `index.lock: Operation not permitted`. `./rp agent` adds it at launch; `--dry-run` shows it:
+  ```
+  $ ./rp agent 6 codex --worktree --dry-run
+  codex -s workspace-write -c 'sandbox_workspace_write.writable_roots=[".../RunPro/.git", ...,
+    ".../RunPro/.git/worktrees/issue-6-watch-development-setup-and-install-scri"]' ...
+  ```
 - network access (`network_access: true`) for Gradle dependencies, `gh` and `git push`.
 
-Edit these in `plan/config.json`. To drop the sandbox completely (not recommended), set
+Agents use the `gh` CLI for issue comments and labels: in `-a never` mode a GitHub connector/MCP tool is
+rejected because it needs an approval. Edit these in `plan/config.json`. To drop the sandbox completely (not recommended), set
 `codex.auto_args` to `["--dangerously-bypass-approvals-and-sandbox"]`.
 
 Notes:
@@ -183,11 +194,18 @@ Notes:
 
 ### `./rp check`: local quality gate
 
-Runs `./gradlew check --continue`: JVM tests, local Android UI tests, ktlint, detekt and Android lint.
-Replay and chaos tests join this gate as their issues are implemented.
+Runs `./gradlew check --continue`: Python harness tests, JVM tests, replay tests, local Android UI tests,
+ktlint, detekt and Android lint. Chaos tests join this gate as their issues are implemented.
 
 For the Gradle skeleton, install JDK 21 and Android SDK platform 37.0 with build-tools 37.0.0. Point
 `ANDROID_HOME` at the SDK, or create an ignored `local.properties` containing `sdk.dir=/path/to/sdk`.
+In a worktree without `local.properties` and with neither `ANDROID_HOME` nor `ANDROID_SDK_ROOT` set,
+`./rp check` first copies the file from the main checkout (this fixes worktrees created before #52):
+
+```
+$ cd ../RunPro-worktrees/issue-3-core-domain-model && ./rp check
+Copied local.properties from the main checkout to .../issue-3-core-domain-model/local.properties
+```
 No globally installed Gradle is needed. The first build downloads Gradle and Maven dependencies.
 
 ```
@@ -196,7 +214,20 @@ $ sdkmanager "platforms;android-37.0" "build-tools;37.0.0" "platform-tools"
 $ ./rp check                                 # all nine modules + root build-script formatting
 $ ./gradlew :wear:assembleDebug               # wear/build/outputs/apk/debug/wear-debug.apk
 $ ./gradlew :core:model:test :tools:replay:test # JVM tests without a watch or emulator
+$ python3 -B -m unittest discover -s tests -v  # harness tests without an SDK or device
 $ ./gradlew ktlintFormat                      # format Kotlin and Gradle Kotlin scripts
+$ ./gradlew :tools:replay:generateSyntheticTraces  # rewrite testdata/traces/ after changing SyntheticTraces
+```
+
+Replay traces live in `testdata/traces/` (see its `README.md`; format in `docs/adr/0004-replay-trace-format.md`).
+A test replays one like this:
+
+```kotlin
+val replayer = Replayer(Trace.read(Paths.get(System.getProperty("runpro.traces"), "strap-dropout.jsonl.gz")))
+val strap = CollectingListener()                    // any SensorListener: the engine, a fake
+replayer.source(SyntheticTraces.STRAP).start(strap)  // sources nobody starts are dropped
+replayer.run()                                       // ReplaySpeed.UNLIMITED by default
+assertEquals(1_125, strap.samples.size)
 ```
 
 The JVM modules share build contract tests from `build-support/src/test/kotlin`: they verify Java 21
@@ -233,10 +264,22 @@ $ ./rp handoff "Journal writer done, reader missing corrupt-tail test. Next: CRC
 
 Appends a dated entry to `docs/HANDOFF.md` with the current branch.
 
-### `./rp install`: put the build on the watch
+### `./rp install [SERIAL]`: put the build on the watch
 
-Builds `:wear` and installs it with `adb` on the watch connected over Wi-Fi ADB (setup comes with issue #6,
-`docs/WATCH_SETUP.md`).
+Follow [WATCH_SETUP.md](WATCH_SETUP.md) to enable developer options, pair, and connect the Galaxy Watch
+5 Pro over Wi-Fi ADB. Put SDK `platform-tools` on `PATH`. Once connected:
+
+```sh
+./rp install                                 # use the sole connected ADB device
+ANDROID_SERIAL=192.0.2.10:39517 ./rp install   # select the watch when a phone is also connected
+./rp install 192.0.2.10:39517                 # explicit serial overrides ANDROID_SERIAL
+```
+
+Use your watch's serial from `adb devices -l` in place of the example. The command rejects ambiguous,
+offline, unauthorized and non-watch targets before building. It builds `:wear:assembleDebug` and installs
+`wear/build/outputs/apk/debug/wear-debug.apk` with `adb -s SERIAL install -r`, retaining app data.
+Finish any active workout before installing. Confirm `Success` and open RunPro on the watch; the
+physical acceptance check and troubleshooting steps are in [WATCH_SETUP.md](WATCH_SETUP.md).
 
 ### `./rp sync`: push new backlog items to GitHub
 

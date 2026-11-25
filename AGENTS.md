@@ -33,7 +33,8 @@ yourself when `./rp check` passes, never merge, and use `./rp handoff` if you ca
 - New dependencies or architecture changes need an ADR in `docs/adr/`.
 - New tasks discovered while working: add an issue with `gh issue create` (milestone + labels), do not
   widen the current PR.
-- English for code, comments, commits, issues and docs.
+- English for code, comments, commits, issues and docs. Exception: `docs/it/` holds owner guides in Italian;
+  when you change a behaviour they describe (watch setup, permissions, field tests), update them too.
 - Commits are authored by the owner only: no `Co-Authored-By` trailers, no "Generated with" lines.
 - Never commit secrets (Strava client secret, keystores). Use `local.properties` / GitHub secrets.
 

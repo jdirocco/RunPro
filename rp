@@ -15,12 +15,13 @@ Commands:
   check               run the local quality gate (./gradlew check, or a notice if no Gradle yet)
   pr                  push the branch and open a PR that closes the issue
   handoff "<text>"    append a handoff note to docs/HANDOFF.md
-  install             build and install :wear on the connected watch (adb)
+  install [SERIAL]    build and install :wear on one watch (default: ANDROID_SERIAL or sole device)
   sync                create labels, milestones, issues from plan/backlog.md, add them to the Project
 """
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -39,6 +40,7 @@ MILESTONES = {
     "M4": "M4 Export and sync",
     "M5": "M5 Running analysis",
     "M6": "M6 Release",
+    "M7": "M7 Phone app",
 }
 LABELS = {
     "type:task": "c5def5", "type:feature": "a2eeef", "type:docs": "0075ca", "bug": "d73a4a",
@@ -321,6 +323,7 @@ def start_issue(n, worktree=False):
             os.makedirs(WORKTREES, exist_ok=True)
             sh(["git", "worktree", "add", cwd, branch] if exists else
                ["git", "worktree", "add", "-b", branch, cwd, base])
+        ensure_local_properties(cwd)
     else:
         cwd = ROOT
         current = sh(["git", "rev-parse", "--abbrev-ref", "HEAD"])
@@ -354,7 +357,8 @@ AGENT_DEFAULTS = {
     "codex": {
         "model": None,
         # Codex always runs in its workspace-write sandbox, with network (Gradle, gh, git push) and
-        # write access to .git (commits) and the build caches.
+        # write access to .git (commits) and the build caches. With --worktree the worktree's own git
+        # dir (.git/worktrees/<name>) is added at launch: Codex protects it otherwise.
         "sandbox_writable_roots": [".git", "~/.gradle", "~/.m2", "~/.android", "~/.konan"],
         "network_access": True,
         "headless_args": [],
@@ -363,11 +367,48 @@ AGENT_DEFAULTS = {
 }
 
 
-def codex_sandbox_args(acfg):
+def worktree_git_dir(cwd):
+    """The per-worktree git dir (.git/worktrees/<name>) of a linked worktree, or None.
+
+    Codex resolves the `.git` file of its working directory and makes that git dir read-only, even when
+    it lies under a writable root, so a linked worktree's own git dir must be listed explicitly."""
+    if not os.path.isfile(os.path.join(cwd, ".git")):
+        return None
+    r = subprocess.run(["git", "rev-parse", "--absolute-git-dir"], cwd=cwd, text=True, capture_output=True)
+    return (r.stdout.strip() or None) if r.returncode == 0 else None
+
+
+def git_common_dir():
+    """The repository's shared .git directory, also when ./rp runs from a linked worktree."""
+    r = subprocess.run(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"], cwd=ROOT,
+                       text=True, capture_output=True)
+    return r.stdout.strip() if r.returncode == 0 and r.stdout.strip() else os.path.join(ROOT, ".git")
+
+
+def ensure_local_properties(cwd):
+    """Copy the main checkout's ignored local.properties (sdk.dir) into the linked worktree `cwd`.
+
+    `git worktree add` does not carry ignored files, so Gradle in a new worktree fails with "SDK location
+    not found" unless ANDROID_HOME is set. An existing file is never overwritten. Returns the copied path,
+    or None when nothing was copied."""
+    dest = os.path.join(cwd, "local.properties")
+    src = os.path.join(os.path.dirname(git_common_dir()), "local.properties")
+    if os.path.exists(dest) or not os.path.isfile(src) or os.path.realpath(src) == os.path.realpath(dest):
+        return None
+    shutil.copyfile(src, dest)
+    return dest
+
+
+def codex_sandbox_args(acfg, cwd=ROOT):
     roots = []
     for p in acfg["codex"]["sandbox_writable_roots"]:
         p = os.path.expanduser(p)
+        if p == ".git":
+            p = git_common_dir()
         roots.append(p if os.path.isabs(p) else os.path.join(ROOT, p))
+    git_dir = worktree_git_dir(cwd)
+    if git_dir and git_dir not in roots:
+        roots.append(git_dir)
     args = ["-s", "workspace-write", "-c", "sandbox_workspace_write.writable_roots=" + json.dumps(roots)]
     if acfg["codex"].get("network_access"):
         args += ["-c", "sandbox_workspace_write.network_access=true"]
@@ -393,6 +434,7 @@ def agent_prompt(n, title, branch, headless, extra, auto=False):
         f"and commit with a message ending in (#{n}). No Co-Authored-By trailer.",
         "If you need the owner (a run on the watch, a decision, credentials): comment on the issue,",
         "add the label needs-owner, and stop.",
+        "Use the gh CLI for GitHub (issue comments, labels, PRs), not a GitHub connector or MCP tool.",
     ]
     if auto:
         lines.append("You run in autonomous mode: never ask the user for confirmation and never wait for input. "
@@ -467,7 +509,7 @@ def cmd_agent(args):
             cmd += acfg["codex"]["auto_args"]  # approval policy is a top-level option
         if headless:
             cmd += ["exec"] + acfg["codex"]["headless_args"]
-        cmd += codex_sandbox_args(acfg)
+        cmd += codex_sandbox_args(acfg, cwd)
         if model:
             cmd += ["-m", model]
         cmd += ["-C", cwd] + extra_cli + [prompt]
@@ -484,6 +526,10 @@ def cmd_agent(args):
 
 def cmd_check(_args):
     if os.path.exists(os.path.join(ROOT, "gradlew")):
+        if not (os.environ.get("ANDROID_HOME") or os.environ.get("ANDROID_SDK_ROOT")):
+            copied = ensure_local_properties(ROOT)  # worktrees created before ./rp copied it
+            if copied:
+                print(f"Copied local.properties from the main checkout to {copied}", flush=True)
         r = subprocess.run(["./gradlew", "check", "--continue"], cwd=ROOT)
         sys.exit(r.returncode)
     print("No Gradle project yet (see the m0-gradle-skeleton issue). Nothing to check.")
@@ -523,12 +569,47 @@ def cmd_handoff(args):
     print("handoff appended to docs/HANDOFF.md")
 
 
-def cmd_install(_args):
+def cmd_install(args):
+    if len(args) > 1:
+        sys.exit("usage: ./rp install [SERIAL] (or set ANDROID_SERIAL)")
     if not os.path.exists(os.path.join(ROOT, "gradlew")):
         sys.exit("No Gradle project yet.")
-    devices = sh(["adb", "devices"])
-    print(devices)
-    r = subprocess.run(["./gradlew", ":wear:installDebug"], cwd=ROOT)
+    setup = "See docs/WATCH_SETUP.md."
+    try:
+        listing = sh(["adb", "devices", "-l"])
+    except FileNotFoundError:
+        sys.exit(f"adb not found. Install Android SDK platform-tools and add it to PATH. {setup}")
+    print(listing, flush=True)
+    devices = {}
+    for line in listing.splitlines():
+        fields = line.split()
+        if len(fields) >= 2 and not line.startswith(("List of devices", "*")):
+            devices[fields[0]] = fields[1]
+    serial = args[0] if args else os.environ.get("ANDROID_SERIAL")
+    if not serial:
+        if not devices:
+            sys.exit(f"No ADB devices found. Pair and connect the watch over Wi-Fi first. {setup}")
+        if len(devices) != 1:
+            sys.exit("Multiple ADB devices found. Use ./rp install SERIAL or set ANDROID_SERIAL. " + setup)
+        serial = next(iter(devices))
+    if serial not in devices:
+        sys.exit(f"ADB device {serial} is not connected. Check adb devices -l and ANDROID_SERIAL. {setup}")
+    if devices[serial] != "device":
+        sys.exit(f"ADB device {serial} is {devices[serial]}. Authorize or reconnect the watch. {setup}")
+    adb = ["adb", "-s", serial]
+    characteristics = sh(adb + ["shell", "getprop", "ro.build.characteristics"])
+    if "watch" not in characteristics.split(","):
+        sys.exit(f"ADB device {serial} does not identify as a watch. Select the Wear OS device. {setup}")
+
+    print(f"Building :wear for {serial}...", flush=True)
+    r = subprocess.run(["./gradlew", ":wear:assembleDebug"], cwd=ROOT)
+    if r.returncode != 0:
+        sys.exit(r.returncode)
+    apk = os.path.join(ROOT, "wear", "build", "outputs", "apk", "debug", "wear-debug.apk")
+    if not os.path.isfile(apk):
+        sys.exit(f"Wear debug APK not found after build: {apk}")
+    print(f"Installing {apk} on {serial}...", flush=True)
+    r = subprocess.run(adb + ["install", "-r", apk], cwd=ROOT)
     sys.exit(r.returncode)
 
 

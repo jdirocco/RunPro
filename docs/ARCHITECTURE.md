@@ -18,6 +18,19 @@
 Rule: everything under `:core:*` and `:tools:*` is plain Kotlin/JVM and fully unit-testable.
 Android code in `:wear` and `:mobile` is a thin adapter layer.
 
+## Domain model (`:core:model`)
+
+- `Sample`: one reading of one `Metric` (heart rate, location, distance, speed, cadence, power, elevation,
+  acceleration) from one `SourceId` (`watch:health-services`, `watch:imu`, `ble:<address>`, `derived`).
+- `Timestamp`: monotonic `elapsedRealtimeNanos` (durations, ordering within one boot) plus wall clock millis.
+- `Run`: the ordered `RunEvent`s (started, paused, resumed, lap, source switched, sensor connected/lost,
+  stopped); laps, start and stop are derived from them.
+- Units are SI value classes with conversions for display and FIT. JSON via `ModelJson` (ADR 0003).
+- `SensorEvent`: a change in a sensor's state reported by its adapter (connected, disconnected with the
+  GATT status, GPS lost / acquired). Inputs to the engine, unlike `RunEvent`s, which are its decisions.
+- `SensorSource` / `SensorListener`: the callback contract every producer of samples implements (Health
+  Services, GATT, accelerometer, replayed trace). `start(listener)` until `stop()`; listeners never block (R6).
+
 ## Recording data flow
 
 ```
@@ -32,6 +45,21 @@ SensorManager accelerometer ────┘                           │       
   It owns the engine. The UI binds to it and only reads `StateFlow`s.
 - Source arbitration: per metric a priority list (e.g. HR: strap → wrist). A source is *stale* after a
   timeout; the engine switches to the next one and writes a source-switch event (R5).
+
+## Replay traces (`:tools:replay`)
+
+A trace is gzip-compressed JSON Lines: a `trace_header` line, then one `Sample` or `SensorEvent` per line in
+delivery order (ADR 0004). `TraceRecorder` is a `SensorListener` that writes one (thread safe, gzip sync
+flush); `TraceReader` reads it back and keeps every complete record of a trace whose recorder was killed.
+`Replayer` exposes one fake `SensorSource` per source in the trace and delivers the records in file order,
+paced by a `ReplayClock` at real time, N× or without waiting. Traces live in `testdata/traces/`.
+
+```
+testdata/traces/*.jsonl.gz ─► TraceReader ─► Trace ─► Replayer ─► ReplaySensorSource (one per SourceId)
+                                                                          │ SensorListener
+real or replayed SensorSource ─► TraceRecorder ─► *.jsonl.gz              ▼
+                                                                 engine / test consumer
+```
 
 ## BLE connection state machine
 
@@ -51,3 +79,12 @@ Length-prefixed protobuf records with CRC32: `RunStarted`, `Sample(batch)`, `Lap
 `SourceSwitch`, `SensorEvent`, `RunStopped`. A reader stops at the first corrupt record and keeps everything
 before it. On app start, any journal without `RunStopped` is offered for recovery (and auto-recovered if the
 service was killed during a run).
+
+## Recording engine (`:core:recording`)
+
+- `RecordingStateMachine` is pure and deterministic: phases (Idle → Preparing → Running ⇄ Paused → Stopped,
+  Reset back to Idle), run events, manual laps and totals (elapsed, timer, moving time, distance, average and
+  max HR, average pace, cadence, ascent and descent). Inputs carry their own monotonic timestamps; samples
+  are judged by their timestamp against the run timeline, so late batched samples still count.
+- `RecordingEngine` runs it on its own thread (R6): `submit` never blocks, and the state is published as a
+  `StateFlow<RunState>` that never waits for the UI. Design and defaults: ADR 0005.

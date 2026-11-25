@@ -1,6 +1,6 @@
 # ADR 0002: Gradle build foundation
 
-- Status: proposed (accepted when issue #1 is merged)
+- Status: accepted (issue #1 merged; detekt 2 alpha confirmed by the owner on 2026-11-25)
 - Date: 2026-11-25
 
 ## Context
