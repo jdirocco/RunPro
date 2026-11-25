@@ -177,8 +177,8 @@ Notes:
 
 ### `./rp check`: local quality gate
 
-Runs `./gradlew check --continue`: Python harness tests, JVM tests, local Android UI tests, ktlint, detekt and Android lint.
-Replay and chaos tests join this gate as their issues are implemented.
+Runs `./gradlew check --continue`: Python harness tests, JVM tests, replay tests, local Android UI tests,
+ktlint, detekt and Android lint. Chaos tests join this gate as their issues are implemented.
 
 For the Gradle skeleton, install JDK 21 and Android SDK platform 37.0 with build-tools 37.0.0. Point
 `ANDROID_HOME` at the SDK, or create an ignored `local.properties` containing `sdk.dir=/path/to/sdk`.
@@ -199,6 +199,18 @@ $ ./gradlew :wear:assembleDebug               # wear/build/outputs/apk/debug/wea
 $ ./gradlew :core:model:test :tools:replay:test # JVM tests without a watch or emulator
 $ python3 -B -m unittest discover -s tests -v  # harness tests without an SDK or device
 $ ./gradlew ktlintFormat                      # format Kotlin and Gradle Kotlin scripts
+$ ./gradlew :tools:replay:generateSyntheticTraces  # rewrite testdata/traces/ after changing SyntheticTraces
+```
+
+Replay traces live in `testdata/traces/` (see its `README.md`; format in `docs/adr/0004-replay-trace-format.md`).
+A test replays one like this:
+
+```kotlin
+val replayer = Replayer(Trace.read(Paths.get(System.getProperty("runpro.traces"), "strap-dropout.jsonl.gz")))
+val strap = CollectingListener()                    // any SensorListener: the engine, a fake
+replayer.source(SyntheticTraces.STRAP).start(strap)  // sources nobody starts are dropped
+replayer.run()                                       // ReplaySpeed.UNLIMITED by default
+assertEquals(1_125, strap.samples.size)
 ```
 
 The JVM modules share build contract tests from `build-support/src/test/kotlin`: they verify Java 21
