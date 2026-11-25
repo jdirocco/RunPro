@@ -1,0 +1,318 @@
+#!/usr/bin/env python3
+"""rp: RunPro development harness.
+
+Commands:
+  status              milestones, work in progress, open PRs, next tasks
+  next                the next ready issue (open, unassigned, dependencies closed)
+  start <N>           assign issue N, mark it In Progress, create branch issue-<N>-<slug>
+  check               run the local quality gate (./gradlew check, or a notice if no Gradle yet)
+  pr                  push the branch and open a PR that closes the issue
+  handoff "<text>"    append a handoff note to docs/HANDOFF.md
+  install             build and install :wear on the connected watch (adb)
+  sync                create labels, milestones, issues from plan/backlog.md, add them to the Project
+"""
+import json
+import os
+import re
+import subprocess
+import sys
+from datetime import datetime
+
+ROOT = os.path.dirname(os.path.abspath(__file__))
+BACKLOG = os.path.join(ROOT, "plan", "backlog.md")
+CONFIG = os.path.join(ROOT, "plan", "config.json")
+HANDOFF = os.path.join(ROOT, "docs", "HANDOFF.md")
+
+MILESTONES = {
+    "M0": "M0 Foundations",
+    "M1": "M1 Recording core",
+    "M2": "M2 BLE sensors",
+    "M3": "M3 Running UI",
+    "M4": "M4 Export and sync",
+    "M5": "M5 Running analysis",
+    "M6": "M6 Release",
+}
+LABELS = {
+    "type:task": "c5def5", "type:feature": "a2eeef", "type:docs": "0075ca", "bug": "d73a4a",
+    "reliability": "b60205", "field-test": "fbca04", "field-report": "e99695", "status:in-progress": "0e8a16",
+    "status:blocked": "000000", "needs-owner": "d876e3",
+    "area:build": "ededed", "area:core": "bfdadc", "area:wear": "bfd4f2", "area:ble": "1d76db",
+    "area:sensors": "5319e7", "area:ui": "f9d0c4", "area:mobile": "fef2c0", "area:dynamics": "c2e0c6",
+    "area:testing": "d4c5f9", "area:release": "0052cc",
+}
+
+
+def sh(cmd, check=True, capture=True):
+    r = subprocess.run(cmd, cwd=ROOT, text=True, capture_output=capture)
+    if check and r.returncode != 0:
+        sys.exit(f"command failed: {' '.join(cmd)}\n{r.stderr}")
+    return r.stdout.strip() if capture else ""
+
+
+def gh_json(args):
+    out = sh(["gh"] + args)
+    return json.loads(out) if out else []
+
+
+def load_config():
+    if os.path.exists(CONFIG):
+        with open(CONFIG) as f:
+            return json.load(f)
+    return {}
+
+
+def save_config(cfg):
+    with open(CONFIG, "w") as f:
+        json.dump(cfg, f, indent=2)
+        f.write("\n")
+
+
+def repo():
+    return load_config().get("repo") or sh(["gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner"])
+
+
+# ---------- backlog parsing ----------
+
+BLOCK = re.compile(r"^### ([a-z0-9-]+): (.+)$", re.M)
+
+
+def parse_backlog():
+    text = open(BACKLOG).read()
+    starts = [m for m in BLOCK.finditer(text)]
+    items = []
+    for i, m in enumerate(starts):
+        end = starts[i + 1].start() if i + 1 < len(starts) else len(text)
+        chunk = text[m.end():end]
+        meta, body_lines, in_meta = {}, [], True
+        for line in chunk.strip("\n").splitlines():
+            mm = re.match(r"^- (milestone|labels|depends|issue):\s*(.*)$", line)
+            if in_meta and mm:
+                meta[mm.group(1)] = mm.group(2).strip()
+            else:
+                in_meta = False
+                body_lines.append(line)
+        items.append({
+            "key": m.group(1), "title": m.group(2).strip(),
+            "milestone": meta.get("milestone", ""),
+            "labels": [x.strip() for x in meta.get("labels", "").split(",") if x.strip()],
+            "depends": [x.strip() for x in meta.get("depends", "").split(",") if x.strip()],
+            "issue": int(meta["issue"]) if meta.get("issue", "").isdigit() else None,
+            "body": "\n".join(body_lines).strip(),
+        })
+    return text, items
+
+
+def write_issue_number(key, number):
+    text = open(BACKLOG).read()
+    pat = re.compile(r"(^### " + re.escape(key) + r": .*?^- issue:)[ \t]*$", re.M | re.S)
+    text, n = pat.subn(lambda m: f"{m.group(1)} {number}", text, count=1)
+    if n != 1:
+        sys.exit(f"could not write issue number for {key}")
+    open(BACKLOG, "w").write(text)
+
+
+def key_to_issue():
+    return {it["key"]: it["issue"] for it in parse_backlog()[1]}
+
+
+# ---------- project helpers ----------
+
+def project_set_status(issue_number, status_name):
+    cfg = load_config()
+    proj = cfg.get("project")
+    if not proj:
+        return
+    owner, number = proj["owner"], str(proj["number"])
+    items = gh_json(["project", "item-list", number, "--owner", owner, "--format", "json", "--limit", "500"])
+    item_id = next((i["id"] for i in items.get("items", [])
+                    if i.get("content", {}).get("number") == issue_number), None)
+    if not item_id:
+        return
+    fields = gh_json(["project", "field-list", number, "--owner", owner, "--format", "json"])
+    status = next(f for f in fields["fields"] if f["name"] == "Status")
+    option = next((o["id"] for o in status["options"] if o["name"] == status_name), None)
+    if option:
+        sh(["gh", "project", "item-edit", "--id", item_id, "--project-id", proj["id"],
+            "--field-id", status["id"], "--single-select-option-id", option])
+
+
+# ---------- commands ----------
+
+def cmd_sync(_args):
+    r = repo()
+    existing = {l["name"] for l in gh_json(["label", "list", "-R", r, "--json", "name", "--limit", "200"])}
+    for name, color in LABELS.items():
+        if name not in existing:
+            sh(["gh", "label", "create", name, "-R", r, "--color", color])
+            print(f"label {name}")
+    ms = gh_json(["api", f"repos/{r}/milestones?state=all&per_page=100"])
+    have = {m["title"] for m in ms}
+    for title in MILESTONES.values():
+        if title not in have:
+            sh(["gh", "api", f"repos/{r}/milestones", "-f", f"title={title}"])
+            print(f"milestone {title}")
+    cfg = load_config()
+    _, items = parse_backlog()
+    for it in items:
+        if it["issue"]:
+            continue
+        deps = [key_to_issue().get(d) for d in it["depends"]]
+        body = it["body"]
+        if it["depends"]:
+            body += "\n\n**Depends on:** " + ", ".join(f"#{n}" if n else d for d, n in zip(it["depends"], deps))
+        body += f"\n\n<!-- backlog-key: {it['key']} -->"
+        args = ["issue", "create", "-R", r, "--title", it["title"], "--body", body,
+                "--milestone", MILESTONES[it["milestone"]]]
+        for l in it["labels"]:
+            args += ["--label", l]
+        url = sh(["gh"] + args)
+        number = int(url.rstrip("/").split("/")[-1])
+        write_issue_number(it["key"], number)
+        print(f"#{number} {it['title']}")
+        if cfg.get("project"):
+            sh(["gh", "project", "item-add", str(cfg["project"]["number"]),
+                "--owner", cfg["project"]["owner"], "--url", url])
+
+
+def open_issues():
+    return gh_json(["issue", "list", "-R", repo(), "--state", "open", "--limit", "300",
+                    "--json", "number,title,milestone,labels,assignees"])
+
+
+def ready_issues():
+    issues = open_issues()
+    open_numbers = {i["number"] for i in issues}
+    _, items = parse_backlog()
+    k2i = {it["key"]: it["issue"] for it in items}
+    deps = {it["issue"]: [k2i.get(d) for d in it["depends"]] for it in items if it["issue"]}
+    ready = []
+    for i in issues:
+        labels = {l["name"] for l in i["labels"]}
+        if i["assignees"] or labels & {"status:in-progress", "status:blocked", "field-test", "needs-owner"}:
+            continue
+        if any(d in open_numbers for d in deps.get(i["number"], []) if d):
+            continue
+        ready.append(i)
+    ready.sort(key=lambda i: ((i.get("milestone") or {}).get("title", "Z"), i["number"]))
+    return ready
+
+
+def cmd_next(_args):
+    ready = ready_issues()
+    if not ready:
+        print("No ready issue. Check ./rp status (blocked, field tests, or owner tasks).")
+        return
+    i = ready[0]
+    print(f"#{i['number']} {i['title']}  [{(i.get('milestone') or {}).get('title', '-')}]")
+    print(f"Start with: ./rp start {i['number']}")
+
+
+def cmd_status(_args):
+    r = repo()
+    print(f"== {r}")
+    for m in sorted(gh_json(["api", f"repos/{r}/milestones?state=all&per_page=100"]), key=lambda m: m["title"]):
+        tot = m["open_issues"] + m["closed_issues"]
+        done = m["closed_issues"]
+        bar = "#" * round(20 * done / tot) if tot else ""
+        print(f"  {m['title']:<24} [{bar:<20}] {done}/{tot}")
+    issues = open_issues()
+    wip = [i for i in issues if any(l["name"] == "status:in-progress" for l in i["labels"])]
+    owner = [i for i in issues if any(l["name"] in ("field-test", "needs-owner", "field-report") for l in i["labels"])]
+    print("\n== In progress")
+    for i in wip:
+        print(f"  #{i['number']} {i['title']}")
+    print("\n== Waiting for the owner (field tests, decisions)")
+    for i in owner:
+        print(f"  #{i['number']} {i['title']}")
+    print("\n== Open PRs")
+    for p in gh_json(["pr", "list", "-R", r, "--json", "number,title,headRefName"]):
+        print(f"  !{p['number']} {p['title']} ({p['headRefName']})")
+    print("\n== Next ready")
+    for i in ready_issues()[:5]:
+        print(f"  #{i['number']} {i['title']}")
+
+
+def slugify(s):
+    return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")[:40].rstrip("-")
+
+
+def cmd_start(args):
+    if not args:
+        sys.exit("usage: ./rp start <issue>")
+    n = int(args[0].lstrip("#"))
+    r = repo()
+    issue = gh_json(["issue", "view", str(n), "-R", r, "--json", "title,state"])
+    if issue["state"] != "OPEN":
+        sys.exit(f"#{n} is not open")
+    branch = f"issue-{n}-{slugify(issue['title'])}"
+    if sh(["git", "status", "--porcelain"]):
+        sys.exit("working tree not clean; commit or stash first")
+    sh(["git", "fetch", "origin"], check=False)
+    sh(["git", "checkout", "main"])
+    sh(["git", "pull", "--ff-only"], check=False)
+    exists = sh(["git", "branch", "--list", branch])
+    sh(["git", "checkout", branch] if exists else ["git", "checkout", "-b", branch])
+    sh(["gh", "issue", "edit", str(n), "-R", r, "--add-assignee", "@me", "--add-label", "status:in-progress"])
+    project_set_status(n, "In Progress")
+    print(f"On branch {branch}. Issue #{n} is In Progress.")
+    print(f"Read it: gh issue view {n}")
+
+
+def cmd_check(_args):
+    if os.path.exists(os.path.join(ROOT, "gradlew")):
+        r = subprocess.run(["./gradlew", "check", "--continue"], cwd=ROOT)
+        sys.exit(r.returncode)
+    print("No Gradle project yet (see the m0-gradle-skeleton issue). Nothing to check.")
+
+
+def current_issue():
+    b = sh(["git", "rev-parse", "--abbrev-ref", "HEAD"])
+    m = re.match(r"issue-(\d+)-", b)
+    if not m:
+        sys.exit(f"branch {b} is not an issue branch")
+    return b, int(m.group(1))
+
+
+def cmd_pr(_args):
+    branch, n = current_issue()
+    r = repo()
+    if sh(["git", "status", "--porcelain"]):
+        sys.exit("uncommitted changes; commit first")
+    sh(["git", "push", "-u", "origin", branch], capture=False)
+    existing = gh_json(["pr", "list", "-R", r, "--head", branch, "--json", "url"])
+    if existing:
+        print(existing[0]["url"])
+        return
+    title = gh_json(["issue", "view", str(n), "-R", r, "--json", "title"])["title"]
+    tpl = open(os.path.join(ROOT, ".github", "pull_request_template.md")).read()
+    body = f"Closes #{n}\n\n" + tpl
+    print(sh(["gh", "pr", "create", "-R", r, "--base", "main", "--head", branch,
+              "--title", f"{title} (#{n})", "--body", body]))
+
+
+def cmd_handoff(args):
+    if not args:
+        sys.exit('usage: ./rp handoff "what was done, what is next, open problems"')
+    b = sh(["git", "rev-parse", "--abbrev-ref", "HEAD"], check=False)
+    with open(HANDOFF, "a") as f:
+        f.write(f"\n## {datetime.now():%Y-%m-%d %H:%M} · {b}\n\n{' '.join(args)}\n")
+    print("handoff appended to docs/HANDOFF.md")
+
+
+def cmd_install(_args):
+    if not os.path.exists(os.path.join(ROOT, "gradlew")):
+        sys.exit("No Gradle project yet.")
+    devices = sh(["adb", "devices"])
+    print(devices)
+    r = subprocess.run(["./gradlew", ":wear:installDebug"], cwd=ROOT)
+    sys.exit(r.returncode)
+
+
+COMMANDS = {"status": cmd_status, "next": cmd_next, "start": cmd_start, "check": cmd_check,
+            "pr": cmd_pr, "handoff": cmd_handoff, "install": cmd_install, "sync": cmd_sync}
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2 or sys.argv[1] not in COMMANDS:
+        print(__doc__)
+        sys.exit(1)
+    COMMANDS[sys.argv[1]](sys.argv[2:])

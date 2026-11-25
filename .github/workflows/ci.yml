@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check rp harness
+        run: python3 -m py_compile rp
+      - name: Detect Gradle project
+        id: gradle
+        run: echo "present=$([ -f gradlew ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-java@v4
+        if: steps.gradle.outputs.present == 'true'
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v4
+        if: steps.gradle.outputs.present == 'true'
+      - name: Check
+        if: steps.gradle.outputs.present == 'true'
+        run: ./gradlew check :wear:assembleDebug --continue
+      - name: Upload APK and reports
+        if: steps.gradle.outputs.present == 'true' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-outputs
+          path: |
+            wear/build/outputs/apk/debug/*.apk
+            **/build/reports/

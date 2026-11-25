@@ -1,0 +1,34 @@
+name: Field report
+description: Result of a run on the watch (problem or test scenario)
+labels: ["field-report"]
+body:
+  - type: dropdown
+    id: scenario
+    attributes:
+      label: Scenario (docs/FIELD_TESTING.md)
+      options: [F1 easy run, F2 strap dropout, F3 force stop, F4 reboot, F5 long run, F6 footpod, F7 no phone, Daily use]
+    validations:
+      required: true
+  - type: input
+    id: build
+    attributes:
+      label: App version / commit
+    validations:
+      required: true
+  - type: input
+    id: sensors
+    attributes:
+      label: Sensors used
+      placeholder: "Polar H10 strap, watch GPS"
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: Expected vs actual. Times during the run help (e.g. "HR lost at 23:40 for 40 s").
+    validations:
+      required: true
+  - type: textarea
+    id: files
+    attributes:
+      label: Trace and sensor log
+      description: Attach the exported trace (.jsonl.gz) and sensor log (zip them if needed).
