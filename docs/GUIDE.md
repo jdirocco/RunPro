@@ -36,15 +36,32 @@ $ ./rp status
   ...
 == In progress
   #3 Core domain model
-== Waiting for the owner (field tests, decisions)
-  #14 Field validation of the recording core
+== Decisions for the owner (needs-owner: answer in the issue, then remove the label)
+  none
+== Field tests to run now (./rp install, then docs/FIELD_TESTING.md)
+  none
+== Field tests not runnable yet
+  #22 Field validation of BLE sensors  (waits for #19, #20)
+  #14 Field validation of the recording core  (waits for #9, #12)
+== Open field reports (for an agent to triage)
+  #45 Field report: HR gap after tunnel
 == Open PRs
   !40 Gradle multi-module project skeleton (#1) (issue-1-gradle-multi-module-project-skeleton)
 == Next ready
   #4 Replay trace format, recorder and replayer
 ```
 
-"Waiting for the owner" lists issues labelled `field-test`, `field-report` or `needs-owner`: that is your to-do list.
+Your to-do list is the first two owner sections:
+
+- **Decisions for the owner**: issues labelled `needs-owner`. Read it with `gh issue view <N>`, answer in a
+  comment, remove the label (`gh issue edit <N> --remove-label needs-owner`). You can also open one yourself
+  for a decision you want to think about: `gh issue create --label needs-owner ...`.
+- **Field tests to run now**: `field-test` issues whose dependencies are all closed, so the code to test exists.
+  Install with `./rp install` and follow the scenarios named in the issue (`docs/FIELD_TESTING.md`).
+- **Field tests not runnable yet** is only a preview: each one waits for the listed open issues.
+- **Open field reports** are for the agents, not for you (see workflow C).
+
+Dependencies come from `plan/backlog.md` and from the `**Depends on:** #a, #b` line in the issue body.
 
 ### `./rp next`: what should be done now?
 
@@ -283,7 +300,7 @@ merge remove it with `git worktree remove ../RunPro-worktrees/<branch>`.
 
 ### D. The agent needs you
 
-The agent comments on the issue, labels it `needs-owner` and stops. You see it under "Waiting for the
+The agent comments on the issue, labels it `needs-owner` and stops. You see it under "Decisions for the
 owner" in `./rp status`. Answer in the issue, remove the label, and the issue is ready again.
 
 ### E. A design decision

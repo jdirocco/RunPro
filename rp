@@ -23,6 +23,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 from datetime import datetime
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -56,9 +57,27 @@ def sh(cmd, check=True, capture=True):
     return r.stdout.strip() if capture else ""
 
 
+GH_RETRIES = 3
+
+
 def gh_json(args):
-    out = sh(["gh"] + args)
-    return json.loads(out) if out else []
+    """Run a read-only gh command and parse its JSON output.
+
+    GitHub's API fails transiently now and then (gh reports e.g. "unknown owner type" when its
+    owner lookup query fails), so retry with a short backoff before giving up. Only reads go
+    through here: retrying them is safe.
+    """
+    cmd = ["gh"] + args
+    for attempt in range(1, GH_RETRIES + 1):
+        r = subprocess.run(cmd, cwd=ROOT, text=True, capture_output=True)
+        if r.returncode == 0:
+            out = r.stdout.strip()
+            return json.loads(out) if out else []
+        if attempt < GH_RETRIES:
+            delay = 2 ** attempt
+            print(f"gh failed ({r.stderr.strip() or 'no output'}), retrying in {delay}s...", file=sys.stderr)
+            time.sleep(delay)
+    sys.exit(f"command failed after {GH_RETRIES} attempts: {' '.join(cmd)}\n{r.stderr}")
 
 
 def load_config():
@@ -183,21 +202,40 @@ def cmd_sync(_args):
 
 def open_issues():
     return gh_json(["issue", "list", "-R", repo(), "--state", "open", "--limit", "300",
-                    "--json", "number,title,milestone,labels,assignees"])
+                    "--json", "number,title,milestone,labels,assignees,body"])
 
 
-def ready_issues():
-    issues = open_issues()
-    open_numbers = {i["number"] for i in issues}
+DEPENDS_LINE = re.compile(r"^\*\*Depends on:\*\*(.*)$", re.M)
+
+
+def dependencies(issues):
+    """Issue number -> set of issue numbers it depends on (backlog plus 'Depends on:' in the body)."""
     _, items = parse_backlog()
     k2i = {it["key"]: it["issue"] for it in items}
-    deps = {it["issue"]: [k2i.get(d) for d in it["depends"]] for it in items if it["issue"]}
+    deps = {it["issue"]: {k2i.get(d) for d in it["depends"]} - {None} for it in items if it["issue"]}
+    for i in issues:
+        for m in DEPENDS_LINE.finditer(i.get("body") or ""):
+            deps.setdefault(i["number"], set()).update(int(n) for n in re.findall(r"#(\d+)", m.group(1)))
+    return deps
+
+
+def open_blockers(issue, issues, deps):
+    open_numbers = {i["number"] for i in issues}
+    return sorted(d for d in deps.get(issue["number"], ()) if d in open_numbers)
+
+
+def has_label(issue, *names):
+    return any(l["name"] in names for l in issue["labels"])
+
+
+def ready_issues(issues=None):
+    issues = issues if issues is not None else open_issues()
+    deps = dependencies(issues)
     ready = []
     for i in issues:
-        labels = {l["name"] for l in i["labels"]}
-        if i["assignees"] or labels & {"status:in-progress", "status:blocked", "field-test", "needs-owner"}:
+        if i["assignees"] or has_label(i, "status:in-progress", "status:blocked", "field-test", "needs-owner"):
             continue
-        if any(d in open_numbers for d in deps.get(i["number"], []) if d):
+        if open_blockers(i, issues, deps):
             continue
         ready.append(i)
     ready.sort(key=lambda i: ((i.get("milestone") or {}).get("title", "Z"), i["number"]))
@@ -223,19 +261,40 @@ def cmd_status(_args):
         bar = "#" * round(20 * done / tot) if tot else ""
         print(f"  {m['title']:<24} [{bar:<20}] {done}/{tot}")
     issues = open_issues()
-    wip = [i for i in issues if any(l["name"] == "status:in-progress" for l in i["labels"])]
-    owner = [i for i in issues if any(l["name"] in ("field-test", "needs-owner", "field-report") for l in i["labels"])]
+    deps = dependencies(issues)
     print("\n== In progress")
-    for i in wip:
+    for i in issues:
+        if has_label(i, "status:in-progress"):
+            print(f"  #{i['number']} {i['title']}")
+    decisions = [i for i in issues if has_label(i, "needs-owner")]
+    print("\n== Decisions for the owner (needs-owner: answer in the issue, then remove the label)")
+    for i in decisions:
         print(f"  #{i['number']} {i['title']}")
-    print("\n== Waiting for the owner (field tests, decisions)")
-    for i in owner:
+    if not decisions:
+        print("  none")
+    tests = [i for i in issues if has_label(i, "field-test")]
+    runnable = [i for i in tests if not open_blockers(i, issues, deps)]
+    blocked = [i for i in tests if open_blockers(i, issues, deps)]
+    print("\n== Field tests to run now (./rp install, then docs/FIELD_TESTING.md)")
+    for i in runnable:
         print(f"  #{i['number']} {i['title']}")
+    if not runnable:
+        print("  none")
+    if blocked:
+        print("\n== Field tests not runnable yet")
+        for i in blocked:
+            waits = ", ".join(f"#{d}" for d in open_blockers(i, issues, deps))
+            print(f"  #{i['number']} {i['title']}  (waits for {waits})")
+    reports = [i for i in issues if has_label(i, "field-report")]
+    if reports:
+        print("\n== Open field reports (for an agent to triage)")
+        for i in reports:
+            print(f"  #{i['number']} {i['title']}")
     print("\n== Open PRs")
     for p in gh_json(["pr", "list", "-R", r, "--json", "number,title,headRefName"]):
         print(f"  !{p['number']} {p['title']} ({p['headRefName']})")
     print("\n== Next ready")
-    for i in ready_issues()[:5]:
+    for i in ready_issues(issues)[:5]:
         print(f"  #{i['number']} {i['title']}")
 
 
