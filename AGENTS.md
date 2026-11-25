@@ -2,7 +2,7 @@
 
 RunPro is a running-only Wear OS app (target device: Galaxy Watch 5 Pro) whose first priority is
 reliability: it must never lose a workout and must keep external BLE sensors working.
-Read `docs/PLAN.md`, `docs/ARCHITECTURE.md` and `docs/RELIABILITY.md` before your first task.
+Read `docs/GUIDE.md` (how the harness works), `docs/PLAN.md`, `docs/ARCHITECTURE.md` and `docs/RELIABILITY.md` before your first task.
 
 ## The loop
 
@@ -39,6 +39,7 @@ add the label `needs-owner`, and stop. Never guess field results.
 
 ## Map
 
+- `docs/GUIDE.md` harness guide; keep it current with concrete examples when `./rp` or the workflow changes.
 - `docs/` plan, architecture, reliability, field testing, ADRs, handoff log.
 - `plan/backlog.md` initial backlog (already synced to GitHub issues; GitHub is the source of truth now).
 - `plan/config.json` repo and GitHub Project ids used by `./rp`.
