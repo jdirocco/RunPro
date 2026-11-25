@@ -1,6 +1,7 @@
 # RunPro release plan
 
-RunPro is a standalone Wear OS running app for the Galaxy Watch 5 Pro (and other Wear OS 4+ watches).
+RunPro is a standalone Wear OS running app for the Galaxy Watch 5 Pro (and other Wear OS 4+ watches),
+followed after the watch 1.0 by a full Android phone version (milestone M7).
 It does one sport, running, and it does it reliably: it never loses a workout, and it keeps external
 BLE sensors (heart-rate strap, footpod, Stryd) connected for the whole run.
 
@@ -22,6 +23,11 @@ screens, laps, intervals, zones, alerts, sensor sources, FIT export, Strava) and
 
 **Non-goals (1.0)**: other sports, maps and navigation, social features, training plans, ANT+ (Wear OS has
 no ANT+), iOS.
+
+**After 1.0 (M7, phone app)**: record runs on the phone (phone GPS, BLE sensors connected to the phone),
+full history and richer analysis (charts, run comparison), configure the watch (data screens, workouts,
+sensors) from the phone. The phone reuses the pure Kotlin core (engine, journal, FIT, BLE protocol,
+dynamics), so the same reliability invariants R1–R8 apply to it.
 
 ## 2. Why Gear Tracker loses the strap (hypotheses to design against)
 
@@ -78,8 +84,22 @@ with the `field-report` template, including the exported sensor log.
 | **M4 Export and sync** | FIT export, phone companion, Strava upload, Health Connect, history on watch | 20 runs imported into Strava with matching distance/time |
 | **M5 Running analysis** | IMU dynamics estimates, post-run analysis screens, comparison vs Galaxy Health / Stryd | Estimates within agreed tolerance on 10 reference runs |
 | **M6 Release** | Play Console internal → closed testing, privacy policy, store listing, 1.0 | 2 weeks of daily use with 0 lost runs, then 1.0 |
+| **M7 Phone app** | Recording on the phone, BLE sensors on the phone, phone run UI, history and analysis, watch configuration from the phone, phone release | 10 phone-only runs with 0 lost, then phone 1.1 release |
 
 M1 and M2 come before any UI polish: the main reason this app exists is reliability.
+
+**Target dates** (GitHub milestone due dates; field tests set the real pace, move them when needed):
+
+| Milestone | Due |
+|---|---|
+| M0 Foundations | 2026-12-06 |
+| M1 Recording core | 2027-01-10 |
+| M2 BLE sensors | 2027-02-07 |
+| M3 Running UI | 2027-03-07 |
+| M4 Export and sync | 2027-04-04 |
+| M5 Running analysis | 2027-05-02 |
+| M6 Release (watch 1.0) | 2027-05-30 |
+| M7 Phone app | 2027-07-31 |
 
 ## 6. Testing strategy
 
