@@ -18,6 +18,15 @@
 Rule: everything under `:core:*` and `:tools:*` is plain Kotlin/JVM and fully unit-testable.
 Android code in `:wear` and `:mobile` is a thin adapter layer.
 
+## Domain model (`:core:model`)
+
+- `Sample`: one reading of one `Metric` (heart rate, location, distance, speed, cadence, power, elevation,
+  acceleration) from one `SourceId` (`watch:health-services`, `watch:imu`, `ble:<address>`, `derived`).
+- `Timestamp`: monotonic `elapsedRealtimeNanos` (durations, ordering within one boot) plus wall clock millis.
+- `Run`: the ordered `RunEvent`s (started, paused, resumed, lap, source switched, sensor connected/lost,
+  stopped); laps, start and stop are derived from them.
+- Units are SI value classes with conversions for display and FIT. JSON via `ModelJson` (ADR 0003).
+
 ## Recording data flow
 
 ```
