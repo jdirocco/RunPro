@@ -1,0 +1,88 @@
+{
+    "trace": "easy-run-30min.jsonl.gz",
+    "description": "30 min easy run at about 6:00/km. The runner laps at 10:00 and 20:00 and pauses 15:00-15:30 while still moving, so distance in the pause is dropped. Heart rate is the wrist: the first source of a metric wins until source arbitration (#19). The trace has no elevation samples, so ascent and descent are 0.",
+    "commands": [
+        {
+            "at_s": 600.0,
+            "input": "lap"
+        },
+        {
+            "at_s": 900.0,
+            "input": "pause"
+        },
+        {
+            "at_s": 930.0,
+            "input": "resume"
+        },
+        {
+            "at_s": 1200.0,
+            "input": "lap"
+        },
+        {
+            "at_s": 1800.0,
+            "input": "stop"
+        }
+    ],
+    "tolerance": {
+        "duration_s": 0.001,
+        "distance_m": 0.05,
+        "heart_rate_bpm": 0,
+        "pace_s_per_km": 0.05,
+        "cadence_spm": 0.05,
+        "elevation_m": 0.05
+    },
+    "run": {
+        "elapsed_s": 1800.0,
+        "timer_s": 1770.0,
+        "moving_s": 1769.0,
+        "distance_m": 4913.89,
+        "avg_hr_bpm": 139,
+        "max_hr_bpm": 147,
+        "avg_pace_s_per_km": 360.2,
+        "avg_cadence_spm": 172.23,
+        "max_cadence_spm": 173.7,
+        "ascent_m": 0.0,
+        "descent_m": 0.0
+    },
+    "laps": [
+        {
+            "elapsed_s": 600.0,
+            "timer_s": 600.0,
+            "moving_s": 600.0,
+            "distance_m": 1666.66,
+            "avg_hr_bpm": 136,
+            "max_hr_bpm": 141,
+            "avg_pace_s_per_km": 360.0,
+            "avg_cadence_spm": 172.22,
+            "max_cadence_spm": 173.7,
+            "ascent_m": 0.0,
+            "descent_m": 0.0
+        },
+        {
+            "elapsed_s": 600.0,
+            "timer_s": 570.0,
+            "moving_s": 570.0,
+            "distance_m": 1583.34,
+            "avg_hr_bpm": 140,
+            "max_hr_bpm": 144,
+            "avg_pace_s_per_km": 360.0,
+            "avg_cadence_spm": 172.23,
+            "max_cadence_spm": 173.7,
+            "ascent_m": 0.0,
+            "descent_m": 0.0
+        },
+        {
+            "elapsed_s": 600.0,
+            "timer_s": 600.0,
+            "moving_s": 599.0,
+            "distance_m": 1663.89,
+            "avg_hr_bpm": 143,
+            "max_hr_bpm": 147,
+            "avg_pace_s_per_km": 360.6,
+            "avg_cadence_spm": 172.23,
+            "max_cadence_spm": 173.7,
+            "ascent_m": 0.0,
+            "descent_m": 0.0
+        }
+    ]
+}

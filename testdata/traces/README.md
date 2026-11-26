@@ -25,6 +25,24 @@ speed and cadence from `watch:health-services`, and chest strap heart rate from
 | `intervals-6x3min.jsonl.gz` | 45 min | 10 min warm-up, 6 × (3 min at 4:00/km + 2 min jog at 6:30/km), 5 min cool-down | 16 200 |
 | `strap-dropout.jsonl.gz` | 20 min | Strap silent 8:00–8:30 (connected, no data), disconnected 12:00–12:45 (GATT status 8), 0 bpm 16:40–16:45; wrist HR throughout | 7 125 |
 
+## Golden totals
+
+`golden/<trace>.json` pins what the recording engine makes of a trace: the runner commands given during
+the replay (`lap`, `pause`, `resume`, `stop`, in seconds from the first record), the tolerances, and the
+totals of the run and of every lap (elapsed, timer, moving, distance, average and max heart rate, average
+pace, average and max cadence, ascent, descent). `TraceGoldenTotalsTest` (`:tools:replay`) replays each
+trace through `RecordingStateMachine` and compares. A command applies after every record up to its time,
+so a sample exactly at a lap mark belongs to the lap before.
+
+| Golden file | Commands |
+|---|---|
+| `golden/easy-run-30min.json` | Laps at 10:00 and 20:00, pause 15:00–15:30, stop at 30:00 |
+| `golden/intervals-6x3min.json` | A lap at the start and end of each rep (14 laps), stop at 45:00 |
+
+When an engine change moves the totals on purpose, the failing test prints the new values in golden-file
+form. Check them against what the change should do before pasting them in; never update a golden file
+just to make the test pass. A field trace that shows a bug gets a golden file with the correct totals.
+
 ## Field traces
 
 A trace recorded on the watch ("Record debug trace", issue #20) that shows a bug goes here with a

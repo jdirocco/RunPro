@@ -3,8 +3,8 @@ package com.runpro.core.recording
 /**
  * Deterministic traces generated in code, so the expected totals can be derived by hand.
  *
- * They stand in for the recorded `testdata/traces/` files until the replay trace format (#4) is merged;
- * the follow-up replays the 30 min trace from #4 through the engine with the same golden checks.
+ * They cover what the committed `testdata/traces/` files do not (a climb, a traffic light, a pause with the
+ * runner standing still); `TraceGoldenTotalsTest` in `:tools:replay` replays those files with golden totals.
  */
 internal object SyntheticTraces {
     const val PAUSE_START_S = 900

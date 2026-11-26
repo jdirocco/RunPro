@@ -1,0 +1,267 @@
+{
+    "trace": "intervals-6x3min.jsonl.gz",
+    "description": "10 min warm-up, 6 x (3 min at 4:00/km + 2 min jog at 6:30/km), 5 min cool-down. The runner laps at the start and end of every rep: 14 laps (warm-up, 6 reps, 6 jogs, cool-down). Heart rate is the wrist: the first source of a metric wins until source arbitration (#19). The trace has no elevation samples, so ascent and descent are 0.",
+    "commands": [
+        {
+            "at_s": 600.0,
+            "input": "lap"
+        },
+        {
+            "at_s": 780.0,
+            "input": "lap"
+        },
+        {
+            "at_s": 900.0,
+            "input": "lap"
+        },
+        {
+            "at_s": 1080.0,
+            "input": "lap"
+        },
+        {
+            "at_s": 1200.0,
+            "input": "lap"
+        },
+        {
+            "at_s": 1380.0,
+            "input": "lap"
+        },
+        {
+            "at_s": 1500.0,
+            "input": "lap"
+        },
+        {
+            "at_s": 1680.0,
+            "input": "lap"
+        },
+        {
+            "at_s": 1800.0,
+            "input": "lap"
+        },
+        {
+            "at_s": 1980.0,
+            "input": "lap"
+        },
+        {
+            "at_s": 2100.0,
+            "input": "lap"
+        },
+        {
+            "at_s": 2280.0,
+            "input": "lap"
+        },
+        {
+            "at_s": 2400.0,
+            "input": "lap"
+        },
+        {
+            "at_s": 2700.0,
+            "input": "stop"
+        }
+    ],
+    "tolerance": {
+        "duration_s": 0.001,
+        "distance_m": 0.05,
+        "heart_rate_bpm": 0,
+        "pace_s_per_km": 0.05,
+        "cadence_spm": 0.05,
+        "elevation_m": 0.05
+    },
+    "run": {
+        "elapsed_s": 2700.0,
+        "timer_s": 2700.0,
+        "moving_s": 2699.0,
+        "distance_m": 8843.37,
+        "avg_hr_bpm": 153,
+        "max_hr_bpm": 181,
+        "avg_pace_s_per_km": 305.31,
+        "avg_cadence_spm": 176.21,
+        "max_cadence_spm": 184.8,
+        "ascent_m": 0.0,
+        "descent_m": 0.0
+    },
+    "laps": [
+        {
+            "elapsed_s": 600.0,
+            "timer_s": 600.0,
+            "moving_s": 600.0,
+            "distance_m": 1667.08,
+            "avg_hr_bpm": 136,
+            "max_hr_bpm": 141,
+            "avg_pace_s_per_km": 359.91,
+            "avg_cadence_spm": 172.22,
+            "max_cadence_spm": 176.4,
+            "ascent_m": 0.0,
+            "descent_m": 0.0
+        },
+        {
+            "elapsed_s": 180.0,
+            "timer_s": 180.0,
+            "moving_s": 180.0,
+            "distance_m": 747.25,
+            "avg_hr_bpm": 167,
+            "max_hr_bpm": 176,
+            "avg_pace_s_per_km": 240.88,
+            "avg_cadence_spm": 183.21,
+            "max_cadence_spm": 184.8,
+            "ascent_m": 0.0,
+            "descent_m": 0.0
+        },
+        {
+            "elapsed_s": 120.0,
+            "timer_s": 120.0,
+            "moving_s": 120.0,
+            "distance_m": 310.79,
+            "avg_hr_bpm": 144,
+            "max_hr_bpm": 174,
+            "avg_pace_s_per_km": 386.11,
+            "avg_cadence_spm": 170.83,
+            "max_cadence_spm": 175.6,
+            "ascent_m": 0.0,
+            "descent_m": 0.0
+        },
+        {
+            "elapsed_s": 180.0,
+            "timer_s": 180.0,
+            "moving_s": 180.0,
+            "distance_m": 746.9,
+            "avg_hr_bpm": 168,
+            "max_hr_bpm": 177,
+            "avg_pace_s_per_km": 241.0,
+            "avg_cadence_spm": 183.17,
+            "max_cadence_spm": 184.8,
+            "ascent_m": 0.0,
+            "descent_m": 0.0
+        },
+        {
+            "elapsed_s": 120.0,
+            "timer_s": 120.0,
+            "moving_s": 120.0,
+            "distance_m": 310.79,
+            "avg_hr_bpm": 146,
+            "max_hr_bpm": 174,
+            "avg_pace_s_per_km": 386.11,
+            "avg_cadence_spm": 170.69,
+            "max_cadence_spm": 177.6,
+            "ascent_m": 0.0,
+            "descent_m": 0.0
+        },
+        {
+            "elapsed_s": 180.0,
+            "timer_s": 180.0,
+            "moving_s": 180.0,
+            "distance_m": 746.91,
+            "avg_hr_bpm": 169,
+            "max_hr_bpm": 178,
+            "avg_pace_s_per_km": 240.99,
+            "avg_cadence_spm": 183.15,
+            "max_cadence_spm": 184.8,
+            "ascent_m": 0.0,
+            "descent_m": 0.0
+        },
+        {
+            "elapsed_s": 120.0,
+            "timer_s": 120.0,
+            "moving_s": 120.0,
+            "distance_m": 310.79,
+            "avg_hr_bpm": 147,
+            "max_hr_bpm": 174,
+            "avg_pace_s_per_km": 386.11,
+            "avg_cadence_spm": 170.82,
+            "max_cadence_spm": 176.4,
+            "ascent_m": 0.0,
+            "descent_m": 0.0
+        },
+        {
+            "elapsed_s": 180.0,
+            "timer_s": 180.0,
+            "moving_s": 180.0,
+            "distance_m": 746.9,
+            "avg_hr_bpm": 170,
+            "max_hr_bpm": 179,
+            "avg_pace_s_per_km": 241.0,
+            "avg_cadence_spm": 183.2,
+            "max_cadence_spm": 184.8,
+            "ascent_m": 0.0,
+            "descent_m": 0.0
+        },
+        {
+            "elapsed_s": 120.0,
+            "timer_s": 120.0,
+            "moving_s": 120.0,
+            "distance_m": 310.79,
+            "avg_hr_bpm": 148,
+            "max_hr_bpm": 174,
+            "avg_pace_s_per_km": 386.11,
+            "avg_cadence_spm": 170.71,
+            "max_cadence_spm": 176.7,
+            "ascent_m": 0.0,
+            "descent_m": 0.0
+        },
+        {
+            "elapsed_s": 180.0,
+            "timer_s": 180.0,
+            "moving_s": 180.0,
+            "distance_m": 746.9,
+            "avg_hr_bpm": 171,
+            "max_hr_bpm": 180,
+            "avg_pace_s_per_km": 241.0,
+            "avg_cadence_spm": 183.12,
+            "max_cadence_spm": 184.8,
+            "ascent_m": 0.0,
+            "descent_m": 0.0
+        },
+        {
+            "elapsed_s": 120.0,
+            "timer_s": 120.0,
+            "moving_s": 120.0,
+            "distance_m": 310.79,
+            "avg_hr_bpm": 150,
+            "max_hr_bpm": 175,
+            "avg_pace_s_per_km": 386.11,
+            "avg_cadence_spm": 170.79,
+            "max_cadence_spm": 177.3,
+            "ascent_m": 0.0,
+            "descent_m": 0.0
+        },
+        {
+            "elapsed_s": 180.0,
+            "timer_s": 180.0,
+            "moving_s": 180.0,
+            "distance_m": 746.9,
+            "avg_hr_bpm": 172,
+            "max_hr_bpm": 181,
+            "avg_pace_s_per_km": 241.0,
+            "avg_cadence_spm": 183.22,
+            "max_cadence_spm": 184.8,
+            "ascent_m": 0.0,
+            "descent_m": 0.0
+        },
+        {
+            "elapsed_s": 120.0,
+            "timer_s": 120.0,
+            "moving_s": 120.0,
+            "distance_m": 310.38,
+            "avg_hr_bpm": 151,
+            "max_hr_bpm": 176,
+            "avg_pace_s_per_km": 386.62,
+            "avg_cadence_spm": 170.75,
+            "max_cadence_spm": 175.9,
+            "ascent_m": 0.0,
+            "descent_m": 0.0
+        },
+        {
+            "elapsed_s": 300.0,
+            "timer_s": 300.0,
+            "moving_s": 299.0,
+            "distance_m": 830.2,
+            "avg_hr_bpm": 146,
+            "max_hr_bpm": 150,
+            "avg_pace_s_per_km": 361.36,
+            "avg_cadence_spm": 172.17,
+            "max_cadence_spm": 173.7,
+            "ascent_m": 0.0,
+            "descent_m": 0.0
+        }
+    ]
+}
