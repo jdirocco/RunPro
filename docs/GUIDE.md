@@ -230,6 +230,35 @@ replayer.run()                                       // ReplaySpeed.UNLIMITED by
 assertEquals(1_125, strap.samples.size)
 ```
 
+Chaos faults are declared in the test, without changing a trace file:
+
+```kotlin
+val plan = ChaosPlan(
+    ReplayFault.BleDisconnect(10.seconds, 3.seconds, SyntheticTraces.STRAP, gattStatus = 133),
+    ReplayFault.SilentStall(20.seconds, 6.seconds, SyntheticTraces.STRAP),
+    ReplayFault.GpsLoss(30.seconds, 5.seconds),
+    ReplayFault.ClockJump(40.seconds, (-3600).seconds)
+)
+val replayer = Replayer(trace, chaos = plan)
+replayer.sources.forEach { it.start(consumer) }
+replayer.run()
+```
+
+Offsets use monotonic time from the first record. Outages exclude the end boundary; GPS loss removes
+location, distance, speed and elevation while wrist HR/cadence continue. Clock jumps adjust wall time
+without changing pacing. `BleDisconnect` without a status models a normal disconnect; status 133
+models GATT_ERROR. Boundaries also run in gaps and after the trace ends. Same-source outages cannot
+overlap. `ReplayResult` counts delivered/dropped effective records, including injected sensor events,
+excluding suppressed records and fault callbacks.
+
+`ReplayFault.ProcessDeath(at)` and `ReplayFault.StorageFull(at)` require a `ReplayFaultHandler` passed
+as `faultHandler` to `Replayer`. The callback must replace the engine from its journal and rebind the
+sources, or make storage writes fail (for example, set `FaultInjectingOutputStream.full = true`). Missing
+handlers fail early; callback exceptions fail the test. See `ChaosRecordingReplayTest` for a sample of
+every fault type using the real engine and an input-log journal double. Production journal recovery,
+BLE fallback/reconnect and full-storage saving still need their own invariant tests; this sample does
+not establish them. Scheduling details and limits are in ADR 0006.
+
 The JVM modules share build contract tests from `build-support/src/test/kotlin`: they verify Java 21
 and that Android framework classes are absent. The watch launcher has a Robolectric Compose test on
 API 30. This does not replace a physical install or field testing. The phone module is an empty APK

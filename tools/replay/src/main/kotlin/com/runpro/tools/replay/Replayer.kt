@@ -6,7 +6,10 @@ import com.runpro.core.model.SourceId
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
-/** What a replay did: records handed to a listener, records of sources nobody had started. */
+/**
+ * Counts the effective records after chaos filtering, including injected sensor events. Fault callbacks
+ * and suppressed records are not counted. [cancelled] means scheduled work was left unprocessed.
+ */
 data class ReplayResult(val delivered: Int, val dropped: Int, val cancelled: Boolean)
 
 /**
@@ -43,14 +46,18 @@ class ReplaySensorSource internal constructor(override val id: SourceId) : Senso
  * record divided by [speed]; the replay clock never goes back, so a record delivered late by the platform
  * (older timestamp than the record before it) is delivered right after its predecessor, as it was then.
  *
+ * [chaos] schedules reusable faults; process death and storage full require [faultHandler].
  * Start the sources you need, then call [run] once. [cancel] (from a listener or another thread) stops the
  * replay before the next record.
  */
 class Replayer(
     private val trace: Trace,
     private val speed: ReplaySpeed = ReplaySpeed.UNLIMITED,
-    private val clock: ReplayClock = SystemReplayClock
+    private val clock: ReplayClock = SystemReplayClock,
+    chaos: ChaosPlan = ChaosPlan(),
+    private val faultHandler: ReplayFaultHandler? = null
 ) {
+    private val steps = chaos.steps(trace, faultHandler)
     val sources: List<ReplaySensorSource> = trace.sources.map(::ReplaySensorSource)
     private val byId = sources.associateBy { it.id }
     private val ran = AtomicBoolean(false)
@@ -68,21 +75,23 @@ class Replayer(
     /** Delivers the whole trace and returns when done or cancelled. */
     fun run(): ReplayResult {
         check(ran.compareAndSet(false, true)) { "A replayer runs once" }
-        val origin = trace.records.firstOrNull()?.time?.elapsedRealtimeNanos ?: 0L
         val start = clock.nanoTime()
-        var offset = 0L
+        var processed = 0
         var delivered = 0
         var dropped = 0
-        for (record in trace.records) {
+        for (step in steps) {
+            if (!cancelled) waitUntil(start, step.offsetNanos)
             if (cancelled) break
-            offset = maxOf(offset, record.time.elapsedRealtimeNanos - origin)
-            waitUntil(start, offset)
-            if (byId.getValue(record.source).deliver(record)) delivered++ else dropped++
+            step.fault?.let { requireNotNull(faultHandler).onFault(it, requireNotNull(step.time)) }
+            step.record?.let { record ->
+                if (byId.getValue(record.source).deliver(record)) delivered++ else dropped++
+            }
+            processed++
         }
         return ReplayResult(
             delivered,
             dropped,
-            cancelled = delivered + dropped < trace.records.size
+            cancelled = processed < steps.size
         )
     }
 

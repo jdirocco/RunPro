@@ -6,6 +6,7 @@ plugins {
 dependencies {
     // Traces, sources and listeners are expressed in model types.
     api(project(":core:model"))
+    testImplementation(project(":core:recording"))
 }
 
 val traces = rootProject.layout.projectDirectory.dir("testdata/traces")
