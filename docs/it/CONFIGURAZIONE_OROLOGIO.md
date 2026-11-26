@@ -112,19 +112,30 @@ La posizione "sempre" viene chiesta dopo le altre, con una schermata a parte. Se
 RunPro lo richiede al prossimo avvio. Basta uno tra posizione, battito e attività fisica per avviare una corsa.
 
 **Batteria: RunPro non deve mai essere sospesa.** È il problema più comune delle app di corsa sui Galaxy Watch.
-RunPro controlla l'impostazione 1 e mostra **Apri impostazioni** finché manca: il pulsante apre la scheda
-di RunPro nelle impostazioni dell'orologio, dove tocchi **Batteria**. L'impostazione 2 non si può
-leggere dall'app: RunPro te la ricorda finché non tocchi **Fatto, controllato**.
+RunPro controlla l'impostazione 1 e mostra il comando da eseguire finché manca. L'impostazione 2 non si
+può leggere dall'app: RunPro te la ricorda finché non tocchi **Fatto, controllato**.
 
-1. Sull'orologio: **Impostazioni → App → RunPro → Batteria**: scegli **Senza restrizioni** (o disattiva
-   "Ottimizza utilizzo batteria").
+1. **Esclusione dall'ottimizzazione della batteria.** Sul Galaxy Watch (Wear OS 6) non c'è nessuna
+   impostazione per farlo: la scheda **Impostazioni → App → RunPro** non ha la voce Batteria. Si fa una
+   volta da adb, con l'orologio collegato (punto 5):
+
+   ```bash
+   adb shell dumpsys deviceidle whitelist +com.runpro.wear
+   ```
+
+   Controllo: `adb shell dumpsys deviceidle whitelist | grep runpro` deve stampare una riga. L'esclusione
+   resta dopo `./rp install`; si perde solo disinstallando RunPro. Riapri RunPro: l'avviso sparisce.
 2. Sul telefono, app **Galaxy Wearable → Impostazioni orologio → Batteria → Limiti utilizzo in background**
    (o "App in sospensione"): RunPro **non** deve essere nell'elenco delle app in sospensione o
-   in sospensione profonda.
+   in sospensione profonda. Se sul telefono è installata anche l'app RunPro, controlla pure
+   **Impostazioni → Assistenza dispositivo → Batteria → Limiti utilizzo in background** del telefono: Android
+   può metterla da solo in **Applicazioni in sospensione** (successo nella prova di #10). Toglila
+   (**⋮ → Rimuovi**) e aggiungila ad **Applicazioni mai in sospensione**.
 
-**Durante una corsa** RunPro mostra una notifica fissa e un'icona sul quadrante (Ongoing Activity) con il
-tempo che scorre: toccala per tornare all'app. Se la notifica sparisce a corsa in corso, l'orologio ha
-chiuso RunPro: segnalalo con una issue **Field report**.
+**Durante una corsa** RunPro mostra un'icona sul quadrante (Ongoing Activity) con il tempo che scorre:
+toccala per tornare all'app. La notifica fissa esiste ma il Galaxy Watch non la mostra nel pannello
+notifiche (scorrendo da sinistra): la mostra come quell'icona. Se l'icona sparisce a corsa in corso,
+l'orologio ha chiuso RunPro: segnalalo con una issue **Field report**.
 
 **Posizione**: **Impostazioni → Posizione** attiva. RunPro usa solo il GPS dell'orologio.
 

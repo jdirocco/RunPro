@@ -63,10 +63,9 @@ private fun ScalingLazyListScope.permissionItems(setup: SetupState, actions: Set
 
 private fun ScalingLazyListScope.batteryItems(advice: List<BatteryAdvice>, actions: SetupActions) {
     if (BatteryAdvice.ALLOW_UNRESTRICTED_BATTERY in advice) {
+        // No button: the watch has no settings screen for this (field bug #10), only adb.
         item { Paragraph(stringResource(R.string.setup_battery_unrestricted)) }
-        item {
-            WideButton(stringResource(R.string.setup_open_settings), actions.openBatterySettings)
-        }
+        item { Paragraph(BATTERY_EXEMPTION_COMMAND) }
     }
     if (BatteryAdvice.REMOVE_FROM_SLEEPING_APPS in advice) {
         item { Paragraph(stringResource(R.string.setup_sleeping_apps)) }
@@ -134,6 +133,10 @@ private fun permissionText(permission: RunPermission): Int = when (permission) {
     RunPermission.NOTIFICATIONS -> R.string.permission_notifications
     RunPermission.BACKGROUND_LOCATION -> R.string.setup_background_location
 }
+
+/** Exempts RunPro from battery optimisation; the watch offers no settings screen for it. */
+internal const val BATTERY_EXEMPTION_COMMAND =
+    "adb shell dumpsys deviceidle whitelist +com.runpro.wear"
 
 private const val SECONDS_PER_MINUTE = 60
 

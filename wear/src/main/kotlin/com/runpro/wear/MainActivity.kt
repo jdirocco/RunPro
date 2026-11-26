@@ -1,16 +1,13 @@
 package com.runpro.wear
 
-import android.content.ActivityNotFoundException
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.os.PowerManager
-import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -63,7 +60,6 @@ class MainActivity : ComponentActivity() {
                     askForeground = { ask(readiness.missingForeground) },
                     askBackgroundLocation = { ask(listOf(RunPermission.BACKGROUND_LOCATION)) },
                     skipBackgroundLocation = { backgroundLocationSkipped = true },
-                    openBatterySettings = ::openBatterySettings,
                     confirmSleepingApps = ::confirmSleepingApps,
                     command = ::send
                 )
@@ -79,7 +75,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        refresh() // the runner may come back from the settings
+        refresh() // the runner may come back after the adb exemption or the phone settings
     }
 
     override fun onStop() {
@@ -111,22 +107,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /**
-     * RunPro's own settings page, which has the Battery entry. Not `ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS`:
-     * on Wear OS it resolves to a placeholder activity that closes at once (field bug on the watch, #10).
-     */
-    private fun openBatterySettings() {
-        val details = Intent(
-            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-            Uri.fromParts("package", packageName, null)
-        )
-        try {
-            startActivity(details)
-        } catch (_: ActivityNotFoundException) {
-            startActivity(Intent(Settings.ACTION_SETTINGS))
-        }
-    }
-
     private fun confirmSleepingApps() {
         prefs().edit { putBoolean(KEY_SLEEPING_APPS_CHECKED, true) }
         refresh()
@@ -151,7 +131,6 @@ class SetupActions(
     val askForeground: () -> Unit,
     val askBackgroundLocation: () -> Unit,
     val skipBackgroundLocation: () -> Unit,
-    val openBatterySettings: () -> Unit,
     val confirmSleepingApps: () -> Unit,
     val command: (ServiceCommand) -> Unit
 )

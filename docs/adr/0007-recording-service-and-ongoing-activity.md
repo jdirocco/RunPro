@@ -33,11 +33,13 @@ permissions (location, body sensors) are not available.
   install-time below API 31 and 33).
 - Background location is optional and asked after the others, on its own, as Android requires. Without
   it a run restored after a kill continues without GPS.
-- The battery settings are reached through RunPro's app details page
-  (`ACTION_APPLICATION_DETAILS_SETTINGS` → Battery). Not the direct exemption request, which needs a
-  special permission and Play policy review, and not `ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS`, which
-  on Wear OS resolves to a placeholder activity that closes at once (found on the watch, see the failure
-  catalogue in `RELIABILITY.md`).
+- The battery exemption has no settings screen on the Galaxy Watch 5 Pro (Wear OS 6, API 36), checked on
+  the watch with `cmd package resolve-activity`: `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` resolves to
+  a placeholder `FakeSettingsActivity` that closes at once, `ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS`
+  resolves to nothing, and the app details page has no Battery entry. The setup screen therefore shows
+  the adb command (`adb shell dumpsys deviceidle whitelist +com.runpro.wear`) instead of a button, and
+  drops the advice once `isIgnoringBatteryOptimizations` is true. See the failure catalogue in
+  `RELIABILITY.md`.
 
 ## Consequences
 

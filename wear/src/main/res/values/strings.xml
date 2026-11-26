@@ -23,8 +23,7 @@
     <string name="setup_background_location">Allow location all the time, so GPS keeps working if the watch restarts RunPro during a run.</string>
     <string name="setup_allow_all_the_time">Allow all the time</string>
     <string name="setup_not_now">Not now</string>
-    <string name="setup_battery_unrestricted">Set RunPro\'s battery use to Unrestricted, or the watch can stop it during a run.</string>
-    <string name="setup_open_settings">Open settings</string>
+    <string name="setup_battery_unrestricted">RunPro is not exempt from battery optimisation, so the watch can stop it during a run. The watch has no setting for this: from the computer, run</string>
     <string name="setup_sleeping_apps">On the phone, open Galaxy Wearable, Watch settings, Battery: RunPro must not be in Sleeping apps or Deep sleeping apps.</string>
     <string name="setup_checked">Done, checked</string>
 </resources>

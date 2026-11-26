@@ -2,7 +2,10 @@ package com.runpro.core.recording.service
 
 /** A battery setting the runner has to change so the watch does not suspend RunPro during a run. */
 enum class BatteryAdvice {
-    /** Settings → Apps → RunPro → Battery → Unrestricted (exempt from battery optimisation). */
+    /**
+     * Exempt RunPro from battery optimisation. Wear OS on the Galaxy Watch has no screen for it (#10), so the
+     * runner does it with `adb shell dumpsys deviceidle whitelist +com.runpro.wear`.
+     */
     ALLOW_UNRESTRICTED_BATTERY,
 
     /** Galaxy Wearable on the phone → Battery → Background usage limits: RunPro not in "Sleeping apps". */

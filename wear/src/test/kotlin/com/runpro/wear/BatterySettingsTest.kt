@@ -1,14 +1,12 @@
 package com.runpro.wear
 
-import android.net.Uri
-import android.provider.Settings
+import android.os.PowerManager
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
-import org.junit.Assert.assertEquals
+import androidx.lifecycle.Lifecycle
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -17,10 +15,11 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 /**
- * Field bug on the Galaxy Watch 5 Pro (#10): "Open settings" did nothing. On Wear OS
- * `ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS` resolves to a `FakeSettingsActivity` that closes at once,
- * so no `ActivityNotFoundException` triggered the fallback. The app's own settings page is the one that
- * exists on the watch and has the Battery entry.
+ * Field bugs on the Galaxy Watch 5 Pro (#10). The watch (Wear OS, API 36) has no screen that exempts an app
+ * from battery optimisation: `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` resolves to a `FakeSettingsActivity`
+ * that closes at once, `ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS` resolves to nothing, and the app details
+ * page has no Battery entry. So the app shows the adb command instead of a button that leads nowhere, and
+ * drops the advice once the exemption is in place.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -29,12 +28,26 @@ class BatterySettingsTest {
     val compose = createAndroidComposeRule<MainActivity>()
 
     @Test
-    fun `open settings opens the app details page of RunPro`() {
-        compose.onNode(hasScrollAction()).performScrollToNode(hasText("Open settings"))
-        compose.onNodeWithText("Open settings").performClick()
+    fun `battery advice shows the adb command and no settings button`() {
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText(COMMAND, substring = true))
 
-        val started = shadowOf(compose.activity).nextStartedActivity
-        assertEquals(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, started.action)
-        assertEquals(Uri.fromParts("package", "com.runpro.wear", null), started.data)
+        compose.onNodeWithText(COMMAND, substring = true).assertExists()
+        compose.onNodeWithText("Open settings").assertDoesNotExist()
+    }
+
+    @Test
+    fun `battery advice disappears once RunPro is exempt`() {
+        val power = compose.activity.getSystemService(PowerManager::class.java)
+        shadowOf(power).setIgnoringBatteryOptimizations("com.runpro.wear", true)
+
+        // The runner comes back to RunPro after running the command.
+        compose.activityRule.scenario.moveToState(Lifecycle.State.STARTED)
+        compose.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+
+        compose.onNodeWithText(COMMAND, substring = true).assertDoesNotExist()
+    }
+
+    private companion object {
+        const val COMMAND = "adb shell dumpsys deviceidle whitelist +com.runpro.wear"
     }
 }
