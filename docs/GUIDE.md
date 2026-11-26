@@ -274,8 +274,9 @@ sources, or make storage writes fail (for example, set `FaultInjectingOutputStre
 handlers fail early; callback exceptions fail the test. See `ChaosRecordingReplayTest` for a sample of
 every fault type using the real engine and an input-log journal double. Real journal recovery is covered
 separately by `CrashRecoveryReplayTest` (ADR 0007).
-BLE fallback/reconnect and full-storage saving still need their own invariant tests; this sample does
-not establish them. Scheduling details and limits are in ADR 0006.
+BLE fallback/reconnect need their own invariant tests; this sample does not establish them.
+`LowResourceReplayTest` in `:core:journal` covers R7 with real journal files and a partial-write ENOSPC
+fault in the reserved file output (ADR 0008); it also replays critical battery stops. Scheduling details and limits are in ADR 0006.
 
 The JVM modules share build contract tests from `build-support/src/test/kotlin`: they verify Java 21
 and that Android framework classes are absent. The watch launcher has a Robolectric Compose test on

@@ -3,11 +3,7 @@ package com.runpro.core.journal
 import java.io.ByteArrayOutputStream
 import java.io.Closeable
 import java.io.IOException
-import java.nio.ByteBuffer
-import java.nio.channels.Channels
-import java.nio.channels.FileChannel
 import java.nio.file.Path
-import java.nio.file.StandardOpenOption
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -25,6 +21,12 @@ fun interface MonotonicClock {
  * process); [sync] makes everything written so far durable on storage (it survives a power loss or a reboot).
  */
 interface JournalOutput : Closeable {
+    /** True after reserved capacity was needed; the recording must stop immediately. */
+    val storageFull: Boolean get() = false
+
+    /** Remaining ordinary capacity; memory/test outputs are unbounded by default. */
+    val availableBytes: Long get() = Long.MAX_VALUE
+
     fun write(bytes: ByteArray, offset: Int, length: Int)
 
     fun sync()
@@ -83,6 +85,9 @@ class JournalWriter private constructor(
         clock: MonotonicClock = MonotonicClock.SYSTEM,
         policy: JournalPolicy = JournalPolicy()
     ) : this(output, clock, policy, true)
+
+    val storageFull: Boolean get() = output.storageFull
+    val availableBytes: Long get() = output.availableBytes
 
     private val lock = Any()
     private val buffer = ByteArrayOutputStream()
@@ -228,61 +233,5 @@ class JournalWriter private constructor(
             clock: MonotonicClock = MonotonicClock.SYSTEM,
             policy: JournalPolicy = JournalPolicy()
         ): JournalWriter = JournalWriter(FileJournalOutput.resume(file), clock, policy, false)
-    }
-}
-
-/** A [JournalOutput] on a file: [write] goes to the OS page cache, [sync] is `fsync` (`FileChannel.force`). */
-class FileJournalOutput private constructor(private val channel: FileChannel) : JournalOutput {
-    override fun write(bytes: ByteArray, offset: Int, length: Int) {
-        val source = ByteBuffer.wrap(bytes, offset, length)
-        while (source.hasRemaining()) channel.write(source)
-    }
-
-    override fun sync() = channel.force(false)
-
-    override fun close() = channel.close()
-
-    companion object {
-        internal fun resume(file: Path): FileJournalOutput {
-            val channel = FileChannel.open(file, StandardOpenOption.READ, StandardOpenOption.WRITE)
-            var opened = false
-            try {
-                val contents = JournalReader.read(Channels.newInputStream(channel))
-                require(contents.runId != null && !contents.isStopped) { "Need an unfinished run" }
-                require(contents.skippedRecords == 0) {
-                    "Cannot continue a journal with unknown records"
-                }
-                channel.truncate(contents.validLength)
-                channel.position(contents.validLength)
-                channel.force(true)
-                opened = true
-                return FileJournalOutput(channel)
-            } finally {
-                if (!opened) channel.close()
-            }
-        }
-
-        /** Creates [file], which must not exist, and makes its directory entry durable. */
-        fun create(file: Path): FileJournalOutput {
-            val channel = FileChannel.open(
-                file,
-                StandardOpenOption.CREATE_NEW,
-                StandardOpenOption.WRITE
-            )
-            syncDirectory(file.toAbsolutePath().parent)
-            return FileJournalOutput(channel)
-        }
-
-        // Without this a power loss can lose the new file itself, not only its tail. Linux (Android) supports
-        // fsync on a directory; other systems may refuse to open one, which is harmless there.
-        @Suppress("SwallowedException")
-        private fun syncDirectory(directory: Path?) {
-            if (directory == null) return
-            try {
-                FileChannel.open(directory, StandardOpenOption.READ).use { it.force(true) }
-            } catch (e: IOException) {
-                // Best effort: the file data is still synced by the writer.
-            }
-        }
     }
 }

@@ -26,3 +26,7 @@ Blocked after validation: ./rp check passes (including all 16 install tests) and
 ## 2026-11-25 15:04 · issue-6-watch-development-setup-and-install-scri
 
 External notification also blocked: the GitHub connector rejected both the issue #6 comment and adding needs-owner with: MCP tool call requires approval, but approval policy is never. Neither comment nor label was applied. Owner must also add needs-owner and record the pending watch acceptance on issue #6. Stopping with validated implementation files and handoff notes preserved locally; no commit, push or PR exists.
+
+## 2026-11-26 14:54 · issue-13-low-battery-and-storage-handling
+
+Done: #13 core resource policy, pre-start filesystem space checks and reserved journal capacity for clean ENOSPC saving; LowResourceReplayTest and ./rp check pass. Next: review/merge this PR, then #71 wires watch monitoring/warnings and platform shutdown after #10/#12. Open problems: no watch field result claimed; reserve exhaustion or unrelated I/O errors remain visible failures with retained journal prefixes.

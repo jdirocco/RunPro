@@ -37,7 +37,8 @@ data class RunState(
     val run: Run? = null,
     val totals: Totals = Totals(),
     val laps: List<LapTotals> = emptyList(),
-    val current: CurrentValues = CurrentValues()
+    val current: CurrentValues = CurrentValues(),
+    val resources: ResourceState = ResourceState()
 )
 
 data class LapTotals(val lap: Lap, val totals: Totals)
@@ -98,5 +99,19 @@ data class CurrentValues(
         is ElevationSample -> copy(elevation = sample.elevation)
 
         else -> this
+    }
+}
+
+/** Latest device readings. Warnings remain observable even if the UI misses intermediate states. */
+data class ResourceState(val batteryPercent: Int? = null, val availableBytes: Long? = null) {
+    val lowBattery: Boolean get() = batteryPercent?.let { it <= BATTERY_WARNING_PERCENT } == true
+    val lowStorage: Boolean get() = availableBytes?.let { it < STORAGE_WARNING_BYTES } == true
+    val canStart: Boolean get() =
+        batteryPercent?.let { it > BATTERY_STOP_PERCENT } != false && availableBytes != 0L
+
+    companion object {
+        const val BATTERY_WARNING_PERCENT = 15
+        const val BATTERY_STOP_PERCENT = 3
+        const val STORAGE_WARNING_BYTES = 50_000_000L
     }
 }

@@ -29,7 +29,7 @@ See `docs/GUIDE.md` and ADR 0006 for declarations and scheduling semantics.
 These are reusable infrastructure for R2, R4, R7 and R8, not substitutes for the invariant tests above.
 The journal double persists every input immediately. That infrastructure sample does not prove clean
 saving under full storage (R7), source fallback/events (R5) or BLE reconnect timing (R8). Real journal
-persistence and recovery evidence follows below.
+persistence and recovery evidence follows below; R7 evidence is in the low-resource section.
 
 ## Journal recovery evidence
 
@@ -46,6 +46,23 @@ persistence and recovery evidence follows below.
 
 These are JVM guarantees. Watch service restart/boot detection and physical validation follow in the
 Android adapter and field-test issues. Recovery policy and clock assumptions: ADR 0007.
+
+## Low-resource saving evidence
+
+- `LowResourceReplayTest` replays sensors through real engines, writers and file outputs. At 3% battery,
+  Running and Paused runs stop with `LOW_BATTERY`, retaining all accepted samples and laps. The 15%
+  warning is observable without stopping. A chaos storage-full callback makes the real file adapter's
+  next write store a partial frame and throw ENOSPC. The adapter releases its 1 MiB reserve, rolls back
+  the partial write and retries; the engine syncs all pending records and one `STORAGE_FULL` stop.
+  Tests read the clean journal before orderly shutdown (R7).
+- `ReservedStorageTest` verifies partial-write rollback, reserve release on ENOSPC during sync, complete
+  synced stop records, and no retry/reserve release for unrelated I/O errors. If even the reserve cannot
+  finish saving, `LowResourceReplayTest` checks observable failure and no falsely published Stopped state.
+- `LowResourceTest` checks exact 15%/3%/50 MB thresholds, start rejection/retry at critical resources,
+  paused runs, repeated readings and pre-start checks against actual output capacity.
+
+These are JVM guarantees, with the reserve limits in ADR 0008. Resource input delivery, visible warnings
+and platform exercise shutdown on the watch are tracked in #71 after #10/#12; no field result is claimed.
 
 ## Failure catalogue
 
