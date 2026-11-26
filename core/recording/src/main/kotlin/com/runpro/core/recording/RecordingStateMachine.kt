@@ -5,6 +5,7 @@ import com.runpro.core.model.Run
 import com.runpro.core.model.RunEvent
 import com.runpro.core.model.RunId
 import com.runpro.core.model.Sample
+import com.runpro.core.model.StopReason
 import com.runpro.core.model.Timestamp
 
 /**
@@ -16,6 +17,7 @@ import com.runpro.core.model.Timestamp
  */
 class RecordingStateMachine(
     private val config: EngineConfig = EngineConfig(),
+    private val requireStorageCheck: Boolean = false,
     private val runIds: () -> RunId = RunId::random
 ) {
     private var phase = RunPhase.IDLE
@@ -23,6 +25,7 @@ class RecordingStateMachine(
     private var metrics: RunMetrics? = null
     private var now: Timestamp? = null
     private var gate = SampleGate()
+    private var resources = ResourceState()
     private var current = CurrentValues()
 
     /** A snapshot of the current state. */
@@ -34,14 +37,15 @@ class RecordingStateMachine(
             if (run == null || metrics == null ||
                 now == null
             ) {
-                return RunState(phase, current = current)
+                return RunState(phase, current = current, resources = resources)
             }
             return RunState(
                 phase = phase,
                 run = run,
                 totals = metrics.totals(now),
                 laps = run.laps.zip(metrics.laps(now), ::LapTotals),
-                current = current
+                current = current,
+                resources = resources
             )
         }
 
@@ -53,6 +57,29 @@ class RecordingStateMachine(
         is EngineInput.Start -> start(input.time)
         is EngineInput.Reset -> reset()
         is EngineInput.Command -> record(input)
+        is EngineInput.Resources -> onResources(input)
+    }
+
+    private fun onResources(input: EngineInput.Resources): Boolean {
+        resources = resources.copy(
+            batteryPercent = input.batteryPercent ?: resources.batteryPercent,
+            availableBytes = input.availableBytes ?: resources.availableBytes
+        )
+        val reason = when {
+            resources.availableBytes == 0L -> StopReason.STORAGE_FULL
+
+            resources.batteryPercent?.let { it <= ResourceState.BATTERY_STOP_PERCENT } == true ->
+                StopReason.LOW_BATTERY
+
+            else -> return true
+        }
+        record(EngineInput.Stop(maxOf(input.time, now ?: input.time), reason))
+        return true
+    }
+
+    internal fun stopForStorageFull(): Boolean {
+        resources = resources.copy(availableBytes = 0)
+        return now?.let { record(EngineInput.Stop(it, StopReason.STORAGE_FULL)) } ?: false
     }
 
     private fun moveTo(next: RunPhase, vararg from: RunPhase): Boolean {
@@ -62,6 +89,11 @@ class RecordingStateMachine(
     }
 
     private fun start(time: Timestamp): Boolean {
+        if (!resources.canStart ||
+            (requireStorageCheck && resources.availableBytes == null)
+        ) {
+            return false
+        }
         val started = moveTo(RunPhase.RUNNING, RunPhase.PREPARING)
         if (started) {
             // Warmup readings are not part of the persisted run or its source choices.

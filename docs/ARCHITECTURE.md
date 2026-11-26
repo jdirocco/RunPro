@@ -118,3 +118,13 @@ time. A service restart that verifies the same boot and run ownership can instea
 After reboot or when boot continuity is unknown, offer to save; never compare timestamps across boots.
 Unknown records are refused, completed journals are not reopened, and recovery never deletes a file.
 The Android service/startup adapter follows in #10/#11; policy and evidence are in ADR 0007.
+
+## Low resources (`:core:recording` / `:core:journal`)
+
+`EngineInput.Resources` supplies battery and journal-filesystem capacity. `RunState.resources` exposes
+warnings at <= 15% battery and < 50 MB (50,000,000 bytes). At <= 3% or zero space, Running/Paused stops
+and the stop is synced before publication. Journal sessions query space before each valid start attempt.
+`FileJournalOutput` holds a physically allocated 1 MiB reserve beside each journal. ENOSPC releases it,
+rolls back a partial write and retries once; the session immediately saves with `STORAGE_FULL`. Other
+I/O failures and exhausted reserves remain observable failures with a recoverable prefix. ADR 0008
+explains the limits. Watch resource monitoring and warning UI integration are tracked in #71.

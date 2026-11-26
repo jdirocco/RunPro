@@ -19,7 +19,10 @@ class RecordingSession internal constructor(
         config: EngineConfig = EngineConfig(),
         runIds: () -> RunId = RunId::random,
         journal: JournalWriter? = null
-    ) : this(RecordingStateMachine(config, runIds), journal)
+    ) : this(
+        RecordingStateMachine(config, requireStorageCheck = journal != null, runIds = runIds),
+        journal
+    )
 
     val state: RunState get() = machine.state
     private var failed = false
@@ -27,20 +30,40 @@ class RecordingSession internal constructor(
     fun handle(input: EngineInput): Boolean {
         check(!failed) { "The recording session failed" }
         if (journal != null && input == EngineInput.Reset) return false
-        val previousEvents = state.run?.events?.size ?: 0
-        val accepted = machine.handle(input)
         try {
+            if (input is EngineInput.Start && journal != null &&
+                state.phase == RunPhase.PREPARING
+            ) {
+                machine.handle(
+                    EngineInput.Resources(input.time, availableBytes = journal.availableBytes)
+                )
+            }
+            val previousEvents = state.run?.events?.size ?: 0
+            val accepted = machine.handle(input)
             if (accepted) persist(input, previousEvents)
             journal?.tick()
+            if (journal?.storageFull == true) {
+                val beforeStop = state.run?.events?.size ?: 0
+                if (machine.stopForStorageFull()) persistEvents(beforeStop)
+            }
+            return accepted
         } catch (e: IOException) {
             failed = true
             throw e
         }
-        return accepted
     }
 
     private fun persist(input: EngineInput, previousEvents: Int) {
-        val run = state.run ?: return // Preparing samples are not part of the run.
+        if (state.run == null) return // Preparing samples are not part of the run.
+        persistEvents(previousEvents)
+        if (input is EngineInput.SampleReceived) {
+            journal?.append(JournalRecord.Samples(listOf(input.sample)))
+        }
+        if (input is EngineInput.Tick) journal?.append(JournalRecord.Checkpoint(input.time))
+    }
+
+    private fun persistEvents(previousEvents: Int) {
+        val run = state.run ?: return
         for (event in run.events.drop(previousEvents)) {
             journal?.append(
                 if (event is RunEvent.Started) {
@@ -50,12 +73,6 @@ class RecordingSession internal constructor(
                 }
             )
         }
-        if (input is EngineInput.SampleReceived) {
-            journal?.append(
-                JournalRecord.Samples(listOf(input.sample))
-            )
-        }
-        if (input is EngineInput.Tick) journal?.append(JournalRecord.Checkpoint(input.time))
     }
 
     /** Orderly shutdown: flushes buffered samples. A stopped run was already synced by handle(Stop). */

@@ -85,7 +85,8 @@ class JournalRecoveryTest {
         val before = session.state
         session.abort()
         JournalRecovery.restore(file, RecoveryMode.RESUME_SAME_BOOT).use { recovered ->
-            assertEquals(before, recovered.state)
+            // Device capacity is live state, not part of journal recovery.
+            assertEquals(before.copy(resources = ResourceState()), recovered.state)
             assertTrue(recovered.handle(hr(2, 140)))
             assertTrue(live.handle(hr(2, 140)))
             assertEquals(live.state, recovered.state)

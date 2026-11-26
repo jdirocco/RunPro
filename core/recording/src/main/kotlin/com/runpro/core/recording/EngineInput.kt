@@ -25,6 +25,22 @@ sealed interface EngineInput {
     /** The clock moved on (UI timer); updates elapsed and timer time without new samples. */
     data class Tick(val time: Timestamp) : EngineInput
 
+    /** Device resources from the adapter, using the current boot clock. Null fields leave the last reading. */
+    data class Resources(
+        val time: Timestamp,
+        val batteryPercent: Int? = null,
+        val availableBytes: Long? = null
+    ) : EngineInput {
+        init {
+            require(batteryPercent == null || batteryPercent in 0..FULL_BATTERY_PERCENT)
+            require(availableBytes == null || availableBytes >= 0)
+        }
+
+        private companion object {
+            const val FULL_BATTERY_PERCENT = 100
+        }
+    }
+
     /**
      * A command that adds an event to the running run. A command older than the last event is moved to the
      * time of that event, so the event list stays ordered and a stop is never lost.
