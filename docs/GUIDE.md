@@ -36,7 +36,12 @@ $ ./rp status
   M1 Recording core        [                    ] 0/8
   ...
 == In progress
-  #3 Core domain model
+  #5 Chaos injector for replay tests
+      running 12m: codex gpt-6.1-sol on openai (cloud), auto, pid 87776
+  #55 rp: --worktree run from inside a worktree nests the new worktree under it
+      no agent running (last: codex devstral-64k:latest on ollama (local), exited 0 25m ago)
+  #47 Field validation of the phone app
+      no agent running
 == Decisions for the owner (needs-owner: answer in the issue, then remove the label)
   none
 == Field tests to run now (./rp install, then docs/FIELD_TESTING.md)
@@ -51,6 +56,15 @@ $ ./rp status
 == Next ready
   #4 Replay trace format, recorder and replayer
 ```
+
+Under each issue **In progress** a second line says whether an agent works on it and where it runs: runner,
+model, provider and `local` or `cloud`. `./rp agent` records each run in `.git/rp-agents/<N>.json` (shared by
+all worktrees) with the model resolved even when `plan/config.json` leaves it `null`: Codex reads
+`~/.codex/config.toml` (`--oss` means local, with `--local-provider`), Claude reads `--model`,
+`ANTHROPIC_MODEL` or `.claude/settings.json` (a localhost `ANTHROPIC_BASE_URL` means local). Agents not
+started by `./rp agent` with a record are still found from the process list. "no agent running" on an issue
+nobody waits for means it was left In Progress by mistake: unassign it, drop `status:in-progress` and set the
+board back to Todo.
 
 Your to-do list is the first two owner sections:
 
