@@ -67,6 +67,19 @@ real or replayed SensorSource ─► TraceRecorder ─► *.jsonl.gz            
                                                                  engine / test consumer
 ```
 
+## BLE protocol parsers (`:core:ble`)
+
+`GattParsers.parse(characteristic, bytes)` decodes Heart Rate Measurement (0x2A37: uint8/uint16 value,
+sensor contact, energy expended, RR intervals in 1/1024 s), RSC Measurement (0x2A53: speed, cadence,
+stride length, total distance, walking/running), Cycling Power Measurement (0x2A63, every optional field;
+Stryd sends running power here) and Battery Level (0x2A19). UUIDs are in `GattUuids`. Parsers never
+throw: a value that ends early is `ParseResult.Malformed` (for the sensor log); reserved flag bits and
+extra trailing bytes are ignored, and a dangling half RR interval is skipped so the heart rate is kept.
+`BleSamples.from` maps measurements to model samples and drops what the model cannot hold at the edge:
+heart rate above 300 bpm and negative power are dropped, lost skin contact becomes 0 bpm, RSC cadence is
+taken as steps per minute (footpods that send strides are a device quirk for #21), battery level gives no
+sample.
+
 ## BLE connection state machine
 
 ```
