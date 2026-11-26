@@ -42,7 +42,7 @@ persistence and recovery evidence follows below; R7 evidence is in the low-resou
 - `JournaledEngineTest` proves start publication follows journal sync and disk work runs on the engine
   thread without blocking submission (R1/R6); persistence failures are exposed to callers.
 - `JournalResumeTest` proves intact prefixes survive truncated/corrupt tails, no extra header is written,
-  and completed or unknown-record journals are refused unchanged (R3 retention; FIT verification is #24).
+  and completed or unknown-record journals are refused unchanged (R3 retention; FIT verification is below).
 
 These are JVM guarantees. Watch service restart/boot detection and physical validation follow in the
 Android adapter and field-test issues. Recovery policy and clock assumptions: ADR 0007.
@@ -63,6 +63,18 @@ Android adapter and field-test issues. Recovery policy and clock assumptions: AD
 
 These are JVM guarantees, with the reserve limits in ADR 0008. Resource input delivery, visible warnings
 and platform exercise shutdown on the watch are tracked in #71 after #10/#12; no field result is claimed.
+
+## Export verification evidence
+
+- `ExportVerificationTest` writes FIT files from real journals (easy run, intervals, strap dropout,
+  every record kind, crash-recovered run, wall clock jump), reads each back from storage, decodes it with
+  the Garmin FIT SDK and compares run id, devices, every run/sensor event, every record, laps and
+  session with the journal. Only a match yields a `VerifiedExport`; a mismatch or damaged file is
+  removed, and the journal bytes never change (R3). Source switches are FIT events carrying the exact
+  RunPro event (R5 in the file; the switching itself is #19).
+- Journal deletion is not implemented here: #30 deletes only after the phone acknowledges a file whose
+  `VerifiedExport` hash still matches. Strava/Garmin validator acceptance is an owner check
+  (`FIELD_TESTING.md`). Format and mapping: ADR 0009.
 
 ## Failure catalogue
 

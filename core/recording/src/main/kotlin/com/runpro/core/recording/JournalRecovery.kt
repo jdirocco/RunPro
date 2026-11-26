@@ -1,13 +1,11 @@
 package com.runpro.core.recording
 
-import com.runpro.core.journal.JournalContents
 import com.runpro.core.journal.JournalPolicy
 import com.runpro.core.journal.JournalReader
 import com.runpro.core.journal.JournalRecord
 import com.runpro.core.journal.JournalWriter
 import com.runpro.core.journal.MonotonicClock
 import com.runpro.core.model.StopReason
-import com.runpro.core.model.Timestamp
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
@@ -64,7 +62,7 @@ object JournalRecovery {
         val rebuilt = RecordingStateMachine(config) { start.runId }
         rebuilt.handle(EngineInput.Prepare(start.time))
         rebuilt.handle(EngineInput.Start(start.time))
-        val last = replay(contents, rebuilt, start.time)
+        val last = replayJournal(contents, rebuilt)
         val session = RecordingSession(rebuilt, JournalWriter.resume(file, clock, policy))
         if (mode == RecoveryMode.SAVE) {
             try {
@@ -75,37 +73,5 @@ object JournalRecovery {
             }
         }
         return session
-    }
-
-    private fun replay(
-        contents: JournalContents,
-        machine: RecordingStateMachine,
-        start: Timestamp
-    ): Timestamp {
-        var last = start
-        for (record in contents.records.drop(1)) {
-            when (record) {
-                is JournalRecord.RunStarted -> error("Multiple run starts in one journal")
-
-                is JournalRecord.Samples -> record.samples.forEach {
-                    machine.handle(EngineInput.SampleReceived(it))
-                    last = maxOf(last, it.time)
-                }
-
-                is JournalRecord.Event -> {
-                    machine.restoreEvent(record.event)
-                    last = maxOf(last, record.event.time)
-                }
-
-                is JournalRecord.Sensor -> last = maxOf(last, record.event.time)
-
-                is JournalRecord.Checkpoint -> {
-                    machine.handle(EngineInput.Tick(record.time))
-                    last = maxOf(last, record.time)
-                }
-            }
-        }
-        machine.handle(EngineInput.Tick(last))
-        return last
     }
 }

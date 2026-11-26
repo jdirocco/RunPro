@@ -24,6 +24,16 @@ Watch setup step by step (in Italian, for the owner): `docs/it/CONFIGURAZIONE_OR
 | F6 | Track or treadmill with footpod | Footpod distance vs GPS vs real |
 | F7 | Run with the phone left at home | Watch-only GPS, sync later |
 
+## FIT file acceptance (no watch needed)
+
+`./rp check` writes `core/fit/build/fit-samples/easy-run-30min.fit` and `every-record.fit`.
+
+1. Open each file in Garmin's FIT File Tools / FitCSVTool (FIT SDK) or https://www.fitfileviewer.com:
+   no errors, one running session, laps and events present.
+2. Upload `easy-run-30min.fit` to Strava (Upload activity → File): it is accepted as a run of about
+   4.91 km, 30:00 elapsed, 3 laps, average HR 139 (Strava computes its own moving time). Delete it afterwards.
+3. Report the result on the export issue (#28): accepted or the exact error message.
+
 ## After the run
 
 1. Settings → Diagnostics → Export logs (sends trace + sensor log to the phone).

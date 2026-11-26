@@ -14,6 +14,7 @@ kotlinx-coroutines = "1.11.0"
 robolectric = "4.16.1"
 androidx-core = "1.18.0"
 wear-ongoing = "1.1.0"
+garmin-fit = "21.176.0"
 
 [libraries]
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity" }
@@ -23,6 +24,7 @@ androidx-core = { module = "androidx.core:core", version.ref = "androidx-core" }
 androidx-wear-ongoing = { module = "androidx.wear:wear-ongoing", version.ref = "wear-ongoing" }
 androidx-compose-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4", version.ref = "compose" }
 androidx-compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest", version.ref = "compose" }
+garmin-fit = { module = "com.garmin:fit", version.ref = "garmin-fit" }
 kotlin-test-junit5 = { module = "org.jetbrains.kotlin:kotlin-test-junit5", version.ref = "kotlin" }
 junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version = "1.13.4" }
