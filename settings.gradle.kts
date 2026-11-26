@@ -21,6 +21,7 @@ include(
     ":core:recording",
     ":core:journal",
     ":core:fit",
+    ":core:sync",
     ":core:dynamics",
     ":core:ble",
     ":tools:replay",

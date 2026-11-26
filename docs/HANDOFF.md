@@ -30,3 +30,7 @@ External notification also blocked: the GitHub connector rejected both the issue
 ## 2026-11-26 14:54 · issue-13-low-battery-and-storage-handling
 
 Done: #13 core resource policy, pre-start filesystem space checks and reserved journal capacity for clean ENOSPC saving; LowResourceReplayTest and ./rp check pass. Next: review/merge this PR, then #71 wires watch monitoring/warnings and platform shutdown after #10/#12. Open problems: no watch field result claimed; reserve exhaustion or unrelated I/O errors remain visible failures with retained journal prefixes.
+
+## 2026-11-26 14:58 · issue-30-phone-companion-and-data-layer-sync
+
+Issue #30 blocked by open prerequisite #28. Read harness/architecture/reliability docs and inspected phone/watch/FIT modules; no production changes. core/fit has no implementation or verified-export API, so end-to-end sync would require widening scope into #28. Commented on #30 and added status:blocked. Next: merge #28, then implement durable ChannelClient outbox/receiver/ack and 20-run interruption/dedup tests; align phone/watch application IDs and signing (currently different IDs), document in ADR. No tests/check/commit/PR or field validation claimed.

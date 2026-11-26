@@ -65,6 +65,27 @@ object FitExporter {
     ): VerifiedExport {
         val run = RecordedRun.from(JournalReader.read(journal), config)
         writeDurably(fit, encode(run))
+        return verifyWritten(run, journal, fit)
+    }
+
+    /**
+     * Verifies a FIT file written earlier by [export] against [journal] without writing it again, e.g.
+     * after a restart, so the file content (and its hash, which the phone uses to recognise a run it
+     * already stored) stays the same. A file that does not match is removed, as in [export].
+     *
+     * @throws ExportVerificationException when [fit] does not match; [fit] is removed.
+     * @throws FitFormatException when [fit] does not decode; [fit] is removed.
+     * @throws IllegalArgumentException when the journal is not a complete stopped run.
+     * @throws IOException on storage errors, including a missing [fit].
+     */
+    fun verifyExisting(
+        journal: Path,
+        fit: Path,
+        config: EngineConfig = EngineConfig()
+    ): VerifiedExport =
+        verifyWritten(RecordedRun.from(JournalReader.read(journal), config), journal, fit)
+
+    private fun verifyWritten(run: RecordedRun, journal: Path, fit: Path): VerifiedExport {
         val written = Files.readAllBytes(fit)
         val verification = try {
             ExportVerifier.verify(run, FitDecoder.decode(written))

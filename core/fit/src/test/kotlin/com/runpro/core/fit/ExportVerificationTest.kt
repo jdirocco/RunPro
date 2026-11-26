@@ -224,6 +224,27 @@ class ExportVerificationTest {
     }
 
     @Test
+    fun `an earlier export is verified again without rewriting it, a changed one is removed`(
+        @TempDir dir: Path
+    ) {
+        val journal = dir.resolve("every.journal")
+        everyRecordJournal(journal)
+        val fit = dir.resolve("every.fit")
+        val first = FitExporter.export(journal, fit)
+        val bytes = Files.readAllBytes(fit)
+
+        val again = FitExporter.verifyExisting(journal, fit)
+
+        assertEquals(first.sha256, again.sha256)
+        assertContentEquals(bytes, Files.readAllBytes(fit))
+        bytes[bytes.size / 2] = (bytes[bytes.size / 2] + 1).toByte()
+        Files.write(fit, bytes)
+        assertFailsWith<FitFormatException> { FitExporter.verifyExisting(journal, fit) }
+        assertFalse(fit.exists())
+        assertFailsWith<java.io.IOException> { FitExporter.verifyExisting(journal, fit) }
+    }
+
+    @Test
     fun `a FIT file that does not match the journal is removed and no proof is given`(
         @TempDir dir: Path
     ) {

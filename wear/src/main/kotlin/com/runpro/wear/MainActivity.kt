@@ -23,6 +23,7 @@ import com.runpro.core.recording.service.PermissionReadiness
 import com.runpro.core.recording.service.RunPermission
 import com.runpro.core.recording.service.ServiceCommand
 import com.runpro.core.recording.service.ServicePermissions
+import com.runpro.wear.sync.PhoneSync
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -52,6 +53,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Runs waiting for the phone are sent again whenever the app opens (#30).
+        PhoneSync.request(this)
         setContent {
             RunProScreen(
                 SetupState(readiness, advice, backgroundLocationSkipped),

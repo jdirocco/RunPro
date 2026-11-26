@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:keep="@array/android_wear_capabilities">
+    <!-- The watch sends FIT files only to nodes with this capability (SyncProtocol.PHONE_CAPABILITY). -->
+    <string-array name="android_wear_capabilities" translatable="false">
+        <item>runpro_fit_receiver</item>
+    </string-array>
+</resources>

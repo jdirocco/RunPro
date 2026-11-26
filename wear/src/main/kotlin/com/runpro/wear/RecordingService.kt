@@ -18,6 +18,7 @@ import com.runpro.core.recording.service.RunRecovery
 import com.runpro.core.recording.service.ServiceCommand
 import com.runpro.core.recording.service.ServiceStartPolicy
 import com.runpro.core.recording.service.ServiceStartPolicy.Decision
+import com.runpro.wear.sync.PhoneSync
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
@@ -148,7 +149,12 @@ class RecordingService : Service() {
         main.post {
             when {
                 ServiceStartPolicy.needsForeground(state.phase) -> notification.update(state)
-                state.phase == RunPhase.STOPPED -> leave()
+
+                state.phase == RunPhase.STOPPED -> {
+                    leave()
+                    PhoneSync.request(this)
+                }
+
                 else -> Unit
             }
         }

@@ -7,7 +7,7 @@ Each invariant has (or will have) a test; the test names are listed so agents ca
 |---|---|---|
 | R1 | A started run is persisted within 1 s of the start tap | `JournalStartLatencyTest` |
 | R2 | After process death at any point, restart restores the run with ≤ 5 s data loss | `CrashRecoveryReplayTest` (chaos replay) |
-| R3 | A journal is deleted only after its FIT file is decoded and matches it | `ExportVerificationTest` |
+| R3 | A journal is deleted only after its FIT file is decoded and matches it | `ExportVerificationTest`, `PhoneSyncTest` |
 | R4 | A sensor dropout never pauses or stops the recording | `SensorDropoutReplayTest` |
 | R5 | Every source switch (strap ↔ wrist, footpod ↔ GPS) is recorded as a FIT event | `SourceSwitchEventTest` |
 | R6 | The recording path never runs on the main thread and never waits for the UI | `RecordingThreadingTest` |
@@ -72,9 +72,27 @@ and platform exercise shutdown on the watch are tracked in #71 after #10/#12; no
   session with the journal. Only a match yields a `VerifiedExport`; a mismatch or damaged file is
   removed, and the journal bytes never change (R3). Source switches are FIT events carrying the exact
   RunPro event (R5 in the file; the switching itself is #19).
-- Journal deletion is not implemented here: #30 deletes only after the phone acknowledges a file whose
+- Journal deletion is in the phone sync below: only after the phone acknowledges a file whose
   `VerifiedExport` hash still matches. Strava/Garmin validator acceptance is an owner check
   (`FIELD_TESTING.md`). Format and mapping: ADR 0009.
+
+## Phone sync evidence
+
+- `PhoneSyncTest` sends 20 runs through an in-process link that fails half of the exchanges (phone out of
+  range, channel open failure, transfer cut at a random byte, a corrupted byte, a lost ack) and restarts
+  the watch and phone objects at random, for 5 seeds. After every pass each deleted journal's FIT file is
+  on the phone byte for byte; at the end all 20 are there exactly once, no journal, reserve or partial file
+  remains, and no run was stored twice or overwritten (R3).
+- `FitOutboxTest`: no phone, a run still recording, a negative ack, an ack for other content or another
+  run, and a FIT file changed after verification all keep the journal; after a restart in another time
+  zone the earlier file is reused, so the phone sees the same hash.
+- `FitInboxTest`: cut transfers store and acknowledge nothing, a hash mismatch gets a negative ack, a repeat
+  offer is acked without a second file, partial files of a dead process are removed, run ids become safe,
+  distinct file names.
+- `ExportVerificationTest` covers `FitExporter.verifyExisting` (same bytes, a damaged file is removed).
+
+These are JVM guarantees. The `ChannelClient` adapters and the 20-run check with the real watch and phone
+need journals written during a run (#60) and are the owner field test #75; ADR 0010.
 
 ## Failure catalogue
 

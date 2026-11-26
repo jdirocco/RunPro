@@ -57,5 +57,18 @@
             android:name=".RecordingService"
             android:exported="false"
             android:foregroundServiceType="health|location|connectedDevice" />
+
+        <!-- Phone sync (#30): Play services wakes it when the phone app becomes reachable. -->
+        <service
+            android:name=".sync.PhoneSyncListenerService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.CAPABILITY_CHANGED" />
+                <data
+                    android:host="*"
+                    android:path="/runpro_fit_receiver"
+                    android:scheme="wear" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>

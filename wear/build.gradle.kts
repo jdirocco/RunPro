@@ -41,6 +41,12 @@ dependencies {
     implementation(libs.androidx.core)
     implementation(libs.androidx.wear.ongoing)
     implementation(project(":core:recording"))
+    implementation(project(":core:sync"))
+    implementation(libs.play.services.wearable)
+    constraints {
+        // Play services brings Fragment 1.0; registerForActivityResult needs 1.3+ (lint, ADR 0010).
+        implementation(libs.androidx.fragment)
+    }
     testImplementation(libs.junit4)
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.compose.ui.test.junit4)
