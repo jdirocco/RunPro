@@ -28,8 +28,28 @@ class RecordingThreadingTest {
         executor.shutdownNow()
     }
 
-    /** The current thread name without the `@coroutine#N` suffix added in coroutine debug mode. */
-    private fun threadName() = Thread.currentThread().name.substringBefore(" @coroutine#")
+    /**
+     * Records the threads `onProcessed` runs on. The engine publishes `state` before it calls `onProcessed`,
+     * so waiting on `state` can read the threads too early (#64): wait for `onProcessed` itself to see STOPPED.
+     */
+    private class ProcessedThreads(private val slowMillis: Long = 0) {
+        private val names = mutableSetOf<String>()
+        private val stopped = CountDownLatch(1)
+
+        fun onProcessed(state: RunState) {
+            if (slowMillis > 0) Thread.sleep(slowMillis)
+            synchronized(names) { names += threadName() }
+            if (state.phase == RunPhase.STOPPED) stopped.countDown()
+        }
+
+        fun awaitStopped(): Set<String> {
+            assertTrue(stopped.await(10, TimeUnit.SECONDS), "onProcessed never saw STOPPED")
+            return synchronized(names) { names.toSet() }
+        }
+
+        /** The current thread name without the `@coroutine#N` suffix added in coroutine debug mode. */
+        private fun threadName() = Thread.currentThread().name.substringBefore(" @coroutine#")
+    }
 
     private fun engine() = RecordingEngine(
         dispatcher = dispatcher,
@@ -51,28 +71,40 @@ class RecordingThreadingTest {
 
     @Test
     fun `inputs are processed on the engine dispatcher, not on the caller thread`() {
-        val processedOn = mutableSetOf<String>()
+        val processed = ProcessedThreads()
         val engine = RecordingEngine(
             dispatcher = dispatcher,
             runIds = { RunId("run-1") },
-            onProcessed = { synchronized(processedOn) { processedOn += threadName() } }
+            onProcessed = processed::onProcessed
         )
         trace.forEach(engine::submit)
-        awaitStopped(engine)
-        assertEquals(setOf(engineThreadName), synchronized(processedOn) { processedOn.toSet() })
+        assertEquals(setOf(engineThreadName), processed.awaitStopped())
         engine.close()
     }
 
     @Test
     fun `the default engine runs on its own recording thread`() {
-        val threads = mutableSetOf<String>()
+        val processed = ProcessedThreads()
         val engine = RecordingEngine(
             runIds = { RunId("run-1") },
-            onProcessed = { synchronized(threads) { threads += threadName() } }
+            onProcessed = processed::onProcessed
         )
         trace.forEach(engine::submit)
-        awaitStopped(engine)
-        assertEquals(setOf(RecordingEngine.THREAD_NAME), synchronized(threads) { threads.toSet() })
+        assertEquals(setOf(RecordingEngine.THREAD_NAME), processed.awaitStopped())
+        engine.close()
+    }
+
+    @Test
+    fun `a slow onProcessed callback still reports the engine thread`() {
+        // Regression for #64: with a slow callback, STOPPED is published long before onProcessed records it.
+        val processed = ProcessedThreads(slowMillis = 200)
+        val engine = RecordingEngine(
+            dispatcher = dispatcher,
+            runIds = { RunId("run-1") },
+            onProcessed = processed::onProcessed
+        )
+        trace.forEach(engine::submit)
+        assertEquals(setOf(engineThreadName), processed.awaitStopped())
         engine.close()
     }
 
