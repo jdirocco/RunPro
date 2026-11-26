@@ -161,6 +161,10 @@ l'orologio ha chiuso RunPro: segnalalo con una issue **Field report**.
 2. Non abbinarla da **Impostazioni → Connessioni → Bluetooth** dell'orologio: la aggiungi da RunPro
    (Sensori → Aggiungi), che gestisce la connessione da sé. Se l'avevi abbinata lì, scegli **Dimentica**.
 3. Chiudi Gear Tracker prima di correre: solo un'app alla volta può usare l'allenamento di Health Services.
+   Se un'altra app ne sta registrando uno, RunPro lo segnala mentre si prepara; quando avvii la corsa,
+   RunPro prende Health Services e l'allenamento dell'altra app si chiude. Se invece un'altra app avvia un
+   allenamento durante la corsa, RunPro continua a registrare (tempo, fascia) ma perde GPS e cardio del
+   polso fino alla corsa successiva.
 4. In Samsung Health disattiva **Rileva automaticamente gli allenamenti** per la corsa, così non parte un
    secondo allenamento in parallelo.
 

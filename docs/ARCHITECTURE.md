@@ -125,6 +125,26 @@ After reboot or when boot continuity is unknown, offer to save; never compare ti
 Unknown records are refused, completed journals are not reopened, and recovery never deletes a file.
 The Android service/startup adapter follows in #10/#11; policy and evidence are in ADR 0007.
 
+## Health Services exercise (`:core:recording` exercise / `:wear` health)
+
+`ExerciseController` drives the `ExerciseClient` running exercise through `ExercisePort` (fakeable; the
+`:wear` adapter is `HealthServicesExercisePort`) and is a `SensorSource` of `watch:health-services`.
+`RecordingService` calls `follow(phase)` on every engine phase change: warm-up while preparing, start,
+pause, resume, end when stopped. One request is in flight at a time; `ExerciseSession` picks the next.
+
+```
+engine phase ─► ExerciseController.follow ─► ExerciseSession.next ─► ExercisePort ─► ExerciseClient
+                         ▲                                                              │ updates
+                         └─ ExerciseSampleMapper (Samples) / ExerciseSignals (GPS events) ◄┘
+```
+
+- `ExercisePlan` requests only data types that are supported and permitted; no auto-pause.
+- Our exercise still running after a restart is adopted; another app's exercise is reported during
+  warm-up and taken over at the start; an exercise ended by the platform is reported in
+  `ExerciseStatus`, loses the GPS fix and never pauses or stops the run (R4).
+- The mapper drops invalid readings and sums distance deltas into the cumulative `DistanceSample`.
+  Decisions: ADR 0011.
+
 ## Low resources (`:core:recording` / `:core:journal`)
 
 `EngineInput.Resources` supplies battery and journal-filesystem capacity. `RunState.resources` exposes
