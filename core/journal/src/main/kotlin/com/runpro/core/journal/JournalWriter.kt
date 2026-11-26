@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream
 import java.io.Closeable
 import java.io.IOException
 import java.nio.ByteBuffer
+import java.nio.channels.Channels
 import java.nio.channels.FileChannel
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
@@ -71,11 +72,18 @@ data class JournalPolicy(
  * every later [append] throws [IllegalStateException]. What reached storage before stays readable.
  * [close] writes and syncs the rest and closes the output.
  */
-class JournalWriter(
+class JournalWriter private constructor(
     private val output: JournalOutput,
-    private val clock: MonotonicClock = MonotonicClock.SYSTEM,
-    private val policy: JournalPolicy = JournalPolicy()
+    private val clock: MonotonicClock,
+    private val policy: JournalPolicy,
+    writeHeader: Boolean
 ) : Closeable {
+    constructor(
+        output: JournalOutput,
+        clock: MonotonicClock = MonotonicClock.SYSTEM,
+        policy: JournalPolicy = JournalPolicy()
+    ) : this(output, clock, policy, true)
+
     private val lock = Any()
     private val buffer = ByteArrayOutputStream()
     private var lastFlush = clock.nanos()
@@ -85,7 +93,7 @@ class JournalWriter(
     private var failed: IOException? = null
 
     init {
-        buffer.write(JournalFormat.header())
+        if (writeHeader) buffer.write(JournalFormat.header())
     }
 
     /**
@@ -139,6 +147,15 @@ class JournalWriter(
                 writeBuffer()
                 syncOutput()
             }
+        }
+    }
+
+    /** Discards memory buffers and closes the output, as when the recording process dies. */
+    fun abort() = synchronized(lock) {
+        if (!closed) {
+            closed = true
+            buffer.reset()
+            output.close()
         }
     }
 
@@ -201,6 +218,16 @@ class JournalWriter(
             clock: MonotonicClock = MonotonicClock.SYSTEM,
             policy: JournalPolicy = JournalPolicy()
         ): JournalWriter = JournalWriter(FileJournalOutput.create(file), clock, policy)
+
+        /**
+         * Continues an unfinished journal after removing only its damaged tail. The previous writer must
+         * be closed. Unknown records and completed/unstarted files are refused without changing the file.
+         */
+        fun resume(
+            file: Path,
+            clock: MonotonicClock = MonotonicClock.SYSTEM,
+            policy: JournalPolicy = JournalPolicy()
+        ): JournalWriter = JournalWriter(FileJournalOutput.resume(file), clock, policy, false)
     }
 }
 
@@ -216,6 +243,25 @@ class FileJournalOutput private constructor(private val channel: FileChannel) : 
     override fun close() = channel.close()
 
     companion object {
+        internal fun resume(file: Path): FileJournalOutput {
+            val channel = FileChannel.open(file, StandardOpenOption.READ, StandardOpenOption.WRITE)
+            var opened = false
+            try {
+                val contents = JournalReader.read(Channels.newInputStream(channel))
+                require(contents.runId != null && !contents.isStopped) { "Need an unfinished run" }
+                require(contents.skippedRecords == 0) {
+                    "Cannot continue a journal with unknown records"
+                }
+                channel.truncate(contents.validLength)
+                channel.position(contents.validLength)
+                channel.force(true)
+                opened = true
+                return FileJournalOutput(channel)
+            } finally {
+                if (!opened) channel.close()
+            }
+        }
+
         /** Creates [file], which must not exist, and makes its directory entry durable. */
         fun create(file: Path): FileJournalOutput {
             val channel = FileChannel.open(

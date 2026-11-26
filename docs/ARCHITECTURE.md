@@ -76,9 +76,10 @@ diagnostics screen and attached to field reports).
 ## Journal format (`:core:journal`)
 
 Length-prefixed protobuf records with CRC32: `RunStarted`, `Sample(batch)`, `Lap`, `Pause`, `Resume`,
-`SourceSwitch`, `SensorEvent`, `RunStopped`, and the engine's sensor status (connected / lost). A reader stops
-at the first corrupt record and keeps everything before it. On app start, any journal without `RunStopped` is
-offered for recovery (and auto-recovered if the service was killed during a run). Details: ADR 0006.
+`SourceSwitch`, `SensorEvent`, `RunStopped`, the engine's sensor status (connected / lost), and timer
+checkpoints during sensor silence. A reader stops at the first corrupt record and keeps everything
+before it. On app start, any journal without `RunStopped` is offered for recovery (and auto-recovered if
+the service was killed during a run). Details: ADR 0006 and ADR 0007.
 
 ```
 file:    "RPJN" | version (int32) | record | record | ...
@@ -102,3 +103,18 @@ record:  length (int32) | CRC32 (int32) | protobuf Record { one of: run_started,
   are judged by their timestamp against the run timeline, so late batched samples still count.
 - `RecordingEngine` runs it on its own thread (R6): `submit` never blocks, and the state is published as a
   `StateFlow<RunState>` that never waits for the UI. Design and defaults: ADR 0005.
+
+## Crash recovery (`:core:recording`)
+
+`RecordingSession` connects the engine to `JournalWriter`: accepted run samples, run events and tick
+checkpoints are persisted before publication. Supply it through `RecordingEngine.sessionFactory` so
+creation/recovery and journal I/O run on the recording thread. Submit ticks at least once a second.
+Persistence failures close submission and are exposed in `RecordingEngine.failure`.
+
+At startup, `JournalRecovery.scan(directory)` finds unfinished `.journal` files without changing them.
+`JournalRecovery.restore(file)` rebuilds state and saves with `StopReason.RECOVERY` at the latest retained
+time. A service restart that verifies the same boot and run ownership can instead select
+`RecoveryMode.RESUME_SAME_BOOT`, retaining Running/Paused state and appending after the valid prefix.
+After reboot or when boot continuity is unknown, offer to save; never compare timestamps across boots.
+Unknown records are refused, completed journals are not reopened, and recovery never deletes a file.
+The Android service/startup adapter follows in #10/#11; policy and evidence are in ADR 0007.

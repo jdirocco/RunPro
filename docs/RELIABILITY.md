@@ -27,8 +27,25 @@ See `docs/GUIDE.md` and ADR 0006 for declarations and scheduling semantics.
 - `FaultInjectingOutputStreamTest` verifies write failures retain the existing storage prefix.
 
 These are reusable infrastructure for R2, R4, R7 and R8, not substitutes for the invariant tests above.
-The journal double persists every input immediately; real durability/loss bounds (R1/R2), clean saving
-under full storage (R7), source fallback/events (R5) and BLE reconnect timing (R8) remain unproven here.
+The journal double persists every input immediately. That infrastructure sample does not prove clean
+saving under full storage (R7), source fallback/events (R5) or BLE reconnect timing (R8). Real journal
+persistence and recovery evidence follows below.
+
+## Journal recovery evidence
+
+- `CrashRecoveryReplayTest` kills real engines at 20 seeded random offsets in the committed easy-run
+  trace and restores them from actual journal files, without an orderly flush. Each restart retains
+  every accepted sample older than 5 s since the preceding restart, keeps the run id and continues with
+  one start and one stop. Final timer and cumulative distance match an uninterrupted baseline (R2).
+- `JournalRecoveryTest` checks 20 power-loss snapshots containing only synced bytes (≤ 5 s timer loss),
+  paused state, laps, totals/source gates, sensor-silent timer checkpoints and save after reboot (R2).
+- `JournaledEngineTest` proves start publication follows journal sync and disk work runs on the engine
+  thread without blocking submission (R1/R6); persistence failures are exposed to callers.
+- `JournalResumeTest` proves intact prefixes survive truncated/corrupt tails, no extra header is written,
+  and completed or unknown-record journals are refused unchanged (R3 retention; FIT verification is #24).
+
+These are JVM guarantees. Watch service restart/boot detection and physical validation follow in the
+Android adapter and field-test issues. Recovery policy and clock assumptions: ADR 0007.
 
 ## Failure catalogue
 

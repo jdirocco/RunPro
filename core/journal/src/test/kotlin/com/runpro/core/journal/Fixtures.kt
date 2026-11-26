@@ -116,6 +116,7 @@ internal val everyRecord: List<JournalRecord> = buildList {
     everySample.forEach { add(JournalRecord.Samples(listOf(it))) }
     everyRunEvent.forEach { add(JournalRecord.Event(it)) }
     everySensorEvent.forEach { add(JournalRecord.Sensor(it)) }
+    add(JournalRecord.Checkpoint(at(40)))
 }
 
 /** A clock that only moves when told to. */

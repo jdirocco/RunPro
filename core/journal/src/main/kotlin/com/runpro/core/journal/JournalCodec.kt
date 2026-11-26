@@ -61,6 +61,8 @@ private object RecordEncoder {
         is JournalRecord.Event -> encode(record.event)
 
         is JournalRecord.Sensor -> RecordProto(sensorEvent = encode(record.event))
+
+        is JournalRecord.Checkpoint -> RecordProto(checkpoint = record.time.toProto())
     }
 
     private fun encode(event: RunEvent): RecordProto = when (event) {
@@ -178,7 +180,8 @@ private object RecordDecoder {
             proto.sourceSwitch?.let(::decode),
             proto.sensorEvent?.let(::decode),
             proto.runStopped?.let(::decode),
-            proto.sensorStatus?.let(::decode)
+            proto.sensorStatus?.let(::decode),
+            proto.checkpoint?.let { JournalRecord.Checkpoint(it.toModel()) }
         )
         require(kinds.size <= 1) { "A record holds ${kinds.size} record kinds" }
         return kinds.firstOrNull()
