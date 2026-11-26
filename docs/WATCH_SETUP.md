@@ -107,6 +107,21 @@ The current foundation build has a launcher screen. Recording, location/health/B
 battery checks and external strap setup belong to later recording/BLE issues. Follow those features'
 setup and [field scenarios](FIELD_TESTING.md) when implemented; this install check proves none of them.
 
+## Battery exemption (once per install)
+
+The watch has no settings screen that exempts an app from battery optimisation (Wear OS 6: the app details
+page has no Battery entry and the exemption intents resolve to a placeholder, #10). Do it with ADB:
+
+```sh
+adb shell dumpsys deviceidle whitelist +com.runpro.wear
+adb shell dumpsys deviceidle whitelist | grep runpro   # must print one line
+```
+
+It survives `./rp install` and is lost only when RunPro is uninstalled. RunPro's setup screen shows the
+command until the exemption is in place. Also check that RunPro is not in Samsung's "Sleeping apps"
+(Galaxy Wearable on the phone, and the phone's own battery settings if the phone app is installed); see
+the Italian guide, section 7.
+
 ## Troubleshooting
 
 | Symptom | Action |

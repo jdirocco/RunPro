@@ -1,0 +1,27 @@
+<resources>
+    <string name="run_channel_name">Corsa in corso</string>
+    <string name="run_channel_description">Mostra la corsa mentre RunPro la registra.</string>
+    <string name="run_starting">Avvio</string>
+    <string name="run_recording">In registrazione</string>
+    <string name="run_paused">In pausa</string>
+    <string name="run_stopped">Terminata</string>
+    <string name="run_stopped_after">Terminata dopo %1$s</string>
+    <string name="run_start">Avvia</string>
+    <string name="run_pause">Pausa</string>
+    <string name="run_resume">Riprendi</string>
+    <string name="run_stop">Stop</string>
+
+    <string name="setup_permissions_intro">A RunPro servono:</string>
+    <string name="permission_location">Posizione, per distanza e passo dal GPS</string>
+    <string name="permission_heart_rate">Battito dal polso</string>
+    <string name="permission_activity">Attività fisica, per la cadenza</string>
+    <string name="permission_bluetooth">Dispositivi nelle vicinanze, per fascia e footpod</string>
+    <string name="permission_notifications">Notifiche, per mostrare la corsa</string>
+    <string name="setup_allow">Consenti</string>
+    <string name="setup_background_location">Consenti la posizione sempre, così il GPS continua se l\'orologio riavvia RunPro durante una corsa.</string>
+    <string name="setup_allow_all_the_time">Consenti sempre</string>
+    <string name="setup_not_now">Non ora</string>
+    <string name="setup_battery_unrestricted">RunPro non è esclusa dall\'ottimizzazione della batteria, quindi l\'orologio può fermarla durante una corsa. L\'orologio non ha un\'impostazione per questo: dal computer esegui</string>
+    <string name="setup_sleeping_apps">Sul telefono apri Galaxy Wearable, Impostazioni orologio, Batteria: RunPro non deve essere tra le app in sospensione o in sospensione profonda.</string>
+    <string name="setup_checked">Fatto, controllato</string>
+</resources>

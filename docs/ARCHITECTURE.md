@@ -42,7 +42,12 @@ SensorManager accelerometer ────┘                           │       
 ```
 
 - `RecordingService` is a foreground service (`health|location|connectedDevice`) with an Ongoing Activity.
-  It owns the engine. The UI binds to it and only reads `StateFlow`s.
+  It owns the engine. The UI binds to it and only reads `StateFlow`s. The decisions are pure Kotlin in
+  `:core:recording` (`service` package, ADR 0007): `ServicePermissions` picks only the service types whose
+  permissions are granted (fewer from the background), `ServiceStartPolicy` maps start commands, and a
+  `START_STICKY` restart (null intent) goes to `RunRecovery` (#9). `BatteryGuidance` lists the battery
+  settings the setup screen asks the runner to change (battery optimisation, exempted with adb because the
+  watch has no screen for it, and Samsung "Sleeping apps").
 - Source arbitration: per metric a priority list (e.g. HR: strap → wrist). A source is *stale* after a
   timeout; the engine switches to the next one and writes a source-switch event (R5).
 
