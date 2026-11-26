@@ -19,6 +19,13 @@ import kotlin.test.assertNull
 
 class JournalCodecTest {
     @Test
+    fun `timer checkpoint has a stable protobuf encoding`() {
+        val record = JournalRecord.Checkpoint(Timestamp(1, 2))
+        assertEquals("520408011002", JournalCodec.encode(record).toHex())
+        assertEquals(record, JournalCodec.decode(JournalCodec.encode(record)))
+    }
+
+    @Test
     fun `every record kind survives a round trip`() {
         for (record in everyRecord) {
             assertEquals(record, JournalCodec.decode(JournalCodec.encode(record)), "$record")

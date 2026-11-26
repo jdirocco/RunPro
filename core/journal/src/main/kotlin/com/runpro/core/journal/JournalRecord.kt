@@ -35,4 +35,7 @@ sealed interface JournalRecord {
 
     /** A sensor state change reported by an adapter (e.g. a disconnect with its GATT status). */
     data class Sensor(val event: SensorEvent) : JournalRecord
+
+    /** Latest recording clock during sensor silence. Buffered with the sample durability policy. */
+    data class Checkpoint(val time: Timestamp) : JournalRecord
 }

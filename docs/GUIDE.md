@@ -269,7 +269,8 @@ excluding suppressed records and fault callbacks.
 as `faultHandler` to `Replayer`. The callback must replace the engine from its journal and rebind the
 sources, or make storage writes fail (for example, set `FaultInjectingOutputStream.full = true`). Missing
 handlers fail early; callback exceptions fail the test. See `ChaosRecordingReplayTest` for a sample of
-every fault type using the real engine and an input-log journal double. Production journal recovery,
+every fault type using the real engine and an input-log journal double. Real journal recovery is covered
+separately by `CrashRecoveryReplayTest` (ADR 0007).
 BLE fallback/reconnect and full-storage saving still need their own invariant tests; this sample does
 not establish them. Scheduling details and limits are in ADR 0006.
 

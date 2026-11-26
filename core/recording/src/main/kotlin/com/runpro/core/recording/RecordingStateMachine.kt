@@ -64,6 +64,9 @@ class RecordingStateMachine(
     private fun start(time: Timestamp): Boolean {
         val started = moveTo(RunPhase.RUNNING, RunPhase.PREPARING)
         if (started) {
+            // Warmup readings are not part of the persisted run or its source choices.
+            gate = SampleGate()
+            current = CurrentValues()
             run = Run(runIds(), listOf(RunEvent.Started(time)))
             metrics = RunMetrics(config, time)
             now = time
@@ -94,32 +97,59 @@ class RecordingStateMachine(
         if (!allowed || run == null || metrics == null) return false
 
         val time = maxOf(command.time, run.events.last().time)
-        advanceClock(time)
-        this.run = run + when (command) {
+        val event = when (command) {
             is EngineInput.Pause -> {
-                metrics.pause(time)
-                phase = RunPhase.PAUSED
                 RunEvent.Paused(time, command.reason)
             }
 
             is EngineInput.Resume -> {
-                metrics.resume(time)
-                phase = RunPhase.RUNNING
                 RunEvent.Resumed(time)
             }
 
             is EngineInput.MarkLap -> {
-                metrics.markLap(time)
                 RunEvent.LapMarked(time, LapTrigger.MANUAL)
             }
 
             is EngineInput.Stop -> {
-                metrics.stop(time)
-                phase = RunPhase.STOPPED
                 RunEvent.Stopped(time, command.reason)
             }
         }
+        restoreEvent(event)
         return true
+    }
+
+    /** Replays an existing event exactly, including its lap trigger and sensor/source metadata. */
+    internal fun restoreEvent(event: RunEvent) {
+        val run = requireNotNull(run)
+        val metrics = requireNotNull(metrics)
+        require(phase == RunPhase.RUNNING || phase == RunPhase.PAUSED) { "Event after run stop" }
+        require(event.time >= run.events.last().time) { "Run events out of order within a boot" }
+        advanceClock(event.time)
+        when (event) {
+            is RunEvent.Started -> error("Duplicate run start")
+
+            is RunEvent.Paused -> {
+                require(phase == RunPhase.RUNNING)
+                metrics.pause(event.time)
+                phase = RunPhase.PAUSED
+            }
+
+            is RunEvent.Resumed -> {
+                require(phase == RunPhase.PAUSED)
+                metrics.resume(event.time)
+                phase = RunPhase.RUNNING
+            }
+
+            is RunEvent.LapMarked -> metrics.markLap(event.time)
+
+            is RunEvent.Stopped -> {
+                metrics.stop(event.time)
+                phase = RunPhase.STOPPED
+            }
+
+            is RunEvent.SourceSwitched, is RunEvent.SensorConnected, is RunEvent.SensorLost -> Unit
+        }
+        this.run = run + event
     }
 
     private fun onSample(sample: Sample): Boolean {

@@ -23,7 +23,8 @@ internal class RecordProto(
     @ProtoNumber(6) val sourceSwitch: SourceSwitchProto? = null,
     @ProtoNumber(7) val sensorEvent: SensorEventProto? = null,
     @ProtoNumber(8) val runStopped: RunStoppedProto? = null,
-    @ProtoNumber(9) val sensorStatus: SensorStatusProto? = null
+    @ProtoNumber(9) val sensorStatus: SensorStatusProto? = null,
+    @ProtoNumber(10) val checkpoint: TimeProto? = null
 )
 
 @Serializable
