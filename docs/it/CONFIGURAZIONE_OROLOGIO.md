@@ -96,24 +96,34 @@ RunPro compare nell'elenco app dell'orologio.
 
 Da fare una volta dopo la prima installazione, e da ricontrollare dopo ogni aggiornamento di One UI Watch.
 
-**Permessi di RunPro** (**Impostazioni → App → RunPro → Autorizzazioni**), oppure accettali al primo avvio:
+**Permessi di RunPro.** Al primo avvio RunPro elenca i permessi che mancano: tocca **Consenti** e accettali.
+Puoi anche cambiarli da **Impostazioni → App → RunPro → Autorizzazioni**:
 
-| Permesso | Valore |
-|---|---|
-| Posizione | Consenti durante l'uso dell'app (precisa) |
-| Sensori del corpo / Dati sanitari | Consenti |
-| Dispositivi nelle vicinanze (Bluetooth) | Consenti |
-| Attività fisica | Consenti |
-| Notifiche | Consenti |
+| Permesso | Valore | Se manca |
+|---|---|---|
+| Posizione | Consenti durante l'uso dell'app (precisa) | Niente GPS: niente distanza e passo |
+| Posizione, seconda richiesta | **Consenti sempre** | Se l'orologio chiude e riapre RunPro durante una corsa, il GPS non riparte |
+| Sensori del corpo / Frequenza cardiaca | Consenti | Niente battito dal polso |
+| Attività fisica | Consenti | Niente cadenza |
+| Dispositivi nelle vicinanze (Bluetooth) | Consenti | Niente fascia cardio né footpod |
+| Notifiche | Consenti | La corsa continua, ma senza notifica né icona sul quadrante |
+
+La posizione "sempre" viene chiesta dopo le altre, con una schermata a parte. Se scegli **Non ora**,
+RunPro lo richiede al prossimo avvio. Basta uno tra posizione, battito e attività fisica per avviare una corsa.
 
 **Batteria: RunPro non deve mai essere sospesa.** È il problema più comune delle app di corsa sui Galaxy Watch.
+RunPro controlla l'impostazione 1 e mostra **Apri impostazioni** finché manca. L'impostazione 2 non si può
+leggere dall'app: RunPro te la ricorda finché non tocchi **Fatto, controllato**.
 
 1. Sull'orologio: **Impostazioni → App → RunPro → Batteria**: scegli **Senza restrizioni** (o disattiva
    "Ottimizza utilizzo batteria").
 2. Sul telefono, app **Galaxy Wearable → Impostazioni orologio → Batteria → Limiti utilizzo in background**
    (o "App in sospensione"): RunPro **non** deve essere nell'elenco delle app in sospensione o
    in sospensione profonda.
-3. Al primo avvio RunPro controlla queste impostazioni e ti avvisa se mancano (issue #10).
+
+**Durante una corsa** RunPro mostra una notifica fissa e un'icona sul quadrante (Ongoing Activity) con il
+tempo che scorre: toccala per tornare all'app. Se la notifica sparisce a corsa in corso, l'orologio ha
+chiuso RunPro: segnalalo con una issue **Field report**.
 
 **Posizione**: **Impostazioni → Posizione** attiva. RunPro usa solo il GPS dell'orologio.
 

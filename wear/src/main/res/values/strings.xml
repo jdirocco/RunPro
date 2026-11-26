@@ -1,3 +1,30 @@
 <resources>
-    <string name="app_name">RunPro</string>
+    <string name="app_name" translatable="false">RunPro</string>
+
+    <string name="run_channel_name">Run in progress</string>
+    <string name="run_channel_description">Shows the run while RunPro records it.</string>
+    <string name="run_starting">Starting</string>
+    <string name="run_recording">Recording</string>
+    <string name="run_paused">Paused</string>
+    <string name="run_stopped">Stopped</string>
+    <string name="run_stopped_after">Stopped after %1$s</string>
+    <string name="run_start">Start</string>
+    <string name="run_pause">Pause</string>
+    <string name="run_resume">Resume</string>
+    <string name="run_stop">Stop</string>
+
+    <string name="setup_permissions_intro">RunPro needs:</string>
+    <string name="permission_location">Location, for GPS distance and pace</string>
+    <string name="permission_heart_rate">Heart rate from the watch</string>
+    <string name="permission_activity">Physical activity, for cadence</string>
+    <string name="permission_bluetooth">Nearby devices, for straps and footpods</string>
+    <string name="permission_notifications">Notifications, to show the run</string>
+    <string name="setup_allow">Allow</string>
+    <string name="setup_background_location">Allow location all the time, so GPS keeps working if the watch restarts RunPro during a run.</string>
+    <string name="setup_allow_all_the_time">Allow all the time</string>
+    <string name="setup_not_now">Not now</string>
+    <string name="setup_battery_unrestricted">Set RunPro\'s battery use to Unrestricted, or the watch can stop it during a run.</string>
+    <string name="setup_open_settings">Open settings</string>
+    <string name="setup_sleeping_apps">On the phone, open Galaxy Wearable, Watch settings, Battery: RunPro must not be in Sleeping apps or Deep sleeping apps.</string>
+    <string name="setup_checked">Done, checked</string>
 </resources>
