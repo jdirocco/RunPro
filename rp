@@ -307,9 +307,6 @@ def slugify(s):
     return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")[:40].rstrip("-")
 
 
-WORKTREES = os.path.join(os.path.dirname(ROOT), os.path.basename(ROOT) + "-worktrees")
-
-
 def start_issue(n, worktree=False):
     """Mark issue N In Progress and prepare its branch. Returns (title, branch, working dir)."""
     r = repo()
@@ -321,9 +318,9 @@ def start_issue(n, worktree=False):
     exists = sh(["git", "branch", "--list", branch])
     base = "origin/main" if sh(["git", "rev-parse", "--verify", "-q", "origin/main"], check=False) else "main"
     if worktree:
-        cwd = os.path.join(WORKTREES, branch)
+        cwd = os.path.join(worktrees_dir(), branch)
         if not os.path.isdir(cwd):
-            os.makedirs(WORKTREES, exist_ok=True)
+            os.makedirs(worktrees_dir(), exist_ok=True)
             sh(["git", "worktree", "add", cwd, branch] if exists else
                ["git", "worktree", "add", "-b", branch, cwd, base])
         ensure_local_properties(cwd)
@@ -386,6 +383,12 @@ def git_common_dir():
     r = subprocess.run(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"], cwd=ROOT,
                        text=True, capture_output=True)
     return r.stdout.strip() if r.returncode == 0 and r.stdout.strip() else os.path.join(ROOT, ".git")
+
+
+def worktrees_dir():
+    """`<main checkout>-worktrees`, next to the main checkout, also when ./rp runs from a linked worktree."""
+    main = os.path.dirname(git_common_dir())
+    return os.path.join(os.path.dirname(main), os.path.basename(main) + "-worktrees")
 
 
 def ensure_local_properties(cwd):
@@ -665,7 +668,7 @@ def cmd_agent(args):
     if "dry-run" in flags:
         title = gh_json(["issue", "view", str(n), "-R", repo(), "--json", "title"])["title"]
         branch = f"issue-{n}-{slugify(title)}"
-        cwd = os.path.join(WORKTREES, branch) if "worktree" in flags else ROOT
+        cwd = os.path.join(worktrees_dir(), branch) if "worktree" in flags else ROOT
     else:
         title, branch, cwd = start_issue(n, worktree="worktree" in flags)
 
