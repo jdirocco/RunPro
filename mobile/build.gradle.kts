@@ -8,7 +8,9 @@ android {
     buildToolsVersion = "37.0.0"
 
     defaultConfig {
-        applicationId = "com.runpro.mobile"
+        // The Data Layer pairs apps by application id and signing key: the phone must use the watch's id
+        // (ADR 0010). The namespace stays com.runpro.mobile.
+        applicationId = "com.runpro.wear"
         minSdk = 30
         targetSdk = 37
         versionCode = 1
@@ -25,4 +27,9 @@ android {
 
 kotlin {
     jvmToolchain(21)
+}
+
+dependencies {
+    implementation(project(":core:sync"))
+    implementation(libs.play.services.wearable)
 }

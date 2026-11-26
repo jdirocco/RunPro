@@ -23,6 +23,7 @@ Watch setup step by step (in Italian, for the owner): `docs/it/CONFIGURAZIONE_OR
 | F5 | 2–3 h long run | Battery %/h, no drops, file exported |
 | F6 | Track or treadmill with footpod | Footpod distance vs GPS vs real |
 | F7 | Run with the phone left at home | Watch-only GPS, sync later |
+| F8 | Phone sync: phone app installed, several runs with the phone out of range for some of them, then in range | Every run in the phone's `files/runs` once, journals gone from the watch (see below) |
 
 ## FIT file acceptance (no watch needed)
 
@@ -33,6 +34,20 @@ Watch setup step by step (in Italian, for the owner): `docs/it/CONFIGURAZIONE_OR
 2. Upload `easy-run-30min.fit` to Strava (Upload activity → File): it is accepted as a run of about
    4.91 km, 30:00 elapsed, 3 laps, average HR 139 (Strava computes its own moving time). Delete it afterwards.
 3. Report the result on the export issue (#28): accepted or the exact error message.
+
+## Phone sync check (F8)
+
+Needs journals written during a run (#60). Watch and phone apps must be the same kind of build (both debug
+from this Mac, or both release): the Data Layer pairs them by application id and signing key.
+
+1. Install the phone app: `./gradlew :mobile:installDebug` with only the phone on adb (or
+   `ANDROID_SERIAL=<phone serial>`), and the watch app with `./rp install`.
+2. Record runs; for some, keep the phone away (or Bluetooth off) until after the stop. Open RunPro on the
+   watch or bring the phone back: the runs move within a minute or two.
+3. Check on the phone: `adb -s <phone> shell run-as com.runpro.wear ls files/runs` lists one `.fit` per run.
+   On the watch: `adb -s <watch> shell run-as com.runpro.wear ls files/journals` is empty.
+4. `adb logcat -s PhoneSync FitReceiver` on each device shows the passes; report the counts on the field-test
+   issue.
 
 ## After the run
 

@@ -92,6 +92,21 @@ Se hai anche un telefono collegato con adb, indica l'orologio (come argomento o 
 
 RunPro compare nell'elenco app dell'orologio.
 
+### App RunPro sul telefono (sincronizzazione delle corse)
+
+Le corse finite passano dall'orologio al telefono tramite il Data Layer di Wear OS. Funziona solo se le due app
+hanno lo stesso id (`com.runpro.wear`, anche quella del telefono) e sono firmate con la stessa chiave: installa
+entrambe dallo stesso Mac (build debug) oppure entrambe da Play, mai una per tipo.
+
+Con il telefono collegato via adb (solo lui, oppure indicato con `ANDROID_SERIAL`):
+
+```bash
+ANDROID_SERIAL=<seriale del telefono> ./gradlew :mobile:installDebug
+```
+
+Sull'orologio una corsa resta salvata finché il telefono non conferma di averla ricevuta; se il telefono è lontano
+la manda appena torna raggiungibile o quando riapri RunPro. La prova completa è la F8 in `docs/FIELD_TESTING.md`.
+
 ## 7. Impostazioni dell'orologio per correre con RunPro
 
 Da fare una volta dopo la prima installazione, e da ricontrollare dopo ogni aggiornamento di One UI Watch.

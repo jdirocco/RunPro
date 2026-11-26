@@ -7,6 +7,7 @@
 :core:recording    RecordingEngine: source arbitration, laps, derived metrics, state machine
 :core:journal      append-only journal, recovery reader
 :core:fit          FIT encoder/decoder wrapper, verification
+:core:sync         watch outbox / phone inbox for FIT files, ack protocol (transport behind SyncChannel)
 :core:dynamics     IMU running dynamics estimators
 :core:ble          BLE protocol parsers (0x180D, 0x1814, 0x1818, Stryd) and the connection state machine,
                    behind a GattPort interface (fakeable)
@@ -133,3 +134,14 @@ and the stop is synced before publication. Journal sessions query space before e
 rolls back a partial write and retries once; the session immediately saves with `STORAGE_FULL`. Other
 I/O failures and exhausted reserves remain observable failures with a recoverable prefix. ADR 0008
 explains the limits. Watch resource monitoring and warning UI integration are tracked in #71.
+
+## Phone sync (`:core:sync`)
+
+The stopped journals in the watch's `files/journals` are the outbox. `FitOutbox.sync(link)` exports each
+to a verified FIT file in `files/exports` (re-verifying an existing one after a restart), offers it on its
+own `SyncChannel` and deletes the journal only when the phone's ack names the same run id and SHA-256 and
+the file is unchanged (R3). `FitInbox.receive` on the phone stores the file durably in `files/runs` before
+acking and recognises a run it already has, so retries never duplicate it. `:wear` adapts `ChannelClient`
+(`DataLayerPhoneLink`) and schedules passes (`PhoneSync`: app open, run stop, phone capability change,
+backoff 30 s to 15 min); `:mobile` receives in `FitReceiverService`. Both apps share the application id
+`com.runpro.wear`. Protocol and decisions: ADR 0010.
