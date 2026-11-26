@@ -33,8 +33,11 @@ permissions (location, body sensors) are not available.
   install-time below API 31 and 33).
 - Background location is optional and asked after the others, on its own, as Android requires. Without
   it a run restored after a kill continues without GPS.
-- The battery settings screen is opened with `ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS`, not the
-  direct exemption request, which needs a special permission and Play policy review.
+- The battery settings are reached through RunPro's app details page
+  (`ACTION_APPLICATION_DETAILS_SETTINGS` → Battery). Not the direct exemption request, which needs a
+  special permission and Play policy review, and not `ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS`, which
+  on Wear OS resolves to a placeholder activity that closes at once (found on the watch, see the failure
+  catalogue in `RELIABILITY.md`).
 
 ## Consequences
 

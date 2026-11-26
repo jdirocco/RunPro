@@ -111,16 +111,19 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * RunPro's own settings page, which has the Battery entry. Not `ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS`:
+     * on Wear OS it resolves to a placeholder activity that closes at once (field bug on the watch, #10).
+     */
     private fun openBatterySettings() {
-        val list = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
         val details = Intent(
             Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
             Uri.fromParts("package", packageName, null)
         )
         try {
-            startActivity(list)
-        } catch (_: ActivityNotFoundException) {
             startActivity(details)
+        } catch (_: ActivityNotFoundException) {
+            startActivity(Intent(Settings.ACTION_SETTINGS))
         }
     }
 

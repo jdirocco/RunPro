@@ -36,3 +36,4 @@ Every real failure seen in the field gets a row here, a recorded trace in `testd
 
 | Date | Issue | What happened | Trace | Test |
 |---|---|---|---|---|
+| 2026-11-26 | #10 | Setup screen: "Open settings" for battery did nothing on the Galaxy Watch 5 Pro. On Wear OS `ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS` resolves to a placeholder activity that closes at once, so the fallback never ran. Now opens the app details page. | none (UI, no sensor data) | `BatterySettingsTest` |

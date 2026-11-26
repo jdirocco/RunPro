@@ -112,7 +112,8 @@ La posizione "sempre" viene chiesta dopo le altre, con una schermata a parte. Se
 RunPro lo richiede al prossimo avvio. Basta uno tra posizione, battito e attività fisica per avviare una corsa.
 
 **Batteria: RunPro non deve mai essere sospesa.** È il problema più comune delle app di corsa sui Galaxy Watch.
-RunPro controlla l'impostazione 1 e mostra **Apri impostazioni** finché manca. L'impostazione 2 non si può
+RunPro controlla l'impostazione 1 e mostra **Apri impostazioni** finché manca: il pulsante apre la scheda
+di RunPro nelle impostazioni dell'orologio, dove tocchi **Batteria**. L'impostazione 2 non si può
 leggere dall'app: RunPro te la ricorda finché non tocchi **Fatto, controllato**.
 
 1. Sull'orologio: **Impostazioni → App → RunPro → Batteria**: scegli **Senza restrizioni** (o disattiva
