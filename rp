@@ -265,9 +265,12 @@ def cmd_status(_args):
     issues = open_issues()
     deps = dependencies(issues)
     print("\n== In progress")
+    live = running_agents()
     for i in issues:
         if has_label(i, "status:in-progress"):
-            print(f"  #{i['number']} {i['title']}")
+            n = i["number"]
+            print(f"  #{n} {i['title']}")
+            print(f"      {agent_status_line(n, read_agent_run(n), live.get(n))}")
     decisions = [i for i in issues if has_label(i, "needs-owner")]
     print("\n== Decisions for the owner (needs-owner: answer in the issue, then remove the label)")
     for i in decisions:
@@ -451,7 +454,8 @@ def agent_prompt(n, title, branch, headless, extra, auto=False):
     return "\n".join(lines)
 
 
-def cmd_agent(args):
+def parse_agent_args(args):
+    """Split `./rp agent` arguments into (opts, flags, target, extra CLI args after --)."""
     extra_cli = []
     if "--" in args:
         i = args.index("--")
@@ -468,6 +472,181 @@ def cmd_agent(args):
             opts["runner"] = a
         else:
             target = a
+    return opts, flags, target, extra_cli
+
+
+# ---------- where an agent runs ----------
+
+LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1", "0.0.0.0"}
+LOCAL_CODEX_PROVIDERS = {"oss", "ollama", "lmstudio"}
+
+
+def _flag_values(args, *names):
+    """Every value of the options `names` in `args`, as `-x v` or `--xx=v`."""
+    out = []
+    for i, a in enumerate(args):
+        for name in names:
+            if a == name and i + 1 < len(args):
+                out.append(args[i + 1])
+            elif a.startswith(name + "="):
+                out.append(a.split("=", 1)[1])
+    return out
+
+
+def _flag_value(args, *names):
+    values = _flag_values(args, *names)
+    return values[-1] if values else None
+
+
+def _read_toml(path):
+    try:
+        import tomllib
+        with open(path, "rb") as f:
+            return tomllib.load(f)
+    except (OSError, ValueError, ImportError):
+        return {}
+
+
+def _read_json(path):
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def is_local_url(url):
+    from urllib.parse import urlparse
+    host = (urlparse(url).hostname or "") if url else ""
+    return host in LOCAL_HOSTS or host.endswith(".localhost")
+
+
+def resolve_agent_target(runner, model, extra_cli, cwd=ROOT, env=None, home=None):
+    """Where an agent runs: (model, provider, location), location "local" or "cloud".
+
+    A null model in plan/config.json means the tool's own default, so read it from the tool's config.
+    """
+    env = os.environ if env is None else env
+    home = home or os.path.expanduser("~")
+    if runner == "codex":
+        overrides = dict(v.split("=", 1) for v in _flag_values(extra_cli, "-c", "--config") if "=" in v)
+        overrides = {k: v.strip("\"'") for k, v in overrides.items()}
+        model = model or _flag_value(extra_cli, "-m", "--model") or overrides.get("model")
+        if "--oss" in extra_cli:
+            return model or "(oss default)", _flag_value(extra_cli, "--local-provider") or "oss", "local"
+        cfg = _read_toml(os.path.join(env.get("CODEX_HOME") or os.path.join(home, ".codex"), "config.toml"))
+        profile = _flag_value(extra_cli, "-p", "--profile") or cfg.get("profile")
+        prof = cfg.get("profiles", {}).get(profile, {}) if profile else {}
+        model = model or prof.get("model") or cfg.get("model") or "(codex default)"
+        provider = overrides.get("model_provider") or prof.get("model_provider") or cfg.get("model_provider") \
+            or "openai"
+        base_url = cfg.get("model_providers", {}).get(provider, {}).get("base_url", "")
+        local = provider in LOCAL_CODEX_PROVIDERS or is_local_url(base_url)
+        return model, provider, "local" if local else "cloud"
+    settings = {}
+    for path in (os.path.join(home, ".claude", "settings.json"), os.path.join(cwd, ".claude", "settings.json"),
+                 os.path.join(cwd, ".claude", "settings.local.json")):
+        settings.update(_read_json(path))
+    model = model or _flag_value(extra_cli, "--model") or env.get("ANTHROPIC_MODEL") or settings.get("model") \
+        or "(claude default)"
+    if env.get("CLAUDE_CODE_USE_BEDROCK"):
+        return model, "bedrock", "cloud"
+    if env.get("CLAUDE_CODE_USE_VERTEX"):
+        return model, "vertex", "cloud"
+    base_url = env.get("ANTHROPIC_BASE_URL", "")
+    if is_local_url(base_url):
+        return model, base_url, "local"
+    return model, "anthropic", "cloud"
+
+
+# ---------- agent run records (shared by all worktrees) ----------
+
+def agent_runs_dir():
+    return os.path.join(git_common_dir(), "rp-agents")
+
+
+def write_agent_run(run):
+    d = agent_runs_dir()
+    os.makedirs(d, exist_ok=True)
+    path = os.path.join(d, f"{run['issue']}.json")
+    with open(path + ".tmp", "w") as f:
+        json.dump(run, f, indent=2)
+    os.replace(path + ".tmp", path)
+
+
+def read_agent_run(n):
+    run = _read_json(os.path.join(agent_runs_dir(), f"{n}.json"))
+    return run or None
+
+
+def _etime_seconds(etime):
+    """ps etime `[[dd-]hh:]mm:ss` to seconds."""
+    days, _, rest = etime.rpartition("-")
+    parts = [int(p) for p in rest.split(":")]
+    while len(parts) < 3:
+        parts.insert(0, 0)
+    return int(days or 0) * 86400 + parts[0] * 3600 + parts[1] * 60 + parts[2]
+
+
+def running_agents(ps_output=None):
+    """Live `./rp agent N` processes: {issue: {"pid", "seconds", "args"}}."""
+    if ps_output is None:
+        r = subprocess.run(["ps", "-eo", "pid=,etime=,command="], text=True, capture_output=True)
+        ps_output = r.stdout if r.returncode == 0 else ""
+    found = {}
+    for line in ps_output.splitlines():
+        parts = line.split(None, 2)
+        if len(parts) < 3:
+            continue
+        pid, etime, command = parts
+        m = re.search(r"(?:^|[\s/])rp agent(?:\s+(.*))?$", command)
+        if not m:
+            continue
+        args = (m.group(1) or "").split()
+        _, _, target, _ = parse_agent_args(args)
+        if not target or not target.lstrip("#").isdigit():
+            continue
+        found[int(target.lstrip("#"))] = {"pid": int(pid), "seconds": _etime_seconds(etime), "args": args}
+    return found
+
+
+def _duration(seconds):
+    seconds = int(seconds)
+    if seconds < 3600:
+        return f"{seconds // 60}m"
+    if seconds < 86400:
+        return f"{seconds // 3600}h{seconds % 3600 // 60:02d}m"
+    return f"{seconds // 86400}d{seconds % 86400 // 3600}h"
+
+
+def _where(model, provider, location):
+    return f"{model} on {provider} ({location})"
+
+
+def agent_status_line(n, run, live, now=None):
+    """One line saying whether an agent works on issue N and where it runs."""
+    now = now or time.time()
+    if run and live and live["pid"] == run.get("pid"):
+        return (f"running {_duration(live['seconds'])}: {run['runner']} {_where(run['model'], run['provider'], run['location'])}"
+                f", {run['mode']}, pid {run['pid']}")
+    if live:
+        opts, _, _, extra = parse_agent_args(live["args"])
+        runner = opts["runner"] or agent_config()["default_runner"]
+        model, provider, location = resolve_agent_target(runner, opts["model"] or agent_config()[runner].get("model"),
+                                                         extra)
+        return (f"running {_duration(live['seconds'])}: {runner} {_where(model, provider, location)}"
+                f", pid {live['pid']} (from the process list)")
+    if not run:
+        return "no agent running"
+    what = f"{run['runner']} {_where(run['model'], run['provider'], run['location'])}"
+    if run.get("ended") is not None:
+        ago = _duration(now - run["ended"])
+        return f"no agent running (last: {what}, exited {run.get('exit_code')} {ago} ago)"
+    return f"no agent running (last: {what}, stopped without an exit code)"
+
+
+def cmd_agent(args):
+    opts, flags, target, extra_cli = parse_agent_args(args)
     acfg = agent_config()
     runner = opts["runner"] or acfg["default_runner"]
     if runner not in ("claude", "codex"):
@@ -515,13 +694,23 @@ def cmd_agent(args):
         cmd += ["-C", cwd] + extra_cli + [prompt]
 
     mode = ("headless" if headless else "interactive") + (" + auto (no confirmations)" if auto else "")
+    real_model, provider, location = resolve_agent_target(runner, model, extra_cli, cwd=cwd)
     print(f"# #{n} {title}")
-    print(f"# runner={runner} model={model or '(tool default)'} mode={mode} cwd={cwd}")
+    print(f"# runner={runner} model={real_model} provider={provider} ({location}) mode={mode} cwd={cwd}")
     if "dry-run" in flags:
         print(" ".join(c if " " not in c and "\n" not in c else repr(c) for c in cmd))
         return
-    r = subprocess.run(cmd, cwd=cwd)
-    sys.exit(r.returncode)
+    run = {"issue": n, "runner": runner, "model": real_model, "provider": provider, "location": location,
+           "mode": "headless" if headless else "auto" if auto else "interactive", "pid": os.getpid(), "cwd": cwd,
+           "started": time.time(), "ended": None, "exit_code": None}
+    write_agent_run(run)
+    code = None
+    try:
+        code = subprocess.run(cmd, cwd=cwd).returncode
+    finally:
+        run.update(ended=time.time(), exit_code=code)
+        write_agent_run(run)
+    sys.exit(code)
 
 
 def cmd_check(_args):
