@@ -266,11 +266,13 @@ def cmd_status(_args):
     deps = dependencies(issues)
     print("\n== In progress")
     live = running_agents()
+    if live is None:
+        print("  (process list unavailable, e.g. ps denied by a sandbox: live agents unknown)")
     for i in issues:
         if has_label(i, "status:in-progress"):
             n = i["number"]
             print(f"  #{n} {i['title']}")
-            print(f"      {agent_status_line(n, read_agent_run(n), live.get(n))}")
+            print(f"      {agent_status_line(n, read_agent_run(n), UNKNOWN if live is None else live.get(n))}")
     decisions = [i for i in issues if has_label(i, "needs-owner")]
     print("\n== Decisions for the owner (needs-owner: answer in the issue, then remove the label)")
     for i in decisions:
@@ -591,11 +593,22 @@ def _etime_seconds(etime):
     return int(days or 0) * 86400 + parts[0] * 3600 + parts[1] * 60 + parts[2]
 
 
+UNKNOWN = "unknown"  # live state of an issue when the process list cannot be read
+
+
 def running_agents(ps_output=None):
-    """Live `./rp agent N` processes: {issue: {"pid", "seconds", "args"}}."""
+    """Live `./rp agent N` processes: {issue: {"pid", "seconds", "args"}}.
+
+    None when the process list is unavailable (a sandbox that denies or lacks `ps`, or `ps` failing).
+    """
     if ps_output is None:
-        r = subprocess.run(["ps", "-eo", "pid=,etime=,command="], text=True, capture_output=True)
-        ps_output = r.stdout if r.returncode == 0 else ""
+        try:
+            r = subprocess.run(["ps", "-eo", "pid=,etime=,command="], text=True, capture_output=True)
+        except (OSError, subprocess.SubprocessError):
+            return None
+        if r.returncode != 0:
+            return None
+        ps_output = r.stdout
     found = {}
     for line in ps_output.splitlines():
         parts = line.split(None, 2)
@@ -629,6 +642,8 @@ def _where(model, provider, location):
 def agent_status_line(n, run, live, now=None):
     """One line saying whether an agent works on issue N and where it runs."""
     now = now or time.time()
+    if live == UNKNOWN:
+        return unknown_status_line(run, now)
     if run and live and live["pid"] == run.get("pid"):
         return (f"running {_duration(live['seconds'])}: {run['runner']} {_where(run['model'], run['provider'], run['location'])}"
                 f", {run['mode']}, pid {run['pid']}")
@@ -646,6 +661,18 @@ def agent_status_line(n, run, live, now=None):
         ago = _duration(now - run["ended"])
         return f"no agent running (last: {what}, exited {run.get('exit_code')} {ago} ago)"
     return f"no agent running (last: {what}, stopped without an exit code)"
+
+
+def unknown_status_line(run, now):
+    """Status line when the process list is unavailable: keep what the run record says."""
+    head = "agent status unknown (process list unavailable"
+    if not run:
+        return head + ")"
+    what = f"{run['runner']} {_where(run['model'], run['provider'], run['location'])}"
+    if run.get("ended") is not None:
+        return f"{head}; last: {what}, exited {run.get('exit_code')} {_duration(now - run['ended'])} ago)"
+    started = f", started {_duration(now - run['started'])} ago" if run.get("started") else ""
+    return f"{head}; recorded: {what}, {run['mode']}, pid {run['pid']}{started})"
 
 
 def cmd_agent(args):

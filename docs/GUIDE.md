@@ -62,7 +62,10 @@ model, provider and `local` or `cloud`. `./rp agent` records each run in `.git/r
 all worktrees) with the model resolved even when `plan/config.json` leaves it `null`: Codex reads
 `~/.codex/config.toml` (`--oss` means local, with `--local-provider`), Claude reads `--model`,
 `ANTHROPIC_MODEL` or `.claude/settings.json` (a localhost `ANTHROPIC_BASE_URL` means local). Agents not
-started by `./rp agent` with a record are still found from the process list. "no agent running" on an issue
+started by `./rp agent` with a record are still found from the process list. When the process list cannot be read (a
+sandbox such as Codex `workspace-write` denies `ps`), the section says so and each issue shows
+`agent status unknown (process list unavailable; recorded: ...)` with what the run record holds; the rest of
+the report renders as usual. "no agent running" on an issue
 nobody waits for means it was left In Progress by mistake: unassign it, drop `status:in-progress` and set the
 board back to Todo.
 
