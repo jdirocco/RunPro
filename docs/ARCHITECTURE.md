@@ -73,12 +73,26 @@ All GATT operations go through one serial queue per device with timeouts. `Bluet
 called before a new `connectGatt`. Every transition is written to the sensor log (exportable from the
 diagnostics screen and attached to field reports).
 
-## Journal format
+## Journal format (`:core:journal`)
 
 Length-prefixed protobuf records with CRC32: `RunStarted`, `Sample(batch)`, `Lap`, `Pause`, `Resume`,
-`SourceSwitch`, `SensorEvent`, `RunStopped`. A reader stops at the first corrupt record and keeps everything
-before it. On app start, any journal without `RunStopped` is offered for recovery (and auto-recovered if the
-service was killed during a run).
+`SourceSwitch`, `SensorEvent`, `RunStopped`, and the engine's sensor status (connected / lost). A reader stops
+at the first corrupt record and keeps everything before it. On app start, any journal without `RunStopped` is
+offered for recovery (and auto-recovered if the service was killed during a run). Details: ADR 0006.
+
+```
+file:    "RPJN" | version (int32) | record | record | ...
+record:  length (int32) | CRC32 (int32) | protobuf Record { one of: run_started, samples, lap, ... }
+```
+
+- `JournalWriter` (thread safe, no own thread): run start and run events are written and fsynced before
+  `append` returns (R1); samples and sensor events are buffered, written every 1 s and fsynced every 5 s,
+  checked on each `append` and `tick()`. `JournalWriter.create` never overwrites a file.
+- `JournalReader` returns `JournalContents`: the intact records, how the file ended (`Clean`, `Truncated`,
+  `Corrupt`), the valid length, the run events and whether the run stopped. Intact records it cannot decode
+  (newer writer) are skipped and counted.
+- `JournalOutput` is the storage seam (`write` reaches the OS, `sync` reaches the flash); tests use a fake
+  that models process death and power loss.
 
 ## Recording engine (`:core:recording`)
 
