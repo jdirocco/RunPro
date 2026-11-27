@@ -104,12 +104,21 @@ sample.
 ```
 Idle → Connecting → DiscoveringServices → Subscribing → Streaming
 Streaming --(no data 5 s)--> Resubscribing --(fail)--> Reconnecting
-any --(disconnect / GATT 133)--> Closing → Backoff(1,2,4,8 s, max 10 s) → Connecting (autoConnect=true)
+any --(disconnect / GATT 133)--> Closing → Backoff(1,2,4,8 s, repeat 8 s) → Connecting (autoConnect=true)
 ```
 
 All GATT operations go through one serial queue per device with timeouts. `BluetoothGatt.close()` is always
 called before a new `connectGatt`. Every transition is written to the sensor log (exportable from the
 diagnostics screen and attached to field reports).
+
+`BleConnectionStateMachine` in `:core:ble` implements this policy behind `GattPort`, with a
+`GattOperationQueue` (one in flight), per-request deadlines, session/request ids that reject stale
+callbacks, and a required `BleTransition` log sink. The adapter serializes calls and ticks at least
+every 100 ms using monotonic milliseconds. Each required measurement characteristic has its own
+five-second watchdog; resubscription must restore real notifications within one second after its last
+CCCD write. Backoff resets only after every required stream sends data. Failed close stays in Closing;
+stop cancels pending work and retries. Defaults, port contract and R8 timing limits: ADR 0012.
+The Android adapter and sensor-log persistence/export follow in #17 and #20.
 
 ## Journal format (`:core:journal`)
 

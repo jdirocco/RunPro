@@ -1,7 +1,47 @@
+import org.gradle.api.file.Directory
+import org.gradle.api.provider.Provider
+import org.gradle.api.tasks.InputDirectory
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
+import org.gradle.api.tasks.Sync
+import org.gradle.process.CommandLineArgumentProvider
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
 }
+
+class RobolectricOfflineArguments(
+    @get:InputDirectory
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    val sdkDir: Provider<Directory>
+) : CommandLineArgumentProvider {
+    override fun asArguments(): Iterable<String> = listOf(
+        "-Drobolectric.offline=true",
+        "-Drobolectric.dependency.dir=${sdkDir.get().asFile.absolutePath}"
+    )
+}
+
+// Separate configurations avoid Gradle version conflict resolution across API levels
+// that share the org.robolectric:android-all-instrumented coordinates.
+val robolectricSdk30 = configurations.create("robolectricSdk30") {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    isTransitive = false
+}
+val robolectricSdk34 = configurations.create("robolectricSdk34") {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    isTransitive = false
+}
+
+val prepareRobolectricSdks = tasks.register<Sync>("prepareRobolectricSdks") {
+    from(robolectricSdk30)
+    from(robolectricSdk34)
+    into(layout.buildDirectory.dir("robolectric-sdks"))
+}
+
+val robolectricSdksDir = layout.dir(prepareRobolectricSdks.map { it.destinationDir })
 
 android {
     namespace = "com.runpro.wear"
@@ -24,7 +64,13 @@ android {
         compose = true
     }
     testOptions {
-        unitTests.isIncludeAndroidResources = true
+        unitTests {
+            isIncludeAndroidResources = true
+            all { test ->
+                test.dependsOn(prepareRobolectricSdks)
+                test.jvmArgumentProviders.add(RobolectricOfflineArguments(robolectricSdksDir))
+            }
+        }
     }
     lint {
         warningsAsErrors = true
@@ -52,6 +98,8 @@ dependencies {
     testImplementation(libs.junit4)
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.compose.ui.test.junit4)
+    robolectricSdk30(libs.robolectric.android.all.api30)
+    robolectricSdk34(libs.robolectric.android.all.api34)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.junit)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
