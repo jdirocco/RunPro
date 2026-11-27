@@ -9,16 +9,22 @@ import android.os.IBinder
 import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
+import com.runpro.core.model.Sample
+import com.runpro.core.model.SensorEvent
+import com.runpro.core.model.SensorListener
 import com.runpro.core.model.Timestamp
 import com.runpro.core.recording.EngineInput
 import com.runpro.core.recording.RecordingEngine
 import com.runpro.core.recording.RecordingSession
 import com.runpro.core.recording.RunPhase
 import com.runpro.core.recording.RunState
+import com.runpro.core.recording.exercise.ExerciseController
+import com.runpro.core.recording.exercise.ExerciseStatus
 import com.runpro.core.recording.service.RunRecovery
 import com.runpro.core.recording.service.ServiceCommand
 import com.runpro.core.recording.service.ServiceStartPolicy
 import com.runpro.core.recording.service.ServiceStartPolicy.Decision
+import com.runpro.wear.health.HealthServicesExercise
 import com.runpro.wear.sync.PhoneSync
 import com.runpro.wear.sync.WatchStorage
 import java.util.concurrent.Executors
@@ -34,7 +40,9 @@ import kotlinx.coroutines.flow.StateFlow
  *   `startForeground` cannot throw and take the run down.
  * - `START_STICKY`: when the system kills the process during a run it recreates the service with a null
  *   intent, and [RunRecovery] restores the run (the journal implementation is #9).
- * - The UI binds to it and only reads [LocalBinder.state].
+ * - The Health Services exercise follows the phases of the engine ([ExerciseController.follow], #11) and
+ *   its samples go to the engine. A refused or lost exercise never pauses or stops the run (R4).
+ * - The UI binds to it and only reads [LocalBinder.state] and [LocalBinder.exercise].
  */
 class RecordingService : Service() {
     private lateinit var engine: RecordingEngine
@@ -44,6 +52,7 @@ class RecordingService : Service() {
             Thread(task, "runpro-tick").apply { isDaemon = true }
         }
     private lateinit var notification: RunNotification
+    private lateinit var exercise: ExerciseController
     private lateinit var foreground: ForegroundController
     private var recovery: RunRecovery = RunRecovery.NONE
 
@@ -55,6 +64,7 @@ class RecordingService : Service() {
     inner class LocalBinder : Binder() {
         val state: StateFlow<RunState> get() = engine.state
         val failure: StateFlow<Throwable?> get() = engine.failure
+        val exercise: StateFlow<ExerciseStatus> get() = this@RecordingService.exercise.status
     }
 
     override fun onCreate() {
@@ -70,6 +80,7 @@ class RecordingService : Service() {
         )
         notification = RunNotification(this).also { it.createChannel() }
         foreground = ForegroundController(this, notification)
+        exercise = HealthServicesExercise.create(this, ::now).also { it.start(EngineFeed()) }
         ticker.scheduleWithFixedDelay(::tick, 1, 1, TimeUnit.SECONDS)
     }
 
@@ -93,6 +104,8 @@ class RecordingService : Service() {
     }
 
     override fun onDestroy() {
+        // The exercise is not ended here: after a restart its owner adopts it (ExerciseController).
+        exercise.stop()
         ticker.shutdownNow()
         engine.close()
         main.removeCallbacksAndMessages(null)
@@ -158,6 +171,8 @@ class RecordingService : Service() {
         val changed = state.phase != lastPhase
         lastPhase = state.phase
         if (!changed) return
+        // Non-blocking: the controller only queues requests to Health Services.
+        exercise.follow(state.phase)
         main.post {
             when {
                 ServiceStartPolicy.needsForeground(state.phase) -> notification.update(state)
@@ -176,6 +191,17 @@ class RecordingService : Service() {
 
                 else -> Unit
             }
+        }
+    }
+
+    /** Health Services samples and sensor events go to the engine, which journals both (#60). */
+    private inner class EngineFeed : SensorListener {
+        override fun onSample(sample: Sample) {
+            engine.submit(EngineInput.SampleReceived(sample))
+        }
+
+        override fun onEvent(event: SensorEvent) {
+            engine.submit(EngineInput.SensorReceived(event))
         }
     }
 

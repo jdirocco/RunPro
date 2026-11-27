@@ -122,6 +122,22 @@ command until the exemption is in place. Also check that RunPro is not in Samsun
 (Galaxy Wearable on the phone, and the phone's own battery settings if the phone app is installed); see
 the Italian guide, section 7.
 
+## Emulator test (Health Services, issue #11)
+
+The Wear OS emulator's Health Services produces synthetic heart rate, location, distance, speed and
+cadence for a running exercise, so the adapter can be tested end to end without the watch. Create a Wear
+OS AVD (API 34 or later, e.g. `Wear_OS_Large_Round`), start it and run the instrumented test:
+
+```
+$ emulator -avd Wear_OS_Large_Round -no-window -no-audio &
+$ ANDROID_SERIAL=emulator-5554 ./gradlew :wear:connectedDebugAndroidTest
+```
+
+`HealthServicesSyntheticRunTest` grants the permissions, starts a run through `RecordingService`, waits
+for at least 15 s of timer with distance, heart rate and cadence, stops the run and checks that the
+exercise ended. It is not part of `./rp check` (it needs a device). Set `ANDROID_SERIAL` when a phone or
+the watch is also connected, so the test does not run on them.
+
 ## Troubleshooting
 
 | Symptom | Action |

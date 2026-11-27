@@ -231,6 +231,7 @@ $ sdkmanager "platforms;android-37.0" "build-tools;37.0.0" "platform-tools"
 $ ./rp check                                 # all nine modules + root build-script formatting
 $ ./gradlew :wear:assembleDebug               # wear/build/outputs/apk/debug/wear-debug.apk
 $ ./gradlew :core:model:test :tools:replay:test # JVM tests without a watch or emulator
+$ ANDROID_SERIAL=emulator-5554 ./gradlew :wear:connectedDebugAndroidTest  # emulator test (WATCH_SETUP.md)
 $ python3 -B -m unittest discover -s tests -v  # harness tests without an SDK or device
 $ ./gradlew ktlintFormat                      # format Kotlin and Gradle Kotlin scripts
 $ ./gradlew :tools:replay:generateSyntheticTraces  # rewrite testdata/traces/ after changing SyntheticTraces
