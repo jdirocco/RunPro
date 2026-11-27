@@ -58,4 +58,19 @@
     <string name="setup_battery_unrestricted">RunPro non è esclusa dall\'ottimizzazione della batteria, quindi l\'orologio può fermarla durante una corsa. L\'orologio non ha un\'impostazione per questo: dal computer esegui</string>
     <string name="setup_sleeping_apps">Sul telefono apri Galaxy Wearable, Impostazioni orologio, Batteria: RunPro non deve essere tra le app in sospensione o in sospensione profonda.</string>
     <string name="setup_checked">Fatto, controllato</string>
+    <string name="workout_mode">Allenamento: %1$s</string>
+    <string name="workout_free">Corsa libera</string>
+    <string name="workout_intervals">Ripetute</string>
+    <string name="workout_auto_lap">Giro automatico: %1$s</string>
+    <string name="workout_off">Disattivato</string>
+    <string name="workout_meters">%1$d m</string>
+    <string name="workout_repetitions">Ripetizioni: %1$d</string>
+    <string name="workout_warm_up">Riscaldamento</string>
+    <string name="workout_work">Lavoro</string>
+    <string name="workout_recovery">Recupero</string>
+    <string name="workout_cool_down">Defaticamento</string>
+    <string name="workout_target">%1$s: %2$s</string>
+    <string name="workout_complete">Allenamento completato — registrazione in corso</string>
+    <string name="workout_progress">%1$s %2$d/%3$d · restano %4$s</string>
+    <string name="workout_lap_summary">Giro %1$d\n%2$d m · %3$s</string>
 </resources>

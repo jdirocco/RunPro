@@ -39,7 +39,11 @@ class RecordingJournalTest {
                 assertTrue(tap.elapsedNow() < 1.seconds)
                 assertEquals(
                     listOf(
-                        JournalRecord.RunStarted(engine.state.value.run!!.id, TestTime.at(0))
+                        JournalRecord.RunStarted(
+                            engine.state.value.run!!.id,
+                            TestTime.at(0),
+                            engine.state.value.workoutSettings
+                        )
                     ),
                     JournalReader.read(file).records
                 )

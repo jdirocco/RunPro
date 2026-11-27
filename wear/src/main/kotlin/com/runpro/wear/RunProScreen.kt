@@ -49,7 +49,11 @@ fun RunProScreen(
                 when (state.phase) {
                     RunPhase.IDLE -> startItems(setup, actions)
 
-                    RunPhase.PREPARING -> warmUpItems(status, actions)
+                    RunPhase.PREPARING -> warmUpItems(
+                        status,
+                        journalFailed = state.journalFailed,
+                        actions = actions
+                    )
 
                     RunPhase.RUNNING, RunPhase.PAUSED -> if (confirmingStop) {
                         confirmStopItems(
@@ -70,6 +74,9 @@ fun RunProScreen(
                     }
                 }
             }
+            if (!confirmingStop) {
+                LapSummaryPopup(state) // Drawn last so it covers the list.
+            }
         }
     }
 }
@@ -78,6 +85,7 @@ private fun ScalingLazyListScope.startItems(setup: SetupState, actions: SetupAct
     item { Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleMedium) }
     permissionItems(setup, actions)
     batteryItems(setup.advice, actions)
+    workoutSetup(setup.workoutSettings, actions.configureWorkout)
     if (setup.readiness.canStart) {
         item {
             WideButton(stringResource(R.string.run_get_ready)) {

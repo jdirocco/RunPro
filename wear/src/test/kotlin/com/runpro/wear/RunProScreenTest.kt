@@ -148,6 +148,13 @@ class RunProScreenTest {
         compose.onNodeWithText("Saved").assertDoesNotExist()
     }
 
+    @Test
+    fun `a failed journal during the warm-up explains why start could not save`() {
+        runState.value = RunState(phase = RunPhase.PREPARING, journalFailed = true)
+        show()
+        shows("Not saved: the run could not be written to the watch storage.")
+    }
+
     private fun running(): RunState {
         val start = Timestamp(0, 0)
         val totals = Totals(

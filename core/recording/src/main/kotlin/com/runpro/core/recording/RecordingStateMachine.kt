@@ -7,6 +7,7 @@ import com.runpro.core.model.RunId
 import com.runpro.core.model.Sample
 import com.runpro.core.model.StopReason
 import com.runpro.core.model.Timestamp
+import com.runpro.core.model.WorkoutSettings
 
 /**
  * The recording core: phases, run events, totals and laps. Pure, synchronous and deterministic, so replay
@@ -18,8 +19,11 @@ import com.runpro.core.model.Timestamp
 class RecordingStateMachine(
     private val config: EngineConfig = EngineConfig(),
     private val requireStorageCheck: Boolean = false,
+    internal var automaticLaps: Boolean = true,
     private val runIds: () -> RunId = RunId::random
 ) {
+    private var settings = WorkoutSettings()
+    private var workout = WorkoutController(settings)
     private var phase = RunPhase.IDLE
     private var run: Run? = null
     private var metrics: RunMetrics? = null
@@ -37,7 +41,12 @@ class RecordingStateMachine(
             if (run == null || metrics == null ||
                 now == null
             ) {
-                return RunState(phase, current = current, resources = resources)
+                return RunState(
+                    phase,
+                    current = current,
+                    resources = resources,
+                    workoutSettings = settings
+                )
             }
             return RunState(
                 phase = phase,
@@ -45,20 +54,56 @@ class RecordingStateMachine(
                 totals = metrics.totals(now),
                 laps = run.laps.zip(metrics.laps(now), ::LapTotals),
                 current = current,
-                resources = resources
+                resources = resources,
+                workoutSettings = settings,
+                workout = workout.progress(metrics.totals(now))
             )
         }
 
     /** Applies [input]; returns false when it does not apply to the current phase. */
-    fun handle(input: EngineInput): Boolean = when (input) {
-        is EngineInput.SampleReceived -> onSample(input.sample)
-        is EngineInput.SensorReceived -> advanceClock(input.event.time)
-        is EngineInput.Tick -> advanceClock(input.time)
-        is EngineInput.Prepare -> moveTo(RunPhase.PREPARING, RunPhase.IDLE)
-        is EngineInput.Start -> start(input.time)
-        is EngineInput.Reset -> reset()
-        is EngineInput.Command -> record(input)
-        is EngineInput.Resources -> onResources(input)
+    fun handle(input: EngineInput): Boolean {
+        // Laps due before a runner command belong before it, so pause/lap/stop never swallow them.
+        if (input is EngineInput.Command) markAutomaticLaps(input.time)
+        val accepted = when (input) {
+            // Workout settings can change only before the run starts.
+            is EngineInput.ConfigureWorkout ->
+                (phase in CONFIGURABLE_PHASES).also { allowed ->
+                    if (allowed) {
+                        settings = input.settings
+                        workout = WorkoutController(settings)
+                    }
+                }
+
+            is EngineInput.SampleReceived -> onSample(input.sample)
+
+            is EngineInput.SensorReceived -> advanceClock(input.event.time)
+
+            is EngineInput.Tick -> advanceClock(input.time)
+
+            is EngineInput.Prepare -> moveTo(RunPhase.PREPARING, RunPhase.IDLE)
+
+            is EngineInput.Start -> start(input.time)
+
+            is EngineInput.Reset -> reset()
+
+            is EngineInput.Command -> record(input)
+
+            is EngineInput.Resources -> onResources(input)
+        }
+        if (accepted) markAutomaticLaps()
+        return accepted
+    }
+
+    /** Marks every automatic lap due at [commandTime] (or the current engine time) while running. */
+    private fun markAutomaticLaps(commandTime: Timestamp? = null) {
+        val metrics = metrics.takeIf { automaticLaps && phase == RunPhase.RUNNING } ?: return
+        commandTime?.let(::advanceClock)
+        val time = now ?: return
+        var event = workout.due(metrics.totals(time), time)
+        while (event != null) {
+            restoreEvent(event.copy(time = maxOf(event.time, run!!.events.last().time)))
+            event = workout.due(metrics.totals(time), time)
+        }
     }
 
     private fun onResources(input: EngineInput.Resources): Boolean {
@@ -102,6 +147,7 @@ class RecordingStateMachine(
             current = CurrentValues()
             run = Run(runIds(), listOf(RunEvent.Started(time)))
             metrics = RunMetrics(config, time)
+            workout = WorkoutController(settings)
             now = time
         }
         return started
@@ -173,7 +219,10 @@ class RecordingStateMachine(
                 phase = RunPhase.RUNNING
             }
 
-            is RunEvent.LapMarked -> metrics.markLap(event.time)
+            is RunEvent.LapMarked -> {
+                workout.marked(event, metrics.totals(event.time))
+                metrics.markLap(event.time)
+            }
 
             is RunEvent.Stopped -> {
                 metrics.stop(event.time)
@@ -204,3 +253,6 @@ class RecordingStateMachine(
         return recording
     }
 }
+
+/** Phases in which the workout settings of the next run can still change. */
+private val CONFIGURABLE_PHASES = setOf(RunPhase.IDLE, RunPhase.PREPARING)

@@ -19,11 +19,18 @@ import com.runpro.core.recording.exercise.Readiness
 import com.runpro.core.recording.service.ServiceCommand
 
 /** GPS and heart rate acquire; the runner starts when ready, or earlier, or goes back. */
-internal fun ScalingLazyListScope.warmUpItems(status: ExerciseStatus, actions: SetupActions) {
+internal fun ScalingLazyListScope.warmUpItems(
+    status: ExerciseStatus,
+    journalFailed: Boolean,
+    actions: SetupActions
+) {
     item { Paragraph(stringResource(R.string.warmup_title)) }
     item { SensorLine(stringResource(R.string.warmup_gps), status.gps) }
     item { SensorLine(stringResource(R.string.warmup_heart_rate), status.heartRate) }
     warmUpNote(status)?.let { note -> item { Paragraph(stringResource(note)) } }
+    if (journalFailed) {
+        item { Paragraph(stringResource(R.string.summary_not_saved)) }
+    }
     item {
         WideButton(stringResource(R.string.run_start)) { actions.command(ServiceCommand.START) }
     }
@@ -69,6 +76,9 @@ internal fun ScalingLazyListScope.runItems(
     if (paused) item { Paragraph(stringResource(R.string.run_paused)) }
     item {
         Text(clock(state.totals.timer), style = MaterialTheme.typography.displayLarge)
+    }
+    if (state.workout != null) {
+        item { WorkoutCountdown(state) }
     }
     item { Metric(kilometers(state.totals.distance), stringResource(R.string.unit_km)) }
     item { Metric(pace(state.current.pace), stringResource(R.string.unit_pace)) }

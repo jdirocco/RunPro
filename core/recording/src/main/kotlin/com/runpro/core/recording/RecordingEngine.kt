@@ -107,13 +107,23 @@ class RecordingEngine(
         }
     }
 
-    private fun process(input: EngineInput, recording: RecordingSession): RecordingSession {
-        if (input == EngineInput.Reset && recording.state.phase == RunPhase.STOPPED) {
+    private fun process(input: EngineInput, recording: RecordingSession): RecordingSession = when {
+        input == EngineInput.Reset && recording.state.phase == RunPhase.STOPPED -> {
             recording.close()
-            return sessionFactory()
+            sessionFactory()
         }
-        recording.handle(input)
-        return recording
+
+        input == EngineInput.Reset &&
+            recording.state.phase == RunPhase.PREPARING &&
+            recording.failure != null -> {
+            recording.abort()
+            sessionFactory()
+        }
+
+        else -> {
+            recording.handle(input)
+            recording
+        }
     }
 
     companion object {

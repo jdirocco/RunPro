@@ -119,6 +119,16 @@ are the owner field test #75; live journals are wired by #60 (ADR 0011); sync pr
 
 Watch behaviour (real GPS and wrist HR, another app taking over) is a field result (#14). ADR 0011.
 
+## Workout evidence
+
+- `WorkoutTest` checks real journal settings/laps survive recovery and rebuild identically for export,
+  without duplicate automatic marks (R2/R3). Auto-laps count admitted active distance only; pauses,
+  rejected sources and source resets do not fabricate laps, and interval completion keeps recording (R4).
+- `IntervalWorkoutReplayTest` replays the committed 45-minute intervals trace into fourteen timed laps.
+  Automatic marks use the existing synced event path; `JournaledEngineTest`, `RecordingThreadingTest`
+  and `LowResourceReplayTest` continue to cover start-before-publication, worker isolation and emergency
+  saves (R1/R6/R7). No sensor arbitration or BLE reconnect policy is changed (R5/R8).
+
 ## Failure catalogue
 
 Every real failure seen in the field gets a row here, a recorded trace in `testdata/traces/`, and a test.
@@ -127,3 +137,4 @@ Every real failure seen in the field gets a row here, a recorded trace in `testd
 |---|---|---|---|---|
 | 2026-11-26 | #10 | Setup screen: "Open settings" for battery did nothing on the Galaxy Watch 5 Pro. On Wear OS `ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS` resolves to a placeholder activity that closes at once, so the fallback never ran. Now opens the app details page. | none (UI, no sensor data) | `BatterySettingsTest` |
 | 2026-11-26 | #10 | The app details page has no Battery entry on the watch either, and `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` is also a placeholder: no screen can exempt RunPro. The setup screen now shows the adb command instead of a button. | none (UI, no sensor data) | `BatterySettingsTest` |
+| 2026-11-27 | #12 | Warm-up screen: tapping "Start" ("Avvia") did nothing on the Galaxy Watch 5 Pro while "Back" returned to the start screen, leaving a 0-byte `.journal` file in `files/journals`. `FileJournalOutput.availableBytes` called `Files.getFileStore(path)`, which scans `/proc/mounts` and throws `IOException` ("Mount point not found") on Android `/data/user/0/...` before `RunStarted` is written; `RecordingSession` caught it, set `journalFailed` and stayed in `PREPARING` with no error shown on the warm-up screen. `FileJournalOutput` now queries `File.usableSpace` (`statvfs`), the warm-up screen shows storage errors, and `Reset` replaces a failed warm-up session. | none (pre-start storage check, no sensor data) | `ReservedStorageTest`, `JournalFailureTest`, `RunProScreenTest` |

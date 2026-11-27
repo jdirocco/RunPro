@@ -9,6 +9,7 @@ import com.runpro.core.model.RunId
 import com.runpro.core.model.Sample
 import com.runpro.core.model.SensorEvent
 import com.runpro.core.model.Timestamp
+import com.runpro.core.model.WorkoutSettings
 
 /**
  * One journaled sample as the engine counted it.
@@ -49,7 +50,8 @@ class RecordedRun internal constructor(
             val start = contents.records.firstOrNull() as? JournalRecord.RunStarted
             requireNotNull(start) { "The journal must begin with a run start" }
 
-            val machine = RecordingStateMachine(config) { start.runId }
+            val machine = RecordingStateMachine(config, automaticLaps = false) { start.runId }
+            machine.handle(EngineInput.ConfigureWorkout(start.workout ?: WorkoutSettings()))
             machine.handle(EngineInput.Prepare(start.time))
             machine.handle(EngineInput.Start(start.time))
             val samples = mutableListOf<RecordedSample>()

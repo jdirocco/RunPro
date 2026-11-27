@@ -29,7 +29,11 @@ import com.runpro.core.model.SpeedSample
 import com.runpro.core.model.StopReason
 import com.runpro.core.model.SwitchReason
 import com.runpro.core.model.Timestamp
+import com.runpro.core.model.WorkoutJson
+import com.runpro.core.model.WorkoutSettings
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.protobuf.ProtoBuf
 
 /**
@@ -51,7 +55,11 @@ internal object JournalCodec {
 private object RecordEncoder {
     fun encode(record: JournalRecord): RecordProto = when (record) {
         is JournalRecord.RunStarted -> RecordProto(
-            runStarted = RunStartedProto(record.runId.value, record.time.toProto())
+            runStarted = RunStartedProto(
+                record.runId.value,
+                record.time.toProto(),
+                record.workout?.let { WorkoutJson.json.encodeToString(it) }
+            )
         )
 
         is JournalRecord.Samples -> RecordProto(
@@ -187,8 +195,11 @@ private object RecordDecoder {
         return kinds.firstOrNull()
     }
 
-    private fun decode(proto: RunStartedProto) =
-        JournalRecord.RunStarted(RunId(proto.runId), proto.time.toModel())
+    private fun decode(proto: RunStartedProto) = JournalRecord.RunStarted(
+        RunId(proto.runId),
+        proto.time.toModel(),
+        proto.workoutJson?.let { WorkoutJson.json.decodeFromString<WorkoutSettings>(it) }
+    )
 
     private fun decode(proto: SampleBatchProto) = JournalRecord.Samples(proto.samples.map(::decode))
 

@@ -5,6 +5,7 @@ import com.runpro.core.model.RunId
 import com.runpro.core.model.Sample
 import com.runpro.core.model.SensorEvent
 import com.runpro.core.model.Timestamp
+import com.runpro.core.model.WorkoutSettings
 
 /**
  * One entry of a run journal. A journal starts with [RunStarted]; a run whose journal has no
@@ -15,7 +16,11 @@ import com.runpro.core.model.Timestamp
  */
 sealed interface JournalRecord {
     /** The start tap: the first record of every journal (R1). */
-    data class RunStarted(val runId: RunId, val time: Timestamp) : JournalRecord {
+    data class RunStarted(
+        val runId: RunId,
+        val time: Timestamp,
+        val workout: WorkoutSettings? = null
+    ) : JournalRecord {
         val event: RunEvent.Started get() = RunEvent.Started(time)
     }
 

@@ -1,18 +1,18 @@
 # RunPro harness guide
 
-How to drive RunPro development with coding agents (Claude Code or Codex) and the `./rp` harness.
+How to drive RunPro development with coding agents (Claude Code, Codex or Antigravity) and the `./rp` harness.
 Everything runs from the repository root: `/Users/juridirocco/development/RunPro`.
 
 ## 1. The pieces
 
 | Piece | Where | What it is for |
 |---|---|---|
-| `./rp` | repo root | CLI that wraps git + GitHub: status, next task, start, launch an agent (Claude Code or Codex), check, PR, handoff, install |
+| `./rp` | repo root | CLI that wraps git + GitHub: status, next task, start, launch an agent (`claude`, `codex`, `agy`), check, PR, handoff, install |
 | Backlog | GitHub issues (seeded from `plan/backlog.md`) | One issue = one branch = one PR |
 | Milestones | GitHub milestones M0–M7, with due dates | Release phases (see `docs/PLAN.md`) |
 | Board | https://github.com/users/jdirocco/projects/1 | Todo / In Progress / Done |
-| Agent rules | `AGENTS.md` (loaded by Claude Code through `CLAUDE.md`) | The loop and the rules every agent follows |
-| Skill | `.claude/skills/runpro-task/` | "Take the next task" in one sentence |
+| Agent rules | `AGENTS.md` (loaded natively by Codex and Antigravity, and by Claude Code through `CLAUDE.md`) | The loop and the rules every agent follows |
+| Skills | `.agents/skills/` (symlinked in `.claude/skills/`) | `runpro-task` (implement an issue), `runpro-review` (PR + R1–R8 review), `runpro-triage` (field-report triage) |
 | Invariants | `docs/RELIABILITY.md` | R1–R8: what can never break |
 | Field tests | `docs/FIELD_TESTING.md` + "Field report" issue template | Your runs on the watch, fed back to agents |
 | Watch setup (Italian) | `docs/it/CONFIGURAZIONE_OROLOGIO.md` | Developer options, Wi-Fi ADB, install, permissions, battery, strap |
@@ -32,39 +32,55 @@ Everything runs from the repository root: `/Users/juridirocco/development/RunPro
 ```
 $ ./rp status
 == jdirocco/RunPro
-  M0 Foundations           [#######             ] 2/6
-  M1 Recording core        [                    ] 0/8
+  M0 Foundations           [####################] 10/10
+  M1 Recording core        [#############       ] 9/14   (open: 2 XS, 1 S, 1 M, 1 field-test)
+  M2 BLE sensors           [##                  ] 1/8    (open: 4 M, 1 M-L, 1 L, 1 field-test)
   ...
 == In progress
-  #5 Chaos injector for replay tests
-      running 12m: codex gpt-6.1-sol on openai (cloud), auto, pid 87776
-  #55 rp: --worktree run from inside a worktree nests the new worktree under it
+  #12 Basic run UI  [S]
       no agent running (last: codex devstral-64k:latest on ollama (local), exited 0 25m ago)
-  #47 Field validation of the phone app
-      no agent running
 == Decisions for the owner (needs-owner: answer in the issue, then remove the label)
   none
 == Field tests to run now (./rp install, then docs/FIELD_TESTING.md)
-  none
+  #75 Field validation of phone sync
 == Field tests not runnable yet
   #22 Field validation of BLE sensors  (waits for #19, #20)
-  #14 Field validation of the recording core  (waits for #9, #12)
-== Open field reports (for an agent to triage)
-  #45 Field report: HR gap after tunnel
+  #14 Field validation of the recording core  (waits for #12)
 == Open PRs
-  !40 Gradle multi-module project skeleton (#1) (issue-1-gradle-multi-module-project-skeleton)
 == Next ready
-  #4 Replay trace format, recorder and replayer
+  #80 Remove header-only journals left by a rejected start  [XS]
+  #16 BLE connection state machine  [M]
+  #29 Run history on the watch  [S]
+```
+
+Each milestone with classified open work shows its open breakdown (`XS`, `S`, `M`, `M-L`, `L`, `field-test`),
+and every issue carries its `[XS]`..`[L]` badge from its `complexity:*` label. Pass `--all` (or a filter such
+as `./rp status xs,s` or `./rp status m-l,l`) to also list blocked and in-progress issues with their state:
+
+```
+$ ./rp status l
+...
+== Next ready (L)
+  none
+== Open issues (L)
+  #17 Android GATT adapter and device association  [M2 BLE sensors · L]  (waits for #16)
+  #34 Running dynamics estimators  [M5 Running analysis · L]  (waits for #33)
 ```
 
 Under each issue **In progress** a second line says whether an agent works on it and where it runs: runner,
 model, provider and `local` or `cloud`. `./rp agent` records each run in `.git/rp-agents/<N>.json` (shared by
 all worktrees) with the model resolved even when `plan/config.json` leaves it `null`: Codex reads
 `~/.codex/config.toml` (`--oss` means local, with `--local-provider`), Claude reads `--model`,
-`ANTHROPIC_MODEL` or `.claude/settings.json` (a localhost `ANTHROPIC_BASE_URL` means local). Agents not
-started by `./rp agent` with a record are still found from the process list. When the process list cannot be read (a
+`ANTHROPIC_MODEL` or `.claude/settings.json` (a localhost `ANTHROPIC_BASE_URL` means local), and Antigravity
+reads `--model`, `GEMINI_MODEL`, `--settings` or `~/.gemini/antigravity-cli/settings.json` (a localhost
+`GOOGLE_GEMINI_BASE_URL` means local). When `./rp start <N>` runs inside an active desktop or IDE agent turn
+(`ANTIGRAVITY_AGENT`, `CLAUDECODE` or `CODEX_THREAD_ID`), it records a `session` entry (e.g.
+`session started 12m ago: agy-app (desktop) on google (cloud), session 926af09c`) so `./rp status` distinguishes
+desktop/IDE agent work from an abandoned issue. Agents not started with a record are still found from the
+process list. When the process list cannot be read (a
 sandbox such as Codex `workspace-write` denies `ps`), the section says so and each issue shows
-`agent status unknown (process list unavailable; recorded: ...)` with what the run record holds; the rest of
+`agent status unknown (process list unavailable; recorded: ...)` with what the run record holds (while
+`session` entries still render normally); the rest of
 the report renders as usual. "no agent running" on an issue
 nobody waits for means it was left In Progress by mistake: unassign it, drop `status:in-progress` and set the
 board back to Todo.
@@ -85,12 +101,24 @@ Dependencies come from `plan/backlog.md` and from the `**Depends on:** #a, #b` l
 
 ```
 $ ./rp next
-#1 Gradle multi-module project skeleton  [M0 Foundations]
-Start with: ./rp start 1
+#80 Remove header-only journals left by a rejected start  [M1 Recording core · XS]
+Start with: ./rp start 80
+
+$ ./rp next s
+#29 Run history on the watch  [M4 Export and sync · S]
+Start with: ./rp start 29
+
+$ ./rp next --all
+#80 Remove header-only journals left by a rejected start  [M1 Recording core · XS]
+#16 BLE connection state machine  [M2 BLE sensors · M]
+#29 Run history on the watch  [M4 Export and sync · S]
+...
 ```
 
 An issue is *ready* when it is open, unassigned, not blocked, not a field test, and all the issues it
-depends on are closed. Lower milestones come first.
+depends on are closed. Lower milestones come first. Pass `--all` to list every ready issue, or a complexity
+filter (`xs`, `s`, `m`, `m-l` / `ml`, `l`, comma-separated like `xs,s`) to pick a task matching the model you
+want to run (for instance `xs,s` for a fast or local model, `m-l,l` for a frontier model).
 
 ### `./rp start <N>`: begin an issue
 
@@ -106,23 +134,24 @@ With `--worktree` the branch is created in `../RunPro-worktrees/<branch>` and th
 (use it for parallel work). `git worktree add` does not carry ignored files, so `./rp` copies this
 checkout's `local.properties` (the `sdk.dir` line) into the new worktree; an existing one is kept.
 
-### `./rp agent`: launch Claude Code or Codex on an issue
+### `./rp agent`: launch Claude Code, Codex or Antigravity on an issue
 
 ```
-./rp agent [N|next] [claude|codex] [--model M] [--auto] [--headless] [--worktree] [--prompt TEXT] [--dry-run] [-- ARGS]
+./rp agent [N|next] [claude|codex|agy] [--model M] [--complexity C] [--auto] [--headless] [--worktree] [--prompt TEXT] [--dry-run] [-- ARGS]
 ```
 
 It does `./rp start` for you (assign, branch, In Progress), then launches the agent CLI with a prompt that
-tells it which issue and branch it is on and to follow `AGENTS.md`. Both CLIs read `AGENTS.md`
+tells it which issue and branch it is on and to follow `AGENTS.md`. All three CLIs read `AGENTS.md`
 (Claude Code through `CLAUDE.md`).
 
 | Option | Default | Effect |
 |---|---|---|
 | `N` / `next` | `next` | Issue to work on; `next` = first ready issue |
-| `claude` / `codex` (or `--runner`) | `agents.default_runner` in `plan/config.json` (`claude`) | Which agent CLI |
-| `--model M` | `agents.<runner>.model` in `plan/config.json`; `null` = the CLI's own default | Model passed as `claude --model M` or `codex -m M` |
+| `claude` / `codex` / `agy` (or `--runner`) | `agents.default_runner` in `plan/config.json` (`claude`) | Which agent CLI |
+| `--model M` | `agents.<runner>.model` in `plan/config.json`; `null` = the CLI's own default | Model passed as `claude --model M`, `codex -m M` or `agy --model M` |
+| `--complexity C` | any | Filter `next` by complexity (`xs`, `s`, `m`, `m-l`, `l`, e.g. `--complexity xs,s` for a local model) |
 | `--auto` | off | Autonomous mode: the agent never asks you anything (see below). It pushes and opens the PR itself with `./rp pr`; it never merges |
-| `--headless` | off (interactive) | `claude -p` / `codex exec`: no chat, the agent runs to the end and exits. Without `--auto` it commits but does not push and ends with `./rp handoff` |
+| `--headless` | off (interactive) | `claude -p` / `codex exec` / `agy -p`: no chat, the agent runs to the end and exits. Without `--auto` it commits but does not push and ends with `./rp handoff` |
 | `--worktree` | off | Work in `../RunPro-worktrees/<branch>` |
 | `--prompt TEXT` | none | Extra instructions appended to the prompt |
 | `--dry-run` | off | Print the command without starting the issue or the agent |
@@ -133,8 +162,10 @@ Examples:
 ```
 $ ./rp agent                                   # next ready issue, Claude Code, default model, interactive
 $ ./rp agent 16 codex                          # issue #16 with Codex, default model
+$ ./rp agent 16 agy --worktree                 # issue #16 with Antigravity CLI in a worktree
 $ ./rp agent 16 claude --model opus            # Claude Code with a chosen model
 $ ./rp agent next codex --model gpt-5.5 --headless --worktree
+$ ./rp agent next agy --auto --headless --worktree -- --effort high
 $ ./rp agent 1 claude --auto                  # works without asking, opens the PR
 $ ./rp agent next codex --auto --headless --worktree   # fully unattended
 $ ./rp agent 4 --prompt "Use kotlinx.serialization for the trace" -- --add-dir ../traces
@@ -142,6 +173,10 @@ $ ./rp agent 3 codex --dry-run
 # #3 Core domain model
 # runner=codex model=(tool default) mode=interactive cwd=/Users/juridirocco/development/RunPro
 codex -s workspace-write -c 'sandbox_workspace_write.writable_roots=[...]' -c sandbox_workspace_write.network_access=true -C /Users/juridirocco/development/RunPro 'You are working on RunPro issue #3: ...'
+$ ./rp agent 83 agy --worktree --dry-run
+# #83 Integrate Antigravity (agy) runner, session tracking and shared skills
+# runner=agy model=(agy default) provider=google (cloud) mode=interactive cwd=/Users/juridirocco/development/RunPro-worktrees/issue-83-...
+agy --add-dir /Users/juridirocco/development/RunPro/.git -i 'You are working on RunPro issue #83: ...'
 ```
 
 Change the defaults in `plan/config.json`:
@@ -160,6 +195,11 @@ Change the defaults in `plan/config.json`:
     "network_access": true,
     "headless_args": [],
     "auto_args": ["-a", "never"]
+  },
+  "agy": {
+    "model": null,
+    "headless_args": ["--mode", "auto"],
+    "auto_args": ["--dangerously-skip-permissions"]
   }
 }
 ```
@@ -172,6 +212,7 @@ The agent works without asking for any authorisation and without waiting for you
 |---|---|
 | Claude Code | `--permission-mode bypassPermissions`: every tool call is allowed, no prompts |
 | Codex | `-a never` (interactive) or `codex exec` (headless, never asks): no approval prompts. Commands still run in the Codex sandbox (see below) |
+| Antigravity (`agy`) | `--dangerously-skip-permissions`: every tool call is auto-approved without prompts. In a linked `--worktree`, `--add-dir` automatically grants workspace access to the shared `.git` directory |
 
 The prompt also changes: the agent must not ask questions, opens the PR with `./rp pr` when `./rp check`
 passes, never merges, and writes `./rp handoff` if it cannot finish. Your control point is the PR review.
@@ -357,16 +398,18 @@ For a single task, `gh issue create` (or the "Task" template on GitHub) is enoug
 
 ### A. Let an agent take the next task
 
-From the terminal, with either agent:
+From the terminal, with any agent:
 
 ```
 $ ./rp agent              # Claude Code
 $ ./rp agent codex        # Codex
+$ ./rp agent agy          # Antigravity CLI
 ```
 
-Or open Claude Code in `/Users/juridirocco/development/RunPro` and say "Take the next RunPro task"
-(the `runpro-task` skill does the same loop). Either way the agent implements with tests, runs
-`./rp check`, asks before `./rp pr`, and you review and merge on GitHub.
+Or open Antigravity, Claude Code or Codex in `/Users/juridirocco/development/RunPro` and say
+"Take the next RunPro task" (the `runpro-task` skill does the same loop; `runpro-review` audits open PRs
+against R1–R8 and `runpro-triage` turns field reports into replay tests). Either way the agent implements
+with tests, runs `./rp check`, asks before `./rp pr`, and you review and merge on GitHub.
 
 ### B. Several agents in parallel
 
@@ -405,6 +448,7 @@ You accept it by merging.
 | Label | Meaning |
 |---|---|
 | `type:task`, `type:feature`, `type:docs`, `bug` | Kind of work |
+| `complexity:xs`, `complexity:s`, `complexity:m`, `complexity:ml`, `complexity:l` | Resolution complexity (`XS`, `S`, `M`, `M-L`, `L`), shown in `./rp status` and `./rp next` |
 | `area:*` | Module or topic (core, wear, ble, ui, mobile, dynamics, testing, build, release) |
 | `reliability` | Touches R1–R8; the PR must name the invariants and their tests |
 | `field-test` | Needs you on the watch; never picked by `./rp next` |

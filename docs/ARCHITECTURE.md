@@ -193,3 +193,12 @@ acking and recognises a run it already has, so retries never duplicate it. `:wea
 (`DataLayerPhoneLink`) and schedules passes (`PhoneSync`: app open, run stop, phone capability change,
 backoff 30 s to 15 min); `:mobile` receives in `FitReceiverService`. Both apps share the application id
 `com.runpro.wear`. Protocol and decisions: ADR 0010.
+
+## Auto-lap and intervals (`:core:recording`)
+
+`ConfigureWorkout` selects a free run (default 1 km auto-lap) or warm-up, repeated work/recovery,
+and cool-down by time or distance. The recording thread emits ordinary TIME/DISTANCE lap events;
+manual laps do not advance the workout. `RunState.workout` exposes stage and remaining target.
+Settings are retained in the journal start, and recovery/export replay existing marks without
+regenerating them. The service handles countdown/transition haptics independently of the activity;
+Compose observes countdown and lap summaries. Semantics and durability: ADR 0011.

@@ -16,6 +16,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
+import com.runpro.core.model.WorkoutSettings
 import com.runpro.core.recording.RunState
 import com.runpro.core.recording.exercise.ExerciseStatus
 import com.runpro.core.recording.service.BatteryAdvice
@@ -30,6 +31,7 @@ import kotlinx.coroutines.flow.StateFlow
 
 /** Binds to [RecordingService] and shows [RunProScreen]: setup checks, warm-up, run and summary. */
 class MainActivity : ComponentActivity() {
+    private var workoutSettings by mutableStateOf(WorkoutSettings())
     private var readiness by mutableStateOf(ServicePermissions.readiness(emptySet()))
     private var advice by mutableStateOf(emptyList<BatteryAdvice>())
     private var runState by mutableStateOf<StateFlow<RunState>>(MutableStateFlow(RunState()))
@@ -58,11 +60,12 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        workoutSettings = WorkoutPreferences.load(this)
         // Runs waiting for the phone are sent again whenever the app opens (#30).
         PhoneSync.request(this)
         setContent {
             RunProScreen(
-                SetupState(readiness, advice, backgroundLocationSkipped),
+                SetupState(readiness, advice, backgroundLocationSkipped, workoutSettings),
                 runState,
                 exercise,
                 SetupActions(
@@ -70,7 +73,11 @@ class MainActivity : ComponentActivity() {
                     askBackgroundLocation = { ask(listOf(RunPermission.BACKGROUND_LOCATION)) },
                     skipBackgroundLocation = { backgroundLocationSkipped = true },
                     confirmSleepingApps = ::confirmSleepingApps,
-                    command = ::send
+                    command = ::send,
+                    configureWorkout = {
+                        workoutSettings = it
+                        WorkoutPreferences.save(this, it)
+                    }
                 )
             )
         }
@@ -134,7 +141,8 @@ class MainActivity : ComponentActivity() {
 data class SetupState(
     val readiness: PermissionReadiness,
     val advice: List<BatteryAdvice>,
-    val backgroundLocationSkipped: Boolean
+    val backgroundLocationSkipped: Boolean,
+    val workoutSettings: WorkoutSettings = WorkoutSettings()
 )
 
 class SetupActions(
@@ -142,5 +150,6 @@ class SetupActions(
     val askBackgroundLocation: () -> Unit,
     val skipBackgroundLocation: () -> Unit,
     val confirmSleepingApps: () -> Unit,
-    val command: (ServiceCommand) -> Unit
+    val command: (ServiceCommand) -> Unit,
+    val configureWorkout: (WorkoutSettings) -> Unit = {}
 )

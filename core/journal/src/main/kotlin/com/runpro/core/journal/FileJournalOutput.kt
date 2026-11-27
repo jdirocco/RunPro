@@ -4,7 +4,6 @@ import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.channels.Channels
 import java.nio.channels.FileChannel
-import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
 
@@ -18,8 +17,9 @@ class FileJournalOutput internal constructor(
     override var storageFull: Boolean = false
         private set
 
+    // File.usableSpace queries statvfs directly; Files.getFileStore scans /proc/mounts and fails on Android (#12).
     override val availableBytes: Long
-        get() = if (storageFull) 0 else Files.getFileStore(reserve.file).usableSpace
+        get() = if (storageFull) 0 else reserve.file.toFile().usableSpace
 
     override fun write(bytes: ByteArray, offset: Int, length: Int) {
         val position = channel.position()

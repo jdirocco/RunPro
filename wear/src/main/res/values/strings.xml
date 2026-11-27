@@ -59,4 +59,19 @@
     <string name="setup_battery_unrestricted">RunPro is not exempt from battery optimisation, so the watch can stop it during a run. The watch has no setting for this: from the computer, run</string>
     <string name="setup_sleeping_apps">On the phone, open Galaxy Wearable, Watch settings, Battery: RunPro must not be in Sleeping apps or Deep sleeping apps.</string>
     <string name="setup_checked">Done, checked</string>
+    <string name="workout_mode">Workout: %1$s</string>
+    <string name="workout_free">Free run</string>
+    <string name="workout_intervals">Intervals</string>
+    <string name="workout_auto_lap">Auto lap: %1$s</string>
+    <string name="workout_off">Off</string>
+    <string name="workout_meters">%1$d m</string>
+    <string name="workout_repetitions">Repetitions: %1$d</string>
+    <string name="workout_warm_up">Warm-up</string>
+    <string name="workout_work">Work</string>
+    <string name="workout_recovery">Recovery</string>
+    <string name="workout_cool_down">Cool-down</string>
+    <string name="workout_target">%1$s: %2$s</string>
+    <string name="workout_complete">Workout complete — recording continues</string>
+    <string name="workout_progress">%1$s %2$d/%3$d · %4$s remaining</string>
+    <string name="workout_lap_summary">Lap %1$d\n%2$d m · %3$s</string>
 </resources>

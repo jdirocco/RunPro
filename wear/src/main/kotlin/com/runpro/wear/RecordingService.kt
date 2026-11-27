@@ -51,6 +51,7 @@ class RecordingService : Service() {
         Executors.newSingleThreadScheduledExecutor { task ->
             Thread(task, "runpro-tick").apply { isDaemon = true }
         }
+    private lateinit var feedback: WorkoutFeedback
     private lateinit var notification: RunNotification
     private lateinit var exercise: ExerciseController
     private lateinit var foreground: ForegroundController
@@ -61,6 +62,8 @@ class RecordingService : Service() {
 
     @Volatile private var lastPhase = RunPhase.IDLE
 
+    @Volatile private var lastJournalFailed = false
+
     inner class LocalBinder : Binder() {
         val state: StateFlow<RunState> get() = engine.state
         val failure: StateFlow<Throwable?> get() = engine.failure
@@ -69,6 +72,7 @@ class RecordingService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        feedback = WorkoutFeedback(this)
         engine = RecordingEngine(
             sessionFactory = {
                 RecordingSession.create(
@@ -130,19 +134,35 @@ class RecordingService : Service() {
         requestedRun = true
         if (engine.state.value.phase == RunPhase.STOPPED) engine.submit(EngineInput.Reset)
         val now = now()
+        engine.submit(EngineInput.ConfigureWorkout(WorkoutPreferences.load(this)))
         engine.submit(EngineInput.Prepare(now))
         if (!warmUp) engine.submit(EngineInput.Start(now))
     }
 
     private fun forward(command: ServiceCommand?) {
+        if (command == ServiceCommand.START &&
+            !foreground.enter(engine.state.value, fromBackground = false)
+        ) {
+            leave()
+            return
+        }
         val now = now()
         val input = when (command) {
-            ServiceCommand.START -> EngineInput.Start(now)
+            ServiceCommand.START -> {
+                engine.submit(EngineInput.ConfigureWorkout(WorkoutPreferences.load(this)))
+                EngineInput.Start(now)
+            }
+
             ServiceCommand.CANCEL -> EngineInput.Reset
+
             ServiceCommand.PAUSE -> EngineInput.Pause(now)
+
             ServiceCommand.RESUME -> EngineInput.Resume(now)
+
             ServiceCommand.LAP -> EngineInput.MarkLap(now)
+
             ServiceCommand.STOP -> EngineInput.Stop(now)
+
             else -> return
         }
         engine.submit(input)
@@ -177,11 +197,17 @@ class RecordingService : Service() {
     private fun onProcessed(state: RunState) {
         val previous = lastPhase
         val changed = state.phase != previous
+        val newlyFailed = state.journalFailed && !lastJournalFailed
         lastPhase = state.phase
-        if (!changed) return
+        lastJournalFailed = state.journalFailed
         // Non-blocking: the controller only queues requests to Health Services.
-        exercise.follow(state.phase)
+        if (changed) exercise.follow(state.phase)
         main.post {
+            feedback.update(state)
+            if (newlyFailed && state.phase != RunPhase.STOPPED) {
+                Log.e(TAG, "journal failed in ${state.phase}", engine.failure.value)
+            }
+            if (!changed) return@post
             when {
                 ServiceStartPolicy.needsForeground(state.phase) -> notification.update(state)
 
