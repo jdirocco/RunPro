@@ -58,7 +58,9 @@ class TraceGoldenTotalsTest {
 
         // The sample at the resume arrives while still paused, so it does not count.
         val active = (0..EASY_PAUSE_S) + (EASY_RESUME_S + 1 until 1800)
-        val heartRates = active.map(watch::heartRate)
+        val strap = trace.samples.filterIsInstance<HeartRateSample>()
+            .filter { it.source == SyntheticTraces.STRAP }
+        val heartRates = active.map { second -> strap[second].heartRate.bpm }
         assertEquals(heartRates.max(), state.totals.maxHeartRate!!.bpm)
         // Samples every second, held for one second each: the time-weighted mean is the plain mean.
         assertEquals(heartRates.average(), state.totals.averageHeartRate!!.bpm.toDouble(), 1.0)
@@ -160,7 +162,7 @@ class TraceGoldenTotalsTest {
 
     /**
      * Feeds every replayed sample to the state machine and gives each command right before the first
-     * record that is later than it. Sensor events are not engine inputs yet (source arbitration, #19).
+     * record that is later than it. Adapter reports are also forwarded to arbitration.
      */
     private class ScriptedRunner(private val start: Timestamp, commands: List<GoldenCommand>) :
         SensorListener {
@@ -186,7 +188,10 @@ class TraceGoldenTotalsTest {
             machine.handle(EngineInput.SampleReceived(sample))
         }
 
-        override fun onEvent(event: SensorEvent) = giveCommandsBefore(event.time)
+        override fun onEvent(event: SensorEvent) {
+            giveCommandsBefore(event.time)
+            machine.handle(EngineInput.SensorReceived(event))
+        }
 
         fun finish() {
             while (pending.isNotEmpty()) give(pending.removeFirst())
@@ -219,8 +224,6 @@ class TraceGoldenTotalsTest {
         private val samples = trace.samples.filter { it.source == SourceId.HEALTH_SERVICES }
 
         fun distance(second: Int): Double = at<DistanceSample>(second).total.meters
-
-        fun heartRate(second: Int): Int = at<HeartRateSample>(second).heartRate.bpm
 
         private inline fun <reified T : Sample> at(second: Int): T =
             samples.filterIsInstance<T>().single { abs(secondsOf(it) - second) < HALF_SECOND }

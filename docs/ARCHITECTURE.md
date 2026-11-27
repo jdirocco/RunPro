@@ -56,7 +56,12 @@ SensorManager accel/gyro 50 Hz ─► ImuCapture (runpro-imu) ◄┘ ─► IMU 
   settings the setup screen asks the runner to change (battery optimisation, exempted with adb because the
   watch has no screen for it, and Samsung "Sleeping apps").
 - Source arbitration: per metric a priority list (e.g. HR: strap → wrist). A source is *stale* after a
-  timeout; the engine switches to the next one and writes a source-switch event (R5).
+  timeout; the engine switches to the next one and writes a source-switch event (R5). `SourcePolicy`
+  configures priorities/timeouts independently; fresh BLE measurements win by default. Loss of all
+  sources clears the value, and fresh preferred data restores it without recording commands. The
+  journal stores decisions before admitted samples; recovery/export replay them exactly. Cumulative
+  distance/elevation baselines restart across switches. `RunState.activeSources` drives the HR
+  strap/wrist icon. Defaults, late data and recovery semantics: ADR 0013.
 
 ## IMU capture (`:core:recording` imu / `:core:journal` / `:wear` imu)
 

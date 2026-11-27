@@ -57,7 +57,7 @@ class RecordingSession internal constructor(
             checkStartStorage(input)
             val previousEvents = state.run?.events?.size ?: 0
             accepted = machine.handle(input)
-            if (accepted) persist(input, previousEvents)
+            persist(input, previousEvents, accepted)
             finishPersistence()
         } catch (e: IOException) {
             failure = e
@@ -89,25 +89,37 @@ class RecordingSession internal constructor(
         if (state.phase == RunPhase.STOPPED) close()
     }
 
-    private fun persist(input: EngineInput, previousEvents: Int) {
-        if (state.run == null) return // Preparing samples are not part of the run.
-        // The input goes first: automatic laps it triggers must follow it on recovery.
-        when (input) {
-            is EngineInput.SampleReceived -> journal?.append(
-                JournalRecord.Samples(listOf(input.sample))
-            )
-
-            is EngineInput.SensorReceived -> journal?.append(JournalRecord.Sensor(input.event))
-
-            else -> Unit
+    private fun persist(input: EngineInput, previousEvents: Int, accepted: Boolean) {
+        if (state.run == null) return
+        val events = state.run!!.events.drop(previousEvents)
+        // Source decisions precede their samples so recovery resets cumulative baselines first.
+        events.filterIsInstance<RunEvent.SourceSwitched>().forEach {
+            journal?.append(JournalRecord.Event(it))
         }
-        persistEvents(previousEvents)
-        if (input is EngineInput.Tick) journal?.append(JournalRecord.Checkpoint(input.time))
+        if (accepted) {
+            when (input) {
+                is EngineInput.SampleReceived -> journal?.append(
+                    JournalRecord.Samples(listOf(input.sample))
+                )
+
+                is EngineInput.SensorReceived -> journal?.append(JournalRecord.Sensor(input.event))
+
+                else -> Unit
+            }
+        }
+        // Automatic laps follow the sample that crossed their distance threshold.
+        persistEvents(previousEvents, excludeSwitches = true)
+        if (accepted &&
+            input is EngineInput.Tick
+        ) {
+            journal?.append(JournalRecord.Checkpoint(input.time))
+        }
     }
 
-    private fun persistEvents(previousEvents: Int) {
+    private fun persistEvents(previousEvents: Int, excludeSwitches: Boolean = false) {
         val run = state.run ?: return
         for (event in run.events.drop(previousEvents)) {
+            if (excludeSwitches && event is RunEvent.SourceSwitched) continue
             journal?.append(
                 if (event is RunEvent.Started) {
                     JournalRecord.RunStarted(run.id, event.time, state.workoutSettings)

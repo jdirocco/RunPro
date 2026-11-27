@@ -172,6 +172,17 @@ l'orologio ha chiuso RunPro: segnalalo con una issue **Field report**.
 4. In Samsung Health disattiva **Rileva automaticamente gli allenamenti** per la corsa, così non parte un
    secondo allenamento in parallelo.
 
+### Fonte del battito durante la corsa
+
+L’icona accanto al battito distingue fascia e polso. La fascia ha priorità quando invia dati validi;
+se resta silenziosa per 5 secondi, perde il contatto con la pelle o si disconnette, il motore sceglie
+il polso se i suoi dati sono ancora recenti. Torna alla fascia al primo dato valido. Il cambio non
+mette in pausa la corsa e viene salvato nel giornale e nel FIT. Se non resta nessuna fonte, appare
+«Nessuna fonte cardio»; al cambio il valore attende la prossima misura.
+
+L’icona segue i dati ricevuti: il collegamento dei sensori BLE all’app è ancora nell’issue #17.
+La verifica fisica di questi passaggi resta la prova F1/F2 dell’issue #22.
+
 ### Giri automatici e ripetute
 
 Prima di **Avvia**, il pulsante **Allenamento** alterna corsa libera e ripetute. Nella corsa libera,

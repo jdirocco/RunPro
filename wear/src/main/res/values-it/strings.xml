@@ -43,4 +43,8 @@
     <string name="imu_mode">IMU: %1$s</string>
     <string name="imu_accelerometer">accelerometro</string>
     <string name="imu_accelerometer_gyroscope">accel. + giroscopio</string>
+    <string name="source_strap">Fascia cardio</string>
+    <string name="source_wrist">Cardio dal polso</string>
+    <string name="source_no_heart_rate">Nessuna fonte cardio</string>
+    <string name="source_heart_rate">%1$d bpm</string>
 </resources>

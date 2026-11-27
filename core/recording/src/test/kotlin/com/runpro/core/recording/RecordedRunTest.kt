@@ -41,8 +41,8 @@ class RecordedRunTest {
         assertEquals(live.state.run, recorded.state.run)
         assertEquals(live.state.totals, recorded.state.totals)
         assertEquals(live.state.laps, recorded.state.laps)
-        // Warm-up samples are not journaled; the strap sample is not admitted (the wrist reported first).
-        assertEquals(6, recorded.samples.size)
+        // Warm-up is excluded; both the first wrist sample and the preferred strap sample are retained.
+        assertEquals(7, recorded.samples.size)
         // Run distance after each distance sample: the paused interval is dropped.
         assertEquals(
             listOf(0.0, 3.0, 3.0, 3.0),
