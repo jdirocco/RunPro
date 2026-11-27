@@ -2,13 +2,17 @@
 """rp: RunPro development harness.
 
 Commands:
-  status              milestones, work in progress, open PRs, next tasks
-  next                the next ready issue (open, unassigned, dependencies closed)
+  status [--all] [COMPLEXITY]
+                      milestones (with open complexity counts), work in progress, open PRs, next tasks
+                      (--all: list every open issue; COMPLEXITY: filter by xs, s, m, m-l, l, e.g. xs,s)
+  next [--all] [COMPLEXITY]
+                      the next ready issue (open, unassigned, dependencies closed) with its complexity
+                      (--all: list all ready issues; COMPLEXITY: filter by xs, s, m, m-l, l, e.g. xs,s)
   start <N> [--worktree]
                       assign issue N, mark it In Progress, create branch issue-<N>-<slug>
                       (--worktree: in ../RunPro-worktrees/<branch> instead of this checkout)
-  agent [N|next] [claude|codex|agy] [--model M] [--auto] [--headless] [--worktree] [--prompt TEXT] [--dry-run] [-- ARGS]
-                      start issue N (default: next ready) and launch a coding agent on it.
+  agent [N|next] [claude|codex|agy] [--model M] [--complexity C] [--auto] [--headless] [--worktree] [--prompt TEXT] [--dry-run] [-- ARGS]
+                      start issue N (default: next ready, optionally filtered by --complexity) and launch a coding agent on it.
                       Runner and model default to plan/config.json "agents" (model null = tool default).
                       --auto: the agent never asks for confirmation and opens the PR itself.
                       ARGS after -- go to the agent CLI unchanged.
@@ -42,6 +46,13 @@ MILESTONES = {
     "M6": "M6 Release",
     "M7": "M7 Phone app",
 }
+COMPLEXITIES = [
+    ("complexity:xs", "XS", "2ea44f"),
+    ("complexity:s", "S", "54aeff"),
+    ("complexity:m", "M", "d4a72c"),
+    ("complexity:ml", "M-L", "e16f24"),
+    ("complexity:l", "L", "cf222e"),
+]
 LABELS = {
     "type:task": "c5def5", "type:feature": "a2eeef", "type:docs": "0075ca", "bug": "d73a4a",
     "reliability": "b60205", "field-test": "fbca04", "field-report": "e99695", "status:in-progress": "0e8a16",
@@ -49,6 +60,12 @@ LABELS = {
     "area:build": "ededed", "area:core": "bfdadc", "area:wear": "bfd4f2", "area:ble": "1d76db",
     "area:sensors": "5319e7", "area:ui": "f9d0c4", "area:mobile": "fef2c0", "area:dynamics": "c2e0c6",
     "area:testing": "d4c5f9", "area:release": "0052cc",
+    **{name: color for name, _, color in COMPLEXITIES},
+}
+COMPLEXITY_ALIASES = {
+    alias: code
+    for label, code, _ in COMPLEXITIES
+    for alias in (code.lower(), code.lower().replace("-", ""), label.lower())
 }
 
 
@@ -227,10 +244,114 @@ def open_blockers(issue, issues, deps):
 
 
 def has_label(issue, *names):
-    return any(l["name"] in names for l in issue["labels"])
+    return any(l["name"] in names for l in issue.get("labels", ()))
 
 
-def ready_issues(issues=None):
+def issue_complexity(issue):
+    """Short complexity code ('XS', 'S', 'M', 'M-L', 'L') from the issue's labels, or None."""
+    for label, code, _ in COMPLEXITIES:
+        if has_label(issue, label):
+            return code
+    return None
+
+
+def parse_complexity_filter(spec):
+    """Parse a comma-separated complexity filter like 'xs,s' or 'm-l' into ordered codes."""
+    if not spec:
+        return None
+    codes = []
+    valid = ", ".join(code for _, code, _ in COMPLEXITIES)
+    for part in spec.split(","):
+        token = part.strip().lower()
+        if not token:
+            continue
+        code = COMPLEXITY_ALIASES.get(token)
+        if not code:
+            sys.exit(f"unknown complexity '{part.strip()}' (choose from: {valid})")
+        if code not in codes:
+            codes.append(code)
+    return codes or None
+
+
+def parse_list_filter_args(args, usage):
+    """Parse `[--all|-a] [--complexity C | C]` for `status` and `next`."""
+    show_all = False
+    spec = None
+    it = iter(args or ())
+    for a in it:
+        if a in ("--all", "-a"):
+            show_all = True
+        elif a == "--complexity":
+            val = next(it, None)
+            if not val:
+                sys.exit(usage)
+            spec = f"{spec},{val}" if spec else val
+        elif a.startswith("--complexity="):
+            val = a.split("=", 1)[1]
+            if not val:
+                sys.exit(usage)
+            spec = f"{spec},{val}" if spec else val
+        elif a.startswith("-"):
+            sys.exit(usage)
+        else:
+            spec = f"{spec},{a}" if spec else a
+    return show_all, parse_complexity_filter(spec)
+
+
+def format_issue(issue, milestone=False, include_field_test=False):
+    tags = []
+    if milestone:
+        tags.append((issue.get("milestone") or {}).get("title", "-"))
+    code = issue_complexity(issue)
+    if code:
+        tags.append(code)
+    elif include_field_test and has_label(issue, "field-test"):
+        tags.append("field-test")
+    suffix = f"  [{' · '.join(tags)}]" if tags else ""
+    return f"#{issue['number']} {issue['title']}{suffix}"
+
+
+def milestone_open_summary(milestone_title, issues):
+    ms_issues = [i for i in issues if (i.get("milestone") or {}).get("title") == milestone_title]
+    if not ms_issues:
+        return ""
+    counts = {code: 0 for _, code, _ in COMPLEXITIES}
+    field_tests = 0
+    unclassified = 0
+    for i in ms_issues:
+        code = issue_complexity(i)
+        if code:
+            counts[code] += 1
+        elif has_label(i, "field-test"):
+            field_tests += 1
+        else:
+            unclassified += 1
+    if unclassified == len(ms_issues):
+        return ""
+    parts = [f"{counts[code]} {code}" for _, code, _ in COMPLEXITIES if counts[code]]
+    if field_tests:
+        parts.append(f"{field_tests} field-test")
+    if unclassified:
+        parts.append(f"{unclassified} ?")
+    return ", ".join(parts)
+
+
+def issue_state_note(issue, issues, deps):
+    blockers = open_blockers(issue, issues, deps)
+    if has_label(issue, "status:in-progress") or issue.get("assignees"):
+        return "in progress"
+    if has_label(issue, "needs-owner"):
+        return "needs-owner"
+    if has_label(issue, "status:blocked"):
+        return "blocked"
+    if blockers:
+        return "waits for " + ", ".join(f"#{d}" for d in blockers)
+    if has_label(issue, "field-test"):
+        return "runnable field-test"
+    return "ready"
+
+
+def ready_issues(issues=None, complexities=None):
     issues = issues if issues is not None else open_issues()
     deps = dependencies(issues)
     ready = []
@@ -239,31 +360,47 @@ def ready_issues(issues=None):
             continue
         if open_blockers(i, issues, deps):
             continue
+        if complexities and issue_complexity(i) not in complexities:
+            continue
         ready.append(i)
     ready.sort(key=lambda i: ((i.get("milestone") or {}).get("title", "Z"), i["number"]))
     return ready
 
 
-def cmd_next(_args):
-    ready = ready_issues()
+def cmd_next(args=None):
+    show_all, complexities = parse_list_filter_args(args, "usage: ./rp next [--all] [COMPLEXITY]")
+    ready = ready_issues(complexities=complexities)
     if not ready:
-        print("No ready issue. Check ./rp status (blocked, field tests, or owner tasks).")
+        if complexities:
+            print(f"No ready issue with complexity {', '.join(complexities)}. Check ./rp status.")
+        else:
+            print("No ready issue. Check ./rp status (blocked, field tests, or owner tasks).")
+        return
+    if show_all:
+        for i in ready:
+            print(format_issue(i, milestone=True))
         return
     i = ready[0]
-    print(f"#{i['number']} {i['title']}  [{(i.get('milestone') or {}).get('title', '-')}]")
+    print(format_issue(i, milestone=True))
     print(f"Start with: ./rp start {i['number']}")
 
 
-def cmd_status(_args):
+def cmd_status(args=None):
+    show_all, complexities = parse_list_filter_args(args, "usage: ./rp status [--all] [COMPLEXITY]")
     r = repo()
+    milestones = sorted(gh_json(["api", f"repos/{r}/milestones?state=all&per_page=100"]), key=lambda m: m["title"])
+    issues = open_issues()
+    deps = dependencies(issues)
     print(f"== {r}")
-    for m in sorted(gh_json(["api", f"repos/{r}/milestones?state=all&per_page=100"]), key=lambda m: m["title"]):
+    for m in milestones:
         tot = m["open_issues"] + m["closed_issues"]
         done = m["closed_issues"]
         bar = "#" * round(20 * done / tot) if tot else ""
-        print(f"  {m['title']:<24} [{bar:<20}] {done}/{tot}")
-    issues = open_issues()
-    deps = dependencies(issues)
+        summary = milestone_open_summary(m["title"], issues)
+        if summary:
+            print(f"  {m['title']:<24} [{bar:<20}] {f'{done}/{tot}':<5}  (open: {summary})")
+        else:
+            print(f"  {m['title']:<24} [{bar:<20}] {done}/{tot}")
     print("\n== In progress")
     live = running_agents()
     if live is None:
@@ -271,12 +408,12 @@ def cmd_status(_args):
     for i in issues:
         if has_label(i, "status:in-progress"):
             n = i["number"]
-            print(f"  #{n} {i['title']}")
+            print(f"  {format_issue(i)}")
             print(f"      {agent_status_line(n, read_agent_run(n), UNKNOWN if live is None else live.get(n))}")
     decisions = [i for i in issues if has_label(i, "needs-owner")]
     print("\n== Decisions for the owner (needs-owner: answer in the issue, then remove the label)")
     for i in decisions:
-        print(f"  #{i['number']} {i['title']}")
+        print(f"  {format_issue(i)}")
     if not decisions:
         print("  none")
     tests = [i for i in issues if has_label(i, "field-test")]
@@ -284,25 +421,38 @@ def cmd_status(_args):
     blocked = [i for i in tests if open_blockers(i, issues, deps)]
     print("\n== Field tests to run now (./rp install, then docs/FIELD_TESTING.md)")
     for i in runnable:
-        print(f"  #{i['number']} {i['title']}")
+        print(f"  {format_issue(i)}")
     if not runnable:
         print("  none")
     if blocked:
         print("\n== Field tests not runnable yet")
         for i in blocked:
             waits = ", ".join(f"#{d}" for d in open_blockers(i, issues, deps))
-            print(f"  #{i['number']} {i['title']}  (waits for {waits})")
+            print(f"  {format_issue(i)}  (waits for {waits})")
     reports = [i for i in issues if has_label(i, "field-report")]
     if reports:
         print("\n== Open field reports (for an agent to triage)")
         for i in reports:
-            print(f"  #{i['number']} {i['title']}")
+            print(f"  {format_issue(i)}")
     print("\n== Open PRs")
     for p in gh_json(["pr", "list", "-R", r, "--json", "number,title,headRefName"]):
         print(f"  !{p['number']} {p['title']} ({p['headRefName']})")
-    print("\n== Next ready")
-    for i in ready_issues(issues)[:5]:
-        print(f"  #{i['number']} {i['title']}")
+    ready = ready_issues(issues, complexities=complexities)
+    heading = f"== Next ready ({', '.join(complexities)})" if complexities else "== Next ready"
+    print(f"\n{heading}")
+    for i in (ready if (show_all or complexities) else ready[:5]):
+        print(f"  {format_issue(i)}")
+    if not ready:
+        print("  none")
+    if show_all or complexities:
+        matched = [i for i in issues if not complexities or issue_complexity(i) in complexities]
+        matched.sort(key=lambda i: ((i.get("milestone") or {}).get("title", "Z"), i["number"]))
+        all_heading = f"== Open issues ({', '.join(complexities)})" if complexities else "== All open issues"
+        print(f"\n{all_heading}")
+        for i in matched:
+            print(f"  {format_issue(i, milestone=True, include_field_test=True)}  ({issue_state_note(i, issues, deps)})")
+        if not matched:
+            print("  none")
 
 
 def slugify(s):
@@ -494,12 +644,14 @@ def parse_agent_args(args):
     if "--" in args:
         i = args.index("--")
         args, extra_cli = args[:i], args[i + 1:]
-    opts = {"runner": None, "model": None, "prompt": None}
+    opts = {"runner": None, "model": None, "prompt": None, "complexity": None}
     flags, target = set(), None
     it = iter(args)
     for a in it:
-        if a in ("--runner", "--model", "--prompt"):
+        if a in ("--runner", "--model", "--prompt", "--complexity"):
             opts[a[2:]] = next(it, None)
+        elif a.startswith("--complexity="):
+            opts["complexity"] = a.split("=", 1)[1]
         elif a in ("--headless", "--worktree", "--dry-run", "--auto"):
             flags.add(a[2:])
         elif a in RUNNERS and opts["runner"] is None:
@@ -768,8 +920,11 @@ def cmd_agent(args):
     headless = "headless" in flags
 
     if target in (None, "next"):
-        ready = ready_issues()
+        complexities = parse_complexity_filter(opts["complexity"])
+        ready = ready_issues(complexities=complexities)
         if not ready:
+            if complexities:
+                sys.exit(f"No ready issue with complexity {', '.join(complexities)} (see ./rp status).")
             sys.exit("No ready issue (see ./rp status).")
         n = ready[0]["number"]
     else:
