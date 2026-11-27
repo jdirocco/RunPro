@@ -46,7 +46,9 @@ SensorManager accelerometer ────┘                           │       
   It owns the engine. The UI binds to it and only reads `StateFlow`s. The decisions are pure Kotlin in
   `:core:recording` (`service` package, ADR 0007): `ServicePermissions` picks only the service types whose
   permissions are granted (fewer from the background), `ServiceStartPolicy` maps start commands, and a
-  `START_STICKY` restart (null intent) goes to `RunRecovery` (#9). `BatteryGuidance` lists the battery
+  `START_STICKY` restart (null intent) goes to `RunRecovery` (#9). The service supplies the journal
+  directory (`files/journals`) and Android boot clock; the core creates one file per run on Start.
+  `BatteryGuidance` lists the battery
   settings the setup screen asks the runner to change (battery optimisation, exempted with adb because the
   watch has no screen for it, and Samsung "Sleeping apps").
 - Source arbitration: per metric a priority list (e.g. HR: strap → wrist). A source is *stale* after a
@@ -115,7 +117,12 @@ record:  length (int32) | CRC32 (int32) | protobuf Record { one of: run_started,
 `RecordingSession` connects the engine to `JournalWriter`: accepted run samples, run events and tick
 checkpoints are persisted before publication. Supply it through `RecordingEngine.sessionFactory` so
 creation/recovery and journal I/O run on the recording thread. Submit ticks at least once a second.
-Persistence failures close submission and are exposed in `RecordingEngine.failure`.
+`EngineInput.SensorReceived` retains adapter reports while running or paused. The stopped journal is
+synced and closed before publishing `RunState.journalSaved`. A stopped phase alone is not proof of a save.
+Journal I/O failures disable further writes, retain the readable prefix and appear in
+`RecordingEngine.failure` and `RunState.journalFailed`; in-memory processing and submission continue.
+Factory/recovery or unexpected processing failures close submission. Reset after Stopped creates a fresh
+session/file through the factory. Details and evidence: ADR 0011.
 
 At startup, `JournalRecovery.scan(directory)` finds unfinished `.journal` files without changing them.
 `JournalRecovery.restore(file)` rebuilds state and saves with `StopReason.RECOVERY` at the latest retained
@@ -132,7 +139,8 @@ warnings at <= 15% battery and < 50 MB (50,000,000 bytes). At <= 3% or zero spac
 and the stop is synced before publication. Journal sessions query space before each valid start attempt.
 `FileJournalOutput` holds a physically allocated 1 MiB reserve beside each journal. ENOSPC releases it,
 rolls back a partial write and retries once; the session immediately saves with `STORAGE_FULL`. Other
-I/O failures and exhausted reserves remain observable failures with a recoverable prefix. ADR 0008
+I/O failures and exhausted reserves remain observable unsaved states with a recoverable prefix; the
+engine continues processing inputs without writing to the failed journal. ADR 0008
 explains the limits. Watch resource monitoring and warning UI integration are tracked in #71.
 
 ## Phone sync (`:core:sync`)

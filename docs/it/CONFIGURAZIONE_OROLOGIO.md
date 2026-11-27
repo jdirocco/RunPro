@@ -104,6 +104,10 @@ Con il telefono collegato via adb (solo lui, oppure indicato con `ANDROID_SERIAL
 ANDROID_SERIAL=<seriale del telefono> ./gradlew :mobile:installDebug
 ```
 
+Durante la corsa RunPro scrive un giornale in `files/journals/<id corsa>.journal`; alla fine lo sincronizza
+su disco e lo chiude prima di inviarlo al telefono. In caso di errore di scrittura il file rimane per il recupero;
+la corsa non viene considerata salvata correttamente.
+
 Sull'orologio una corsa resta salvata finché il telefono non conferma di averla ricevuta; se il telefono è lontano
 la manda appena torna raggiungibile o quando riapri RunPro. La prova completa è la F8 in `docs/FIELD_TESTING.md`.
 

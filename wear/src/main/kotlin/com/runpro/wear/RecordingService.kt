@@ -12,6 +12,7 @@ import android.util.Log
 import com.runpro.core.model.Timestamp
 import com.runpro.core.recording.EngineInput
 import com.runpro.core.recording.RecordingEngine
+import com.runpro.core.recording.RecordingSession
 import com.runpro.core.recording.RunPhase
 import com.runpro.core.recording.RunState
 import com.runpro.core.recording.service.RunRecovery
@@ -19,6 +20,7 @@ import com.runpro.core.recording.service.ServiceCommand
 import com.runpro.core.recording.service.ServiceStartPolicy
 import com.runpro.core.recording.service.ServiceStartPolicy.Decision
 import com.runpro.wear.sync.PhoneSync
+import com.runpro.wear.sync.WatchStorage
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
@@ -35,7 +37,7 @@ import kotlinx.coroutines.flow.StateFlow
  * - The UI binds to it and only reads [LocalBinder.state].
  */
 class RecordingService : Service() {
-    private val engine = RecordingEngine(onProcessed = ::onProcessed)
+    private lateinit var engine: RecordingEngine
     private val main = Handler(Looper.getMainLooper())
     private val ticker: ScheduledExecutorService =
         Executors.newSingleThreadScheduledExecutor { task ->
@@ -52,10 +54,20 @@ class RecordingService : Service() {
 
     inner class LocalBinder : Binder() {
         val state: StateFlow<RunState> get() = engine.state
+        val failure: StateFlow<Throwable?> get() = engine.failure
     }
 
     override fun onCreate() {
         super.onCreate()
+        engine = RecordingEngine(
+            sessionFactory = {
+                RecordingSession.create(
+                    WatchStorage.journals(this).toPath(),
+                    SystemClock::elapsedRealtimeNanos
+                )
+            },
+            onProcessed = ::onProcessed
+        )
         notification = RunNotification(this).also { it.createChannel() }
         foreground = ForegroundController(this, notification)
         ticker.scheduleWithFixedDelay(::tick, 1, 1, TimeUnit.SECONDS)
@@ -152,7 +164,14 @@ class RecordingService : Service() {
 
                 state.phase == RunPhase.STOPPED -> {
                     leave()
-                    PhoneSync.request(this)
+                    if (state.journalSaved) PhoneSync.request(this)
+                    if (state.journalFailed) {
+                        Log.e(
+                            TAG,
+                            "journal failed; retained file needs recovery",
+                            engine.failure.value
+                        )
+                    }
                 }
 
                 else -> Unit

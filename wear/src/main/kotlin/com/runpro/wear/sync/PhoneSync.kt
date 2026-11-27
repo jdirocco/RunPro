@@ -11,7 +11,7 @@ import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
-/** Where the watch keeps journals and FIT exports. The journal writer (#60) must use [journals]. */
+/** Where the watch keeps journals and FIT exports. The recording service supplies [journals] to the engine. */
 object WatchStorage {
     fun journals(context: Context): File = File(context.filesDir, "journals")
 

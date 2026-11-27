@@ -38,7 +38,11 @@ data class RunState(
     val totals: Totals = Totals(),
     val laps: List<LapTotals> = emptyList(),
     val current: CurrentValues = CurrentValues(),
-    val resources: ResourceState = ResourceState()
+    val resources: ResourceState = ResourceState(),
+    /** True only after the complete stopped journal has been synced and closed. */
+    val journalSaved: Boolean = false,
+    /** Persistence failed; a stopped phase must not be presented as a successful save. */
+    val journalFailed: Boolean = false
 )
 
 data class LapTotals(val lap: Lap, val totals: Totals)
