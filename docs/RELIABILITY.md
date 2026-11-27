@@ -82,7 +82,7 @@ and platform exercise shutdown on the watch are tracked in #71 after #10/#12; no
   the Garmin FIT SDK and compares run id, devices, every run/sensor event, every record, laps and
   session with the journal. Only a match yields a `VerifiedExport`; a mismatch or damaged file is
   removed, and the journal bytes never change (R3). Source switches are FIT events carrying the exact
-  RunPro event (R5 in the file; the switching itself is #19).
+  RunPro event (R5; engine-generated switches are also covered by `SourceSwitchEventTest`).
 - Journal deletion is in the phone sync below: only after the phone acknowledges a file whose
   `VerifiedExport` hash still matches. Strava/Garmin validator acceptance is an owner check
   (`FIELD_TESTING.md`). Format and mapping: ADR 0009.
@@ -144,6 +144,22 @@ Watch behaviour (real GPS and wrist HR, another app taking over) is a field resu
   Policy and budgets: ADR 0012. Watch adapter integration is #17; physical validation remains #22,
   scenarios F1/F2. The controller never issues recording commands; R4 recording evidence remains
   `SensorDropoutReplayTest` and `ChaosRecordingReplayTest`.
+
+## Source arbitration evidence
+
+- `SensorDropoutReplayTest` records the committed strap-dropout trace and chaos GATT 133, silent stalls
+  and GPS loss into real journals. It checks uninterrupted Running/timer state, exact HR fallback/return
+  counts, and recovery with identical run events, laps and totals (R4/R2).
+- `SourceArbitrationTest` checks per-metric priority lists and stale deadlines (including the exact
+  boundary), paused loss, zero-HR contact loss, old samples/callbacks and independent cumulative
+  distance/elevation offsets. Losing a source never creates distance, ascent or a lap.
+- `SourceSwitchEventTest` in recording checks initial/fallback/return decisions are persisted before
+  admitted measurements and remain identical after recovery. Its FIT counterpart records real engine
+  strap/wrist and footpod/GPS switches, exports and decodes a verified FIT, and checks every source
+  decision exactly (R5/R3). Replay honors recorded decisions rather than generating new ones.
+- `HeartRateSourceTest` observes the strap/wrist icon through fallback, return and loss of all sources.
+  These are JVM/Robolectric guarantees. BLE adapter ingestion remains #17; physical field results are
+  #22 (F1/F2). Policy and limits: ADR 0013.
 
 ## Failure catalogue
 

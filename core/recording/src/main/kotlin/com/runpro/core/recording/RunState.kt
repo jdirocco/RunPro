@@ -8,9 +8,11 @@ import com.runpro.core.model.ElevationSample
 import com.runpro.core.model.HeartRate
 import com.runpro.core.model.HeartRateSample
 import com.runpro.core.model.Lap
+import com.runpro.core.model.Metric
 import com.runpro.core.model.Pace
 import com.runpro.core.model.Run
 import com.runpro.core.model.Sample
+import com.runpro.core.model.SourceId
 import com.runpro.core.model.Speed
 import com.runpro.core.model.SpeedSample
 import com.runpro.core.model.WorkoutSettings
@@ -45,7 +47,8 @@ data class RunState(
     /** True only after the complete stopped journal has been synced and closed. */
     val journalSaved: Boolean = false,
     /** Persistence failed; a stopped phase must not be presented as a successful save. */
-    val journalFailed: Boolean = false
+    val journalFailed: Boolean = false,
+    val activeSources: Map<Metric, SourceId> = emptyMap()
 )
 
 data class LapTotals(val lap: Lap, val totals: Totals)
@@ -94,6 +97,14 @@ data class CurrentValues(
     val elevation: Elevation? = null
 ) {
     val pace: Pace? get() = speed?.pace()
+
+    internal fun cleared(metric: Metric): CurrentValues = when (metric) {
+        Metric.HEART_RATE -> copy(heartRate = null)
+        Metric.CADENCE -> copy(cadence = null)
+        Metric.SPEED -> copy(speed = null)
+        Metric.ELEVATION -> copy(elevation = null)
+        else -> this
+    }
 
     internal fun updatedWith(sample: Sample): CurrentValues = when (sample) {
         // 0 bpm means the sensor lost skin contact: no current heart rate.

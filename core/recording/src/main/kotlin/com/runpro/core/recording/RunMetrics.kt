@@ -4,6 +4,7 @@ import com.runpro.core.model.CadenceSample
 import com.runpro.core.model.DistanceSample
 import com.runpro.core.model.ElevationSample
 import com.runpro.core.model.HeartRateSample
+import com.runpro.core.model.Metric
 import com.runpro.core.model.Sample
 import com.runpro.core.model.Timestamp
 import kotlin.time.Duration.Companion.nanoseconds
@@ -48,6 +49,29 @@ internal class RunMetrics(config: EngineConfig, private val startedAt: Timestamp
                 val change = elevation.update(time, sample.elevation.meters, timeline)
                 if (change > 0.0) both { ascent += change }
                 if (change < 0.0) both { descent -= change }
+            }
+
+            else -> Unit
+        }
+    }
+
+    fun sourceSwitched(metric: Metric, time: Timestamp) {
+        val timer = timeline.timerAt(time.elapsedRealtimeNanos)
+        when (metric) {
+            Metric.DISTANCE -> distance.reset()
+
+            Metric.ELEVATION -> elevation.reset()
+
+            Metric.HEART_RATE -> {
+                heartRateHold.advanceTo(timer) { value, nanos ->
+                    both { heartRate.add(value, nanos) }
+                }
+                heartRateHold.clear()
+            }
+
+            Metric.CADENCE -> {
+                cadenceHold.advanceTo(timer) { value, nanos -> both { cadence.add(value, nanos) } }
+                cadenceHold.clear()
             }
 
             else -> Unit

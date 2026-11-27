@@ -68,7 +68,7 @@ class RunTotalsTest {
     }
 
     @Test
-    fun `only the first source of a metric is used until source arbitration exists`() {
+    fun `external sources take priority without mixing cumulative distance offsets`() {
         val state = runningMachine().feed(
             dist(0, 0.0, WATCH),
             dist(0, 0.0, FOOTPOD),
@@ -80,7 +80,7 @@ class RunTotalsTest {
             hr(2, 100, WATCH),
             hr(3, 150, STRAP)
         )
-        assertEquals(6.0, state.meters(), 1e-9)
+        assertEquals(6.4, state.meters(), 1e-9)
         assertEquals(HeartRate(150), state.totals.maxHeartRate)
         assertEquals(HeartRate(150), state.current.heartRate)
     }

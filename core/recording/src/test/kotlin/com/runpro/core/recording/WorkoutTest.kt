@@ -48,7 +48,7 @@ class WorkoutTest {
     }
 
     @Test
-    fun `pause movement source resets and rejected sources do not trigger laps`() {
+    fun `pause movement source resets and source switches do not fabricate laps`() {
         val machine = runningMachine()
         machine.feed(
             dist(0, 0.0), dist(5, 500.0), pause(5), dist(10, 2000.0),
@@ -56,7 +56,9 @@ class WorkoutTest {
             dist(22, 9000.0, FOOTPOD)
         )
         assertEquals(1, machine.state.laps.size)
-        machine.feed(dist(25, 510.0))
+        machine.feed(dist(25, 510.0)) // Still on the fresh footpod.
+        assertEquals(1, machine.state.laps.size)
+        machine.feed(dist(27, 520.0), dist(28, 930.0)) // Wrist returns with a fresh baseline.
         assertEquals(2, machine.state.laps.size)
         assertEquals(RunPhase.RUNNING, machine.state.phase)
     }
