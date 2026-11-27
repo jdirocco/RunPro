@@ -15,6 +15,7 @@ import com.runpro.core.model.SensorListener
 import com.runpro.core.model.Timestamp
 import com.runpro.core.recording.EngineInput
 import com.runpro.core.recording.RecordingEngine
+import com.runpro.core.recording.RecordingSession
 import com.runpro.core.recording.RunPhase
 import com.runpro.core.recording.RunState
 import com.runpro.core.recording.exercise.ExerciseController
@@ -25,6 +26,7 @@ import com.runpro.core.recording.service.ServiceStartPolicy
 import com.runpro.core.recording.service.ServiceStartPolicy.Decision
 import com.runpro.wear.health.HealthServicesExercise
 import com.runpro.wear.sync.PhoneSync
+import com.runpro.wear.sync.WatchStorage
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
@@ -43,7 +45,7 @@ import kotlinx.coroutines.flow.StateFlow
  * - The UI binds to it and only reads [LocalBinder.state] and [LocalBinder.exercise].
  */
 class RecordingService : Service() {
-    private val engine = RecordingEngine(onProcessed = ::onProcessed)
+    private lateinit var engine: RecordingEngine
     private val main = Handler(Looper.getMainLooper())
     private val ticker: ScheduledExecutorService =
         Executors.newSingleThreadScheduledExecutor { task ->
@@ -61,11 +63,21 @@ class RecordingService : Service() {
 
     inner class LocalBinder : Binder() {
         val state: StateFlow<RunState> get() = engine.state
+        val failure: StateFlow<Throwable?> get() = engine.failure
         val exercise: StateFlow<ExerciseStatus> get() = this@RecordingService.exercise.status
     }
 
     override fun onCreate() {
         super.onCreate()
+        engine = RecordingEngine(
+            sessionFactory = {
+                RecordingSession.create(
+                    WatchStorage.journals(this).toPath(),
+                    SystemClock::elapsedRealtimeNanos
+                )
+            },
+            onProcessed = ::onProcessed
+        )
         notification = RunNotification(this).also { it.createChannel() }
         foreground = ForegroundController(this, notification)
         exercise = HealthServicesExercise.create(this, ::now).also { it.start(EngineFeed()) }
@@ -167,7 +179,14 @@ class RecordingService : Service() {
 
                 state.phase == RunPhase.STOPPED -> {
                     leave()
-                    PhoneSync.request(this)
+                    if (state.journalSaved) PhoneSync.request(this)
+                    if (state.journalFailed) {
+                        Log.e(
+                            TAG,
+                            "journal failed; retained file needs recovery",
+                            engine.failure.value
+                        )
+                    }
                 }
 
                 else -> Unit
@@ -175,14 +194,14 @@ class RecordingService : Service() {
         }
     }
 
-    /** Health Services samples go to the engine; sensor events are logged until arbitration uses them (#19). */
+    /** Health Services samples and sensor events go to the engine, which journals both (#60). */
     private inner class EngineFeed : SensorListener {
         override fun onSample(sample: Sample) {
             engine.submit(EngineInput.SampleReceived(sample))
         }
 
         override fun onEvent(event: SensorEvent) {
-            Log.i(TAG, "sensor event $event")
+            engine.submit(EngineInput.SensorReceived(event))
         }
     }
 

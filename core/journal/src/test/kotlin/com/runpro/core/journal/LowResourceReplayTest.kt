@@ -183,8 +183,10 @@ class LowResourceReplayTest {
             engine.submit(EngineInput.Resources(at(1), batteryPercent = 3))
             assertEquals(2, failedWrites)
             assertIs<IOException>(engine.failure.value)
-            assertEquals(RunPhase.RUNNING, engine.state.value.phase)
-            assertFalse(engine.submit(EngineInput.Tick(at(2))))
+            assertEquals(RunPhase.STOPPED, engine.state.value.phase)
+            assertTrue(engine.state.value.journalFailed)
+            assertFalse(engine.state.value.journalSaved)
+            assertTrue(engine.submit(EngineInput.Tick(at(2))))
             assertFalse(JournalReader.read(file).isStopped)
         }
     }

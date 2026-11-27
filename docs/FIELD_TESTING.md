@@ -38,7 +38,7 @@ Watch setup step by step (in Italian, for the owner): `docs/it/CONFIGURAZIONE_OR
 
 ## Phone sync check (F8)
 
-Needs journals written during a run (#60). Watch and phone apps must be the same kind of build (both debug
+The recording service writes journals during a run (#60). Watch and phone apps must be the same kind of build (both debug
 from this Mac, or both release): the Data Layer pairs them by application id and signing key.
 
 1. Install the phone app: `./gradlew :mobile:installDebug` with only the phone on adb (or

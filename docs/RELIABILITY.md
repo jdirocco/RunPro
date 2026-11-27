@@ -5,7 +5,7 @@ Each invariant has (or will have) a test; the test names are listed so agents ca
 
 | Id | Invariant | Test |
 |---|---|---|
-| R1 | A started run is persisted within 1 s of the start tap | `JournalStartLatencyTest` |
+| R1 | A started run is persisted within 1 s of the start tap | `JournalStartLatencyTest`, `RecordingJournalTest` |
 | R2 | After process death at any point, restart restores the run with ≤ 5 s data loss | `CrashRecoveryReplayTest` (chaos replay) |
 | R3 | A journal is deleted only after its FIT file is decoded and matches it | `ExportVerificationTest`, `PhoneSyncTest` |
 | R4 | A sensor dropout never pauses or stops the recording | `SensorDropoutReplayTest` |
@@ -41,6 +41,12 @@ persistence and recovery evidence follows below; R7 evidence is in the low-resou
   paused state, laps, totals/source gates, sensor-silent timer checkpoints and save after reboot (R2).
 - `JournaledEngineTest` proves start publication follows journal sync and disk work runs on the engine
   thread without blocking submission (R1/R6); persistence failures are exposed to callers.
+- `RecordingJournalTest` checks real threaded start-input-to-file latency (< 1 s), one-second sample
+  flushing and five-second sync during sensor silence, exact synthetic run read-back, closure before
+  stop publication and distinct files for successive runs. `EngineJournalReplayTest` compares the
+  committed dropout trace's accepted samples, adapter events, run events, laps and totals after reading
+  the actual engine-written journal. `RecordingServiceTest` checks the watch service writes these files
+  to the phone outbox and releases reserves on stop (R1/R2/R3/R6; ADR 0011).
 - `JournalResumeTest` proves intact prefixes survive truncated/corrupt tails, no extra header is written,
   and completed or unknown-record journals are refused unchanged (R3 retention; FIT verification is below).
 
@@ -57,7 +63,12 @@ Android adapter and field-test issues. Recovery policy and clock assumptions: AD
   Tests read the clean journal before orderly shutdown (R7).
 - `ReservedStorageTest` verifies partial-write rollback, reserve release on ENOSPC during sync, complete
   synced stop records, and no retry/reserve release for unrelated I/O errors. If even the reserve cannot
-  finish saving, `LowResourceReplayTest` checks observable failure and no falsely published Stopped state.
+  finish saving, `LowResourceReplayTest` checks observable failure and no false `journalSaved` state.
+- `JournalFailureTest` injects write, sync, close and file creation errors. The engine keeps processing
+  after journal I/O failure, never reuses the failed writer, and exposes `failure` and `journalFailed`.
+  A stopped phase alone is not a successful save; the service checks `journalSaved` before requesting
+  phone sync. Recovery SAVE still propagates errors. This refines the original fail-closed behavior
+  without claiming persistence when storage is unavailable (R7, ADR 0011).
 - `LowResourceTest` checks exact 15%/3%/50 MB thresholds, start rejection/retry at critical resources,
   paused runs, repeated readings and pre-start checks against actual output capacity.
 
@@ -92,7 +103,7 @@ and platform exercise shutdown on the watch are tracked in #71 after #10/#12; no
 - `ExportVerificationTest` covers `FitExporter.verifyExisting` (same bytes, a damaged file is removed).
 
 These are JVM guarantees. The `ChannelClient` adapters and the 20-run check with the real watch and phone
-need journals written during a run (#60) and are the owner field test #75; ADR 0010.
+are the owner field test #75; live journals are wired by #60 (ADR 0011); sync protocol is ADR 0010.
 
 ## Health Services evidence
 

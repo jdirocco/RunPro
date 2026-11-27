@@ -52,6 +52,7 @@ class RecordingStateMachine(
     /** Applies [input]; returns false when it does not apply to the current phase. */
     fun handle(input: EngineInput): Boolean = when (input) {
         is EngineInput.SampleReceived -> onSample(input.sample)
+        is EngineInput.SensorReceived -> advanceClock(input.event.time)
         is EngineInput.Tick -> advanceClock(input.time)
         is EngineInput.Prepare -> moveTo(RunPhase.PREPARING, RunPhase.IDLE)
         is EngineInput.Start -> start(input.time)

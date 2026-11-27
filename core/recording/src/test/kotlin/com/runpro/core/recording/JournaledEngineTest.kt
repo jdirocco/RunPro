@@ -61,7 +61,7 @@ class JournaledEngineTest {
         }
 
     @Test
-    fun `persistence failures are observable and reject later inputs`() = runBlocking {
+    fun `persistence failures are observable without stopping later inputs`() = runBlocking {
         val engine = RecordingEngine(sessionFactory = {
             RecordingSession(
                 journal = JournalWriter(object : JournalOutput {
@@ -76,9 +76,14 @@ class JournaledEngineTest {
             engine.submit(prepare(0))
             engine.submit(start(0))
             assertIs<IOException>(withTimeout(10.seconds) { engine.failure.first { it != null } })
-            // A failure must close submission before it is published.
-            assertFalse(engine.submit(tick(10)))
-            assertEquals(null, engine.state.value.run)
+            assertTrue(engine.submit(hr(10, 155)))
+            assertTrue(engine.submit(tick(10)))
+            withTimeout(10.seconds) { engine.state.first { it.current.heartRate?.bpm == 155 } }
+            assertEquals(RunPhase.RUNNING, engine.state.value.phase)
+            assertTrue(engine.state.value.journalFailed)
+            engine.submit(stop(11))
+            withTimeout(10.seconds) { engine.state.first { it.phase == RunPhase.STOPPED } }
+            assertFalse(engine.state.value.journalSaved)
         } finally {
             engine.close()
         }

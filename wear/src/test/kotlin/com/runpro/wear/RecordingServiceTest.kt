@@ -5,10 +5,14 @@ import android.app.Application
 import android.app.Service
 import android.content.pm.ServiceInfo
 import androidx.test.core.app.ApplicationProvider
+import com.runpro.core.journal.JournalReader
+import com.runpro.core.model.RunEvent
 import com.runpro.core.recording.RunPhase
 import com.runpro.core.recording.service.RunRecovery
 import com.runpro.core.recording.service.ServiceCommand
+import com.runpro.wear.sync.WatchStorage
 import java.util.concurrent.TimeUnit
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -19,6 +23,7 @@ import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
+import org.robolectric.android.controller.ServiceController
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowLooper
 
@@ -39,7 +44,17 @@ class RecordingServiceTest {
         Manifest.permission.POST_NOTIFICATIONS
     )
 
-    private fun service() = Robolectric.buildService(RecordingService::class.java).create()
+    private val services = mutableListOf<ServiceController<RecordingService>>()
+
+    private fun service() = Robolectric.buildService(RecordingService::class.java).create().also {
+        services +=
+            it
+    }
+
+    @After
+    fun destroyServices() {
+        services.forEach { it.destroy() }
+    }
 
     /** Waits for the engine thread, then runs what it posted to the main thread. */
     private fun RecordingService.awaitPhase(phase: RunPhase) {
@@ -94,6 +109,7 @@ class RecordingServiceTest {
 
         assertNull(shadowOf(service).lastForegroundNotification)
         assertTrue(shadowOf(service).isStoppedBySelf)
+        assertFalse(WatchStorage.journals(app).exists())
     }
 
     @Test
@@ -108,6 +124,42 @@ class RecordingServiceTest {
         service.awaitPhase(RunPhase.STOPPED)
         assertTrue(shadowOf(service).isForegroundStopped)
         assertTrue(shadowOf(service).isStoppedBySelf)
+    }
+
+    @Test
+    fun `service writes a closed stopped journal to the phone outbox for each run`() {
+        grantAll()
+        val service = service().get()
+        assertFalse(WatchStorage.journals(app).exists())
+        repeat(2) { index ->
+            service.onStartCommand(RecordingService.intent(app, ServiceCommand.START), 0, 1)
+            service.awaitPhase(RunPhase.RUNNING)
+            val binder = service.onBind(null) as RecordingService.LocalBinder
+            val id = binder.state.value.run!!.id
+            val file = WatchStorage.journals(app).resolve("$id.journal")
+            assertEquals(id, JournalReader.read(file.toPath()).runId)
+            service.onStartCommand(RecordingService.intent(app, ServiceCommand.PAUSE), 0, 2)
+            service.awaitPhase(RunPhase.PAUSED)
+            service.onStartCommand(RecordingService.intent(app, ServiceCommand.RESUME), 0, 3)
+            service.awaitPhase(RunPhase.RUNNING)
+            service.onStartCommand(RecordingService.intent(app, ServiceCommand.STOP), 0, 4)
+            service.awaitPhase(RunPhase.STOPPED)
+            assertTrue(binder.state.value.journalSaved)
+            assertFalse(binder.state.value.journalFailed)
+            assertNull(binder.failure.value)
+            val journal = JournalReader.read(file.toPath())
+            assertEquals(binder.state.value.run!!.events, journal.runEvents)
+            assertEquals(4, journal.runEvents.size)
+            assertTrue(journal.runEvents.last() is RunEvent.Stopped)
+            assertFalse(file.resolveSibling("${file.name}.reserve").exists())
+            assertEquals(
+                index + 1,
+                WatchStorage.journals(app).listFiles()!!.count {
+                    it.extension ==
+                        "journal"
+                }
+            )
+        }
     }
 
     @Test
