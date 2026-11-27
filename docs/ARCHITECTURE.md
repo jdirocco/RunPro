@@ -51,6 +51,13 @@ SensorManager accelerometer ────┘                           │       
   `BatteryGuidance` lists the battery
   settings the setup screen asks the runner to change (battery optimisation, exempted with adb because the
   watch has no screen for it, and Samsung "Sleeping apps").
+- Run UI (`RunProScreen`, #12): one screen by phase. Idle: setup checks and **Get ready**, which sends
+  `PREPARE` (foreground, engine `Prepare`, Health Services warm-up). Preparing: GPS and heart-rate
+  readiness from `ExerciseStatus`, **Start** (`START`, forwarded as engine `Start`) or **Back** (`CANCEL`,
+  engine `Reset`; the service then leaves the foreground). `CANCEL` is ignored once the run records, and a
+  journaled session accepts `Reset` only while it has no run, so a run is never discarded. Running/paused:
+  time, distance, pace, heart rate, lap, pause/resume; **Stop** asks for a confirmation whose first choice
+  keeps running. Stopped: a summary that says whether the journal was saved.
 - Source arbitration: per metric a priority list (e.g. HR: strap → wrist). A source is *stale* after a
   timeout; the engine switches to the next one and writes a source-switch event (R5).
 

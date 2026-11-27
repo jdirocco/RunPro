@@ -127,6 +127,52 @@ class RecordingServiceTest {
     }
 
     @Test
+    fun `prepare warms up in the foreground and start begins the prepared run`() {
+        grantAll()
+        val service = service().get()
+
+        service.onStartCommand(RecordingService.intent(app, ServiceCommand.PREPARE), 0, 1)
+
+        service.awaitPhase(RunPhase.PREPARING)
+        assertNotNull(shadowOf(service).lastForegroundNotification)
+        assertFalse(shadowOf(service).isStoppedBySelf)
+
+        service.onStartCommand(RecordingService.intent(app, ServiceCommand.START), 0, 2)
+
+        service.awaitPhase(RunPhase.RUNNING)
+        assertFalse(shadowOf(service).isStoppedBySelf)
+    }
+
+    @Test
+    fun `cancel during the warm-up leaves the foreground without a run`() {
+        grantAll()
+        val service = service().get()
+        service.onStartCommand(RecordingService.intent(app, ServiceCommand.PREPARE), 0, 1)
+        service.awaitPhase(RunPhase.PREPARING)
+
+        service.onStartCommand(RecordingService.intent(app, ServiceCommand.CANCEL), 0, 2)
+
+        service.awaitPhase(RunPhase.IDLE)
+        assertTrue(shadowOf(service).isForegroundStopped)
+        assertTrue(shadowOf(service).isStoppedBySelf)
+        val binder = service.onBind(null) as RecordingService.LocalBinder
+        assertNull(binder.state.value.run)
+    }
+
+    @Test
+    fun `cancel during a run keeps recording`() {
+        grantAll()
+        val service = service().get()
+        service.onStartCommand(RecordingService.intent(app, ServiceCommand.START), 0, 1)
+        service.awaitPhase(RunPhase.RUNNING)
+
+        service.onStartCommand(RecordingService.intent(app, ServiceCommand.CANCEL), 0, 2)
+
+        service.awaitPhase(RunPhase.RUNNING)
+        assertFalse(shadowOf(service).isStoppedBySelf)
+    }
+
+    @Test
     fun `service writes a closed stopped journal to the phone outbox for each run`() {
         grantAll()
         val service = service().get()

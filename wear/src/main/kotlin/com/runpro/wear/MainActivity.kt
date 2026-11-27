@@ -17,6 +17,7 @@ import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import com.runpro.core.recording.RunState
+import com.runpro.core.recording.exercise.ExerciseStatus
 import com.runpro.core.recording.service.BatteryAdvice
 import com.runpro.core.recording.service.BatteryGuidance
 import com.runpro.core.recording.service.PermissionReadiness
@@ -27,14 +28,14 @@ import com.runpro.wear.sync.PhoneSync
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
-/**
- * Setup checks before a run (permissions, battery settings) and minimal run controls. The real run screens
- * are issue #12.
- */
+/** Binds to [RecordingService] and shows [RunProScreen]: setup checks, warm-up, run and summary. */
 class MainActivity : ComponentActivity() {
     private var readiness by mutableStateOf(ServicePermissions.readiness(emptySet()))
     private var advice by mutableStateOf(emptyList<BatteryAdvice>())
     private var runState by mutableStateOf<StateFlow<RunState>>(MutableStateFlow(RunState()))
+    private var exercise by mutableStateOf<StateFlow<ExerciseStatus>>(
+        MutableStateFlow(ExerciseStatus())
+    )
     private var backgroundLocationSkipped by mutableStateOf(false)
 
     private val askPermissions = registerForActivityResult(
@@ -43,11 +44,15 @@ class MainActivity : ComponentActivity() {
 
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
-            (binder as? RecordingService.LocalBinder)?.let { runState = it.state }
+            (binder as? RecordingService.LocalBinder)?.let {
+                runState = it.state
+                exercise = it.exercise
+            }
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
             runState = MutableStateFlow(RunState())
+            exercise = MutableStateFlow(ExerciseStatus())
         }
     }
 
@@ -59,6 +64,7 @@ class MainActivity : ComponentActivity() {
             RunProScreen(
                 SetupState(readiness, advice, backgroundLocationSkipped),
                 runState,
+                exercise,
                 SetupActions(
                     askForeground = { ask(readiness.missingForeground) },
                     askBackgroundLocation = { ask(listOf(RunPermission.BACKGROUND_LOCATION)) },
@@ -103,7 +109,8 @@ class MainActivity : ComponentActivity() {
 
     private fun send(command: ServiceCommand) {
         val intent = RecordingService.intent(this, command)
-        if (command == ServiceCommand.START) {
+        // These may enter the foreground; the others only reach a service that already is.
+        if (command == ServiceCommand.PREPARE || command == ServiceCommand.START) {
             ContextCompat.startForegroundService(this, intent)
         } else {
             startService(intent)

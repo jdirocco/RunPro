@@ -94,7 +94,8 @@ class RecordingService : Service() {
         val decision = ServiceStartPolicy.decide(command, phase)
         Log.i(TAG, "command $command in $phase: $decision")
         when (decision) {
-            Decision.START_RUN -> startRun()
+            Decision.START_RUN -> startRun(warmUp = false)
+            Decision.PREPARE_RUN -> startRun(warmUp = true)
             Decision.FORWARD -> forward(command)
             Decision.RECOVER -> recover()
             Decision.KEEP_RUNNING -> Unit
@@ -117,7 +118,11 @@ class RecordingService : Service() {
         this.recovery = recovery
     }
 
-    private fun startRun() {
+    /**
+     * A new run: with [warmUp] it stays in the warm-up (GPS and heart rate acquire, the start screen shows
+     * their readiness) until [ServiceCommand.START] or [ServiceCommand.CANCEL]; otherwise it starts at once.
+     */
+    private fun startRun(warmUp: Boolean) {
         if (!foreground.enter(engine.state.value, fromBackground = false)) {
             leave()
             return
@@ -126,12 +131,14 @@ class RecordingService : Service() {
         if (engine.state.value.phase == RunPhase.STOPPED) engine.submit(EngineInput.Reset)
         val now = now()
         engine.submit(EngineInput.Prepare(now))
-        engine.submit(EngineInput.Start(now))
+        if (!warmUp) engine.submit(EngineInput.Start(now))
     }
 
     private fun forward(command: ServiceCommand?) {
         val now = now()
         val input = when (command) {
+            ServiceCommand.START -> EngineInput.Start(now)
+            ServiceCommand.CANCEL -> EngineInput.Reset
             ServiceCommand.PAUSE -> EngineInput.Pause(now)
             ServiceCommand.RESUME -> EngineInput.Resume(now)
             ServiceCommand.LAP -> EngineInput.MarkLap(now)
@@ -168,7 +175,8 @@ class RecordingService : Service() {
 
     /** Engine thread: must not block (R6), so the notification work goes to the main thread. */
     private fun onProcessed(state: RunState) {
-        val changed = state.phase != lastPhase
+        val previous = lastPhase
+        val changed = state.phase != previous
         lastPhase = state.phase
         if (!changed) return
         // Non-blocking: the controller only queues requests to Health Services.
@@ -188,6 +196,9 @@ class RecordingService : Service() {
                         )
                     }
                 }
+
+                // The warm-up was cancelled: no run, so no foreground and no notification.
+                state.phase == RunPhase.IDLE && previous == RunPhase.PREPARING -> leave()
 
                 else -> Unit
             }

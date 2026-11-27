@@ -4,7 +4,14 @@ import com.runpro.core.recording.RunPhase
 
 /** Why `RecordingService.onStartCommand` was called. */
 enum class ServiceCommand {
+    /** Warm up GPS and heart rate before the start (the start screen shows their readiness). */
+    PREPARE,
+
+    /** Start the run: the prepared one, or a new one without a warm-up. */
     START,
+
+    /** Leave the warm-up without starting; never ends a run that records. */
+    CANCEL,
     PAUSE,
     RESUME,
     LAP,
@@ -20,6 +27,9 @@ object ServiceStartPolicy {
         /** Enter the foreground and start a new run (after a reset, if the last run is stopped). */
         START_RUN,
 
+        /** Enter the foreground and warm up the sensors for a new run (after a reset, if needed). */
+        PREPARE_RUN,
+
         /** Pass the command to the engine. */
         FORWARD,
 
@@ -33,18 +43,42 @@ object ServiceStartPolicy {
         STOP_SERVICE
     }
 
-    fun decide(command: ServiceCommand?, phase: RunPhase): Decision {
-        val active = needsForeground(phase)
-        return when (command) {
-            ServiceCommand.START -> if (active) Decision.KEEP_RUNNING else Decision.START_RUN
+    fun decide(command: ServiceCommand?, phase: RunPhase): Decision = when (command) {
+        ServiceCommand.PREPARE ->
+            byPhase(phase, idle = Decision.PREPARE_RUN, preparing = Decision.KEEP_RUNNING)
 
-            ServiceCommand.RESTART -> if (active) Decision.KEEP_RUNNING else Decision.RECOVER
+        ServiceCommand.START ->
+            byPhase(phase, idle = Decision.START_RUN, preparing = Decision.FORWARD)
 
-            ServiceCommand.PAUSE, ServiceCommand.RESUME, ServiceCommand.LAP, ServiceCommand.STOP ->
-                if (active) Decision.FORWARD else Decision.STOP_SERVICE
+        // R1: cancel only discards a warm-up; a recording run is stopped and saved instead.
+        ServiceCommand.CANCEL ->
+            byPhase(phase, idle = Decision.STOP_SERVICE, preparing = Decision.FORWARD)
 
-            null -> if (active) Decision.KEEP_RUNNING else Decision.STOP_SERVICE
-        }
+        ServiceCommand.RESTART ->
+            byPhase(phase, idle = Decision.RECOVER, preparing = Decision.KEEP_RUNNING)
+
+        // The warm-up has no run to pause, lap or stop.
+        ServiceCommand.PAUSE, ServiceCommand.RESUME, ServiceCommand.LAP, ServiceCommand.STOP ->
+            byPhase(
+                phase,
+                idle = Decision.STOP_SERVICE,
+                preparing = Decision.KEEP_RUNNING,
+                recording = Decision.FORWARD
+            )
+
+        null -> byPhase(phase, idle = Decision.STOP_SERVICE, preparing = Decision.KEEP_RUNNING)
+    }
+
+    /** [idle] without a run (idle or stopped), [preparing] in the warm-up, [recording] while it records. */
+    private fun byPhase(
+        phase: RunPhase,
+        idle: Decision,
+        preparing: Decision,
+        recording: Decision = Decision.KEEP_RUNNING
+    ): Decision = when (phase) {
+        RunPhase.IDLE, RunPhase.STOPPED -> idle
+        RunPhase.PREPARING -> preparing
+        RunPhase.RUNNING, RunPhase.PAUSED -> recording
     }
 
     /** A run is in progress: the service must stay in the foreground. */

@@ -5,11 +5,45 @@
     <string name="run_recording">In registrazione</string>
     <string name="run_paused">In pausa</string>
     <string name="run_stopped">Terminata</string>
-    <string name="run_stopped_after">Terminata dopo %1$s</string>
     <string name="run_start">Avvia</string>
     <string name="run_pause">Pausa</string>
     <string name="run_resume">Riprendi</string>
     <string name="run_stop">Stop</string>
+
+    <string name="run_get_ready">Preparati</string>
+    <string name="run_lap_button">Giro</string>
+    <string name="run_lap">Giro %1$d · %2$s</string>
+    <string name="unit_km">km</string>
+    <string name="unit_pace">min/km</string>
+    <string name="unit_bpm">bpm</string>
+
+    <string name="warmup_title">Ricerca di GPS e battito</string>
+    <string name="warmup_gps">GPS</string>
+    <string name="warmup_heart_rate">Battito</string>
+    <string name="warmup_ready">pronto</string>
+    <string name="warmup_waiting">in ricerca</string>
+    <string name="warmup_unavailable">non disponibile</string>
+    <string name="warmup_not_used">spento</string>
+    <string name="warmup_other_app">Un\'altra app sta registrando un allenamento: avviando la corsa si chiude.</string>
+    <string name="warmup_no_health_services">Niente GPS né battito dal polso: la corsa registra solo il tempo.</string>
+    <string name="warmup_cancel">Indietro</string>
+
+    <string name="stop_question">Fermare e salvare la corsa?</string>
+    <string name="stop_keep_running">Continua a correre</string>
+    <string name="stop_confirm">Ferma e salva</string>
+
+    <string name="summary_title">Corsa finita</string>
+    <string name="summary_average_pace">min/km medio</string>
+    <string name="summary_average_hr">bpm medi</string>
+    <plurals name="summary_laps">
+        <item quantity="one">%1$d giro</item>
+        <item quantity="many">%1$d giri</item>
+        <item quantity="other">%1$d giri</item>
+    </plurals>
+    <string name="summary_saved">Salvata</string>
+    <string name="summary_saving">Salvataggio…</string>
+    <string name="summary_not_saved">Non salvata: non è stato possibile scrivere la corsa nella memoria dell\'orologio.</string>
+    <string name="summary_done">Fatto</string>
 
     <string name="setup_permissions_intro">A RunPro servono:</string>
     <string name="permission_location">Posizione, per distanza e passo dal GPS</string>
