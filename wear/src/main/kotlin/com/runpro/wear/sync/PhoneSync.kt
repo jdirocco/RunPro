@@ -16,6 +16,9 @@ object WatchStorage {
     fun journals(context: Context): File = File(context.filesDir, "journals")
 
     fun exports(context: Context): File = File(context.filesDir, "exports")
+
+    /** IMU streams (ADR 0012): kept on the watch, never sent or deleted by phone sync. */
+    fun imu(context: Context): File = File(context.filesDir, "imu")
 }
 
 /**

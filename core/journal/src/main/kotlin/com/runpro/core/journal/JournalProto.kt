@@ -6,6 +6,7 @@ package com.runpro.core.journal
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.protobuf.ProtoNumber
+import kotlinx.serialization.protobuf.ProtoPacked
 
 // Protobuf messages of the journal payload (ADR 0006). They are private to the journal and mapped to the
 // model types by JournalCodec, so the wire shape does not follow Kotlin renames. Field numbers and enum codes
@@ -24,7 +25,8 @@ internal class RecordProto(
     @ProtoNumber(7) val sensorEvent: SensorEventProto? = null,
     @ProtoNumber(8) val runStopped: RunStoppedProto? = null,
     @ProtoNumber(9) val sensorStatus: SensorStatusProto? = null,
-    @ProtoNumber(10) val checkpoint: TimeProto? = null
+    @ProtoNumber(10) val checkpoint: TimeProto? = null,
+    @ProtoNumber(11) val imu: ImuBatchProto? = null
 )
 
 @Serializable
@@ -110,4 +112,24 @@ internal class SensorStatusProto(
     @ProtoNumber(2) val time: TimeProto = TimeProto(),
     @ProtoNumber(3) val source: String = "",
     @ProtoNumber(4) val lossReason: Int = 0
+)
+
+/**
+ * IMU readings of one sensor (ADR 0012). [time] is the first reading. [offsetDeltas] are the differences
+ * between consecutive offsets from [time] in microseconds (the first is 0). Each value is quantised to
+ * `1 / [unitsPerValue]` of its unit and stored as the difference from the previous reading's quantised
+ * value ([x], [y], [z]; the first reading is relative to 0), zigzag encoded (`(n shl 1) xor (n shr 63)`,
+ * as protobuf `sint64`: kotlinx `@ProtoType` does not apply to list elements). Packed varints keep a
+ * 50 Hz second of running at about 10 bytes a reading.
+ */
+@Serializable
+internal class ImuBatchProto(
+    @ProtoNumber(1) val sensor: Int = 0,
+    @ProtoNumber(2) val time: TimeProto = TimeProto(),
+    @ProtoNumber(3) val source: String = "",
+    @ProtoNumber(4) val unitsPerValue: Int = 0,
+    @ProtoNumber(5) @ProtoPacked val offsetDeltas: List<Long> = emptyList(),
+    @ProtoNumber(6) @ProtoPacked val x: List<Long> = emptyList(),
+    @ProtoNumber(7) @ProtoPacked val y: List<Long> = emptyList(),
+    @ProtoNumber(8) @ProtoPacked val z: List<Long> = emptyList()
 )

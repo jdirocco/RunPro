@@ -129,6 +129,26 @@ Watch behaviour (real GPS and wrist HR, another app taking over) is a field resu
   and `LowResourceReplayTest` continue to cover start-before-publication, worker isolation and emergency
   saves (R1/R6/R7). No sensor arbitration or BLE reconnect policy is changed (R5/R8).
 
+## IMU capture evidence
+
+The IMU capture (ADR 0012) is kept out of the recording path, so it cannot weaken R1–R8:
+
+- R1/R2/R3: IMU batches never enter the engine or the run journal. They go to separate stream files
+  with their own magic (`RPIM`), which the journal reader, recovery and phone sync refuse or never list.
+  `ImuStreamTest` checks the separation, that a restarted capture opens a new segment without rewriting
+  the old one, that process death keeps everything flushed (1 s) and that a cut tail keeps every complete
+  batch. `RecordingServiceImuTest` records a run with a shadow accelerometer and checks the journal is
+  where it was and stopped, and that a watch without motion sensors or with IMU off saves the run as usual.
+- R6: `ImuCapture.follow` only queues work for the IMU thread, and only when the target state changed
+  (`ImuCaptureTest`: `follow only queues work...`). Sensor callbacks and stream writes run on that thread.
+- R4/R7: no sensor, a platform refusal, a storage failure, free space under 100 MB and the battery warning
+  each end the capture for that run, keep what was written and never throw (`ImuCaptureTest`); the
+  100 MB floor leaves the journal its space. Old streams are pruned to 300 MB, never the current run's.
+- `ImuCodecTest` bounds the encoding (at most 12 bytes a reading, several times smaller than samples) and
+  the quantisation (1 µs, 0.001 m/s²); `ImuTraceTest` and `ImuReportTest` cover traces and the report tool.
+
+Gaps, real rate and battery cost on the Galaxy Watch 5 Pro are field results (F10), not claimed here.
+
 ## Failure catalogue
 
 Every real failure seen in the field gets a row here, a recorded trace in `testdata/traces/`, and a test.

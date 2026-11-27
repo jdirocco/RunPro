@@ -25,6 +25,7 @@ Watch setup step by step (in Italian, for the owner): `docs/it/CONFIGURAZIONE_OR
 | F7 | Run with the phone left at home | Watch-only GPS, sync later |
 | F9 | Auto-lap and time/distance intervals | Correct lap summaries, countdowns and haptics with screen on/off; pauses freeze targets (see below) |
 | F8 | Phone sync: phone app installed, several runs with the phone out of range for some of them, then in range | Every run in the phone's `files/runs` once, journals gone from the watch (see below) |
+| F10 | IMU capture and battery cost (see below) | 50 Hz without gaps, battery %/h with IMU off, accelerometer, accelerometer + gyroscope |
 | F9 | Start a workout in Gear Tracker (or another Health Services app), then a RunPro run; during it start a workout in the other app again | RunPro takes over at its start; when the other app takes over, the run keeps recording (timer, strap) without wrist HR and GPS, and the log shows it |
 
 ## Auto-lap and interval check (F9)
@@ -38,6 +39,30 @@ repetitions cycle 1–20 and warm-up/cool-down can be off. Try short timed stage
 with timed recovery. Check stage/repetition, remaining time/metres, 3–2–1 countdown vibrations and
 transition vibration with the screen off. Pause mid-stage: countdown must freeze. Completion must show
 that recording continues until Stop. Report actual observations; JVM replay is not a physical result.
+
+## IMU capture and reference runs (F10)
+
+The setup screen has **IMU: accelerometer** (default), **IMU: accel + gyro** and **IMU: Off**; a run keeps
+the setting it started with. Streams stay on the watch in `files/imu` (phone sync does not send them).
+
+1. Battery cost: three runs of the same length (≥ 45 min) and conditions, one per setting, all with GPS
+   and the strap as usual. Write down the battery % at start and stop (the log also prints it:
+   `adb logcat -s ImuCapture` shows each capture change with `battery=..%`).
+2. After each run copy the streams to the Mac and check them:
+
+   ```bash
+   adb exec-out run-as com.runpro.wear tar -c files/imu > imu.tar && tar -xf imu.tar
+   ./gradlew :tools:replay:imuReport --args="$PWD/files/imu --csv $PWD/imu-csv"
+   ```
+
+   Each sensor should show about 50.0 Hz and `0 gaps`; report the lines as they are, including gaps,
+   with the screen off most of the run.
+3. Reference runs for #34: record 10 runs with IMU on, each with a reference for the same run: Stryd
+   recorded by its own app (phone), or Galaxy Health data. A Samsung Health workout cannot run on the watch
+   next to RunPro (only one app owns the Health Services exercise), so Galaxy Health data must come from a
+   source that does not start a second workout on the watch. Keep, per run: the `.imu` file(s) (named by
+   run id), the FIT from the phone and the reference export. Report them on the field-test issue; nothing
+   about accuracy is claimed until #34 compares them.
 
 ## FIT file acceptance (no watch needed)
 

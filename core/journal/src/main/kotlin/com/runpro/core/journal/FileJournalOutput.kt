@@ -8,10 +8,14 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
 
-/** A [JournalOutput] on a file: [write] goes to the OS page cache, [sync] is `fsync` (`FileChannel.force`). */
+/**
+ * A [JournalOutput] on a file: [write] goes to the OS page cache, [sync] is `fsync` (`FileChannel.force`).
+ * Without a [reserve] (IMU streams, ADR 0012) a full storage is an ordinary I/O failure.
+ */
 class FileJournalOutput internal constructor(
     private val channel: FileChannel,
-    private val reserve: StorageReserve,
+    private val reserve: StorageReserve?,
+    private val file: Path = requireNotNull(reserve).file,
     private val writeChannel: (ByteBuffer) -> Int = channel::write,
     private val syncChannel: () -> Unit = { channel.force(false) }
 ) : JournalOutput {
@@ -19,7 +23,7 @@ class FileJournalOutput internal constructor(
         private set
 
     override val availableBytes: Long
-        get() = if (storageFull) 0 else Files.getFileStore(reserve.file).usableSpace
+        get() = if (storageFull) 0 else Files.getFileStore(file).usableSpace
 
     override fun write(bytes: ByteArray, offset: Int, length: Int) {
         val position = channel.position()
@@ -39,7 +43,7 @@ class FileJournalOutput internal constructor(
         try {
             action()
         } catch (e: IOException) {
-            if (storageFull || !e.isStorageFull()) throw e
+            if (reserve == null || storageFull || !e.isStorageFull()) throw e
             onFull()
             reserve.release()
             storageFull = true
@@ -48,7 +52,7 @@ class FileJournalOutput internal constructor(
     }
 
     override fun close() {
-        channel.use { reserve.close() }
+        channel.use { reserve?.close() }
     }
 
     companion object {
@@ -73,16 +77,19 @@ class FileJournalOutput internal constructor(
         }
 
         /** Creates [file], which must not exist, and makes its directory entry durable. */
-        fun create(file: Path): FileJournalOutput {
+        fun create(file: Path): FileJournalOutput = create(file, reserved = true)
+
+        /** Creates [file] like [create], without a storage reserve. */
+        internal fun create(file: Path, reserved: Boolean): FileJournalOutput {
             val channel = FileChannel.open(
                 file,
                 StandardOpenOption.CREATE_NEW,
                 StandardOpenOption.WRITE
             )
             try {
-                val reserve = StorageReserve.create(file)
+                val reserve = if (reserved) StorageReserve.create(file) else null
                 syncDirectory(file.toAbsolutePath().parent)
-                return FileJournalOutput(channel, reserve)
+                return FileJournalOutput(channel, reserve, file)
             } catch (e: IOException) {
                 channel.close()
                 throw e

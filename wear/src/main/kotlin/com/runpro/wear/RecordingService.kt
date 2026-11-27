@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Binder
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.IBinder
 import android.os.Looper
 import android.os.SystemClock
@@ -20,11 +21,16 @@ import com.runpro.core.recording.RunPhase
 import com.runpro.core.recording.RunState
 import com.runpro.core.recording.exercise.ExerciseController
 import com.runpro.core.recording.exercise.ExerciseStatus
+import com.runpro.core.recording.imu.ImuCapture
+import com.runpro.core.recording.imu.ImuMode
+import com.runpro.core.recording.imu.ImuStatus
 import com.runpro.core.recording.service.RunRecovery
 import com.runpro.core.recording.service.ServiceCommand
 import com.runpro.core.recording.service.ServiceStartPolicy
 import com.runpro.core.recording.service.ServiceStartPolicy.Decision
 import com.runpro.wear.health.HealthServicesExercise
+import com.runpro.wear.imu.ImuPreferences
+import com.runpro.wear.imu.WatchImu
 import com.runpro.wear.sync.PhoneSync
 import com.runpro.wear.sync.WatchStorage
 import java.util.concurrent.Executors
@@ -42,6 +48,8 @@ import kotlinx.coroutines.flow.StateFlow
  *   intent, and [RunRecovery] restores the run (the journal implementation is #9).
  * - The Health Services exercise follows the phases of the engine ([ExerciseController.follow], #11) and
  *   its samples go to the engine. A refused or lost exercise never pauses or stops the run (R4).
+ * - The IMU capture ([ImuCapture], #33) follows the run on its own thread into `files/imu`, apart from
+ *   the journal; it never affects the run (ADR 0012).
  * - The UI binds to it and only reads [LocalBinder.state] and [LocalBinder.exercise].
  */
 class RecordingService : Service() {
@@ -55,6 +63,11 @@ class RecordingService : Service() {
     private lateinit var notification: RunNotification
     private lateinit var exercise: ExerciseController
     private lateinit var foreground: ForegroundController
+    private val imuThread = HandlerThread("runpro-imu").apply { start() }
+    private lateinit var imu: ImuCapture
+
+    /** The IMU setting of the current run, read when it starts (or is restored). */
+    @Volatile private var imuMode = ImuMode.OFF
     private var recovery: RunRecovery = RunRecovery.NONE
 
     /** A run was started or restored; the engine may not have processed the start yet. */
@@ -66,10 +79,15 @@ class RecordingService : Service() {
         val state: StateFlow<RunState> get() = engine.state
         val failure: StateFlow<Throwable?> get() = engine.failure
         val exercise: StateFlow<ExerciseStatus> get() = this@RecordingService.exercise.status
+        val imu: StateFlow<ImuStatus> get() = this@RecordingService.imu.status
     }
 
     override fun onCreate() {
         super.onCreate()
+        // A restored run keeps capturing with the current setting. The capture exists before the
+        // engine, so it follows the first published state.
+        imuMode = ImuPreferences.load(this)
+        imu = WatchImu.capture(this, imuThread, ::now)
         feedback = WorkoutFeedback(this)
         engine = RecordingEngine(
             sessionFactory = {
@@ -110,6 +128,8 @@ class RecordingService : Service() {
         exercise.stop()
         ticker.shutdownNow()
         engine.close()
+        imu.close()
+        imuThread.quitSafely()
         main.removeCallbacksAndMessages(null)
         super.onDestroy()
     }
@@ -125,6 +145,7 @@ class RecordingService : Service() {
             return
         }
         requestedRun = true
+        imuMode = ImuPreferences.load(this)
         if (engine.state.value.phase == RunPhase.STOPPED) engine.submit(EngineInput.Reset)
         val now = now()
         engine.submit(EngineInput.ConfigureWorkout(WorkoutPreferences.load(this)))
@@ -175,6 +196,8 @@ class RecordingService : Service() {
         lastPhase = state.phase
         // Non-blocking: the controller only queues requests to Health Services.
         if (changed) exercise.follow(state.phase)
+        // Only queues to the IMU thread, and only when something changed.
+        imu.follow(state, imuMode)
         main.post {
             feedback.update(state)
             if (!changed) return@post

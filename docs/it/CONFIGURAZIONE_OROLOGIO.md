@@ -187,6 +187,23 @@ L’orologio vibra negli ultimi tre secondi e al cambio fase, anche con l’app 
 rimanenti. Al termine dell’allenamento la registrazione continua: premi **Stop** per salvarla.
 La prova sul campo è F9 in `docs/FIELD_TESTING.md`; i risultati fisici devono ancora essere verificati.
 
+### Registrazione IMU (accelerometro e giroscopio)
+
+Prima di **Avvia**, il pulsante **IMU** alterna **accelerometro** (predefinito), **accel. + giroscopio** e
+**Disattivato**. La corsa usa l'impostazione con cui è partita. RunPro registra a 50 Hz solo mentre la corsa
+è in corso (non in pausa) in file separati (`files/imu`), che il telefono non riceve e che restano
+sull'orologio (i più vecchi vengono cancellati oltre 300 MB). Se lo spazio libero scende sotto 100 MB o la
+batteria è in riserva, la registrazione IMU si ferma e la corsa continua normalmente.
+
+Per copiare i file sul Mac e controllarli (frequenza, buchi):
+
+```bash
+adb exec-out run-as com.runpro.wear tar -c files/imu > imu.tar && tar -xf imu.tar
+./gradlew :tools:replay:imuReport --args="$PWD/files/imu --csv $PWD/imu-csv"
+```
+
+La prova per il consumo di batteria e le corse di riferimento è F10 in `docs/FIELD_TESTING.md`.
+
 ## 8. Prima di una prova sul campo
 
 Segui `docs/FIELD_TESTING.md`. In breve:

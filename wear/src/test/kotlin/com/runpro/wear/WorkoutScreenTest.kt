@@ -16,6 +16,7 @@ import com.runpro.core.model.Timestamp
 import com.runpro.core.model.WorkoutSettings
 import com.runpro.core.recording.EngineInput
 import com.runpro.core.recording.RecordingStateMachine
+import com.runpro.core.recording.imu.ImuMode
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -38,6 +39,20 @@ class WorkoutScreenTest {
         }
         compose.onNodeWithText("Auto lap: 1000 m").performClick()
         compose.onNodeWithText("Auto lap: 2000 m").assertIsDisplayed()
+    }
+
+    @Test
+    fun `the IMU setting cycles accelerometer, accelerometer and gyroscope, off`() {
+        var mode by mutableStateOf(ImuMode.ACCELEROMETER)
+        compose.setContent {
+            MaterialTheme {
+                ScalingLazyColumn { item { ImuButton(mode) { mode = it } } }
+            }
+        }
+        compose.onNodeWithText("IMU: accelerometer").performClick()
+        compose.onNodeWithText("IMU: accel + gyro").performClick()
+        compose.onNodeWithText("IMU: Off").performClick()
+        compose.onNodeWithText("IMU: accelerometer").assertIsDisplayed()
     }
 
     @Test
