@@ -129,6 +129,22 @@ Watch behaviour (real GPS and wrist HR, another app taking over) is a field resu
   and `LowResourceReplayTest` continue to cover start-before-publication, worker isolation and emergency
   saves (R1/R6/R7). No sensor arbitration or BLE reconnect policy is changed (R5/R8).
 
+## BLE connection evidence
+
+- `BleReconnectStateMachineTest` injects normal disconnects, GATT 133, silent stalls, slow discovery,
+  missing callbacks, platform request rejection and failed close through a fake `GattPort`. It rejects
+  overlapping requests and connect-before-close, checks serial subscription writes and their
+  cancellation, stale/duplicate callbacks, independent devices, stop/restart and transition logging.
+- Five-second silence is checked per required measurement characteristic; battery readings and other
+  live streams cannot conceal a stall. Successful resubscription needs actual notifications, including
+  a deadline check between ticks. Retry grows 1/2/4/8 s and resets on data, not CCCD success.
+- R8 timing tests cover dropout recovery, failed/silent resubscription and 20 seeded return-to-range
+  offsets during capped backoff with 1.2 s discovery. Restored data arrives in < 10 s with the fake's
+  responsive setup. A platform/radio that cannot complete setup or close is outside this JVM guarantee.
+  Policy and budgets: ADR 0012. Watch adapter integration is #17; physical validation remains #22,
+  scenarios F1/F2. The controller never issues recording commands; R4 recording evidence remains
+  `SensorDropoutReplayTest` and `ChaosRecordingReplayTest`.
+
 ## Failure catalogue
 
 Every real failure seen in the field gets a row here, a recorded trace in `testdata/traces/`, and a test.
