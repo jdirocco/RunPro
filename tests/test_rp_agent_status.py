@@ -1,7 +1,9 @@
 """Status tests: ./rp status must say whether an agent works on an issue and where it runs (#62)."""
 
+import contextlib
 import importlib.machinery
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -64,11 +66,28 @@ class ResolveTargetTest(unittest.TestCase):
         self.assertEqual(self.resolve("claude", env={"ANTHROPIC_BASE_URL": "https://api.anthropic.com"})[2], "cloud")
         self.assertEqual(self.resolve("claude", env={"CLAUDE_CODE_USE_BEDROCK": "1"})[1:], ("bedrock", "cloud"))
 
+    def test_agy_model_precedence(self):
+        self.assertEqual(self.resolve("agy"), ("(agy default)", "google", "cloud"))
+        cli_dir = self.home / ".gemini" / "antigravity-cli"
+        cli_dir.mkdir(parents=True)
+        (cli_dir / "settings.json").write_text(json.dumps({"model": "gemini-pro"}))
+        self.assertEqual(self.resolve("agy"), ("gemini-pro", "google", "cloud"))
+        self.assertEqual(self.resolve("agy", extra=["--settings", '{"model":"gemini-flash"}'])[0], "gemini-flash")
+        self.assertEqual(self.resolve("agy", env={"GEMINI_MODEL": "gemini-env"})[0], "gemini-env")
+        self.assertEqual(self.resolve("agy", "gemini-explicit")[0], "gemini-explicit")
+
+    def test_agy_local_and_remote_targets(self):
+        self.assertEqual(self.resolve("agy", "gemma", env={"GOOGLE_GEMINI_BASE_URL": "http://127.0.0.1:8080"}),
+                         ("gemma", "http://127.0.0.1:8080", "local"))
+        self.assertEqual(self.resolve("agy", "gemini-pro", extra=["--remote-agent"]),
+                         ("gemini-pro", "google-remote", "cloud"))
+
 
 PS = """\
   87776   06:19 python3 ./rp agent 5 codex --worktree --auto
   77702   24:12 python3 ./rp agent 55 codex --model devstral-64k:latest --worktree -- --oss --local-provider ollama
   62069 01-18:44:13 python3 ./rp agent 3 claude --worktree --auto
+  91234   08:05 python3 ./rp agent 83 agy --worktree --auto
   90001   00:03 grep -E rp agent|codex -s
   90002   00:01 python3 ./rp agent next
   90003   00:01 vim notes-about-rp
@@ -78,10 +97,11 @@ PS = """\
 class RunningAgentsTest(unittest.TestCase):
     def test_parses_issue_pid_and_elapsed(self):
         found = rp.running_agents(PS)
-        self.assertEqual(sorted(found), [3, 5, 55])
+        self.assertEqual(sorted(found), [3, 5, 55, 83])
         self.assertEqual(found[5]["pid"], 87776)
         self.assertEqual(found[5]["seconds"], 6 * 60 + 19)
         self.assertEqual(found[3]["seconds"], 86400 + 18 * 3600 + 44 * 60 + 13)
+        self.assertEqual(found[83]["pid"], 91234)
         self.assertIn("--oss", found[55]["args"])
 
 
@@ -118,6 +138,58 @@ class RunRecordTest(unittest.TestCase):
             self.assertTrue(os.path.isfile(os.path.join(d, "rp-agents", "5.json")))
             self.assertEqual(rp.read_agent_run(5)["model"], "gpt-6.1-sol")
             self.assertIsNone(rp.read_agent_run(6))
+
+
+class SessionStartStatusTest(unittest.TestCase):
+    def test_detect_antigravity_and_ide_sessions(self):
+        self.assertIsNone(rp.detect_agent_session({}))
+        agy = rp.detect_agent_session({
+            "ANTIGRAVITY_AGENT": "1",
+            "ANTIGRAVITY_CONVERSATION_ID": "926af09c-0dbe-43fa-8f2b-e46dbe1babca",
+        })
+        self.assertEqual("agy-app", agy["runner"])
+        self.assertEqual("(desktop)", agy["model"])
+        self.assertEqual("google", agy["provider"])
+        self.assertEqual("cloud", agy["location"])
+        self.assertEqual("session", agy["mode"])
+        self.assertEqual("926af09c", agy["session_id"])
+
+        claude = rp.detect_agent_session({"CLAUDECODE": "1", "ANTHROPIC_MODEL": "opus"})
+        self.assertEqual("claude-ide", claude["runner"])
+        self.assertEqual("opus", claude["model"])
+        self.assertEqual("session", claude["mode"])
+
+        codex = rp.detect_agent_session({"CODEX_THREAD_ID": "01a21afe-3ef2-7f52"})
+        self.assertEqual("codex-app", codex["runner"])
+        self.assertEqual("01a21afe", codex["session_id"])
+        self.assertEqual("session", codex["mode"])
+
+    def test_cmd_start_records_session_only_inside_agent_env(self):
+        with tempfile.TemporaryDirectory() as d, \
+                patch.object(rp, "git_common_dir", return_value=d), \
+                patch.object(rp, "start_issue", return_value=("Title", "issue-83-agy", "/tmp/wt")), \
+                contextlib.redirect_stdout(io.StringIO()):
+            with patch.dict(os.environ, {}, clear=True):
+                rp.cmd_start(["83", "--worktree"])
+                self.assertIsNone(rp.read_agent_run(83))
+            with patch.dict(os.environ, {"ANTIGRAVITY_AGENT": "1", "ANTIGRAVITY_CONVERSATION_ID": "926af09c-1111"},
+                            clear=True):
+                rp.cmd_start(["83", "--worktree"])
+                rec = rp.read_agent_run(83)
+                self.assertEqual("agy-app", rec["runner"])
+                self.assertEqual("session", rec["mode"])
+                self.assertEqual("926af09c", rec["session_id"])
+                self.assertEqual("/tmp/wt", rec["cwd"])
+
+    def test_session_status_line_never_looks_crashed_or_abandoned(self):
+        rec = {
+            "issue": 83, "runner": "agy-app", "model": "(desktop)", "provider": "google", "location": "cloud",
+            "mode": "session", "session_id": "926af09c", "cwd": "/tmp/wt", "started": 1000.0,
+            "ended": None, "exit_code": None,
+        }
+        expected = "session started 12m ago: agy-app (desktop) on google (cloud), session 926af09c"
+        self.assertEqual(expected, rp.agent_status_line(83, rec, None, now=1000.0 + 12 * 60))
+        self.assertEqual(expected, rp.agent_status_line(83, rec, rp.UNKNOWN, now=1000.0 + 12 * 60))
 
 
 if __name__ == "__main__":

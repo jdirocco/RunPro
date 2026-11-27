@@ -34,6 +34,16 @@
         "-a",
         "never"
       ]
+    },
+    "agy": {
+      "model": null,
+      "headless_args": [
+        "--mode",
+        "auto"
+      ],
+      "auto_args": [
+        "--dangerously-skip-permissions"
+      ]
     }
   }
 }
