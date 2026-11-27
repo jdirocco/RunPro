@@ -10,6 +10,9 @@ import com.runpro.core.model.Elevation
 import com.runpro.core.model.ElevationSample
 import com.runpro.core.model.HeartRate
 import com.runpro.core.model.HeartRateSample
+import com.runpro.core.model.ImuBatch
+import com.runpro.core.model.ImuReading
+import com.runpro.core.model.ImuSensor
 import com.runpro.core.model.LapTrigger
 import com.runpro.core.model.LocationSample
 import com.runpro.core.model.Metric
@@ -109,6 +112,30 @@ internal val everySensorEvent: List<SensorEvent> = listOf(
     SensorEvent.GpsAcquired(at(34), WATCH)
 )
 
+/**
+ * One IMU batch per sensor. Values and offsets are exact at the stored resolution (1 µs, 0.001 m/s²,
+ * 0.0001 rad/s), so they compare equal after a round trip.
+ */
+internal val everyImuBatch: List<ImuBatch> = listOf(
+    ImuBatch(
+        at(41),
+        SourceId.WATCH_IMU,
+        ImuSensor.ACCELEROMETER,
+        listOf(
+            ImuReading(0, 0.125f, -9.75f, 1.5f),
+            ImuReading(20_000_000, -0.5f, -9.625f, 2.25f),
+            ImuReading(20_000_000, 0f, 0f, 0f),
+            ImuReading(40_001_000, -16.5f, 39.25f, -78.5f)
+        )
+    ),
+    ImuBatch(
+        at(42),
+        SourceId.WATCH_IMU,
+        ImuSensor.GYROSCOPE,
+        listOf(ImuReading(0, 0.0625f, -3.5f, 0.25f), ImuReading(19_998_000, -0.5f, 0f, 10.75f))
+    )
+)
+
 /** Every kind of record, with the run start first. */
 internal val everyRecord: List<JournalRecord> = buildList {
     add(started())
@@ -117,6 +144,7 @@ internal val everyRecord: List<JournalRecord> = buildList {
     everyRunEvent.forEach { add(JournalRecord.Event(it)) }
     everySensorEvent.forEach { add(JournalRecord.Sensor(it)) }
     add(JournalRecord.Checkpoint(at(40)))
+    everyImuBatch.forEach { add(JournalRecord.Imu(it)) }
 }
 
 /** A clock that only moves when told to. */

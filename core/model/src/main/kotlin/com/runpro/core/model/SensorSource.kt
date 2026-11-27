@@ -8,6 +8,9 @@ interface SensorListener {
     fun onSample(sample: Sample)
 
     fun onEvent(event: SensorEvent)
+
+    /** IMU readings (ADR 0012). Listeners that do not use the IMU keep this default and ignore them. */
+    fun onImu(batch: ImuBatch) = Unit
 }
 
 /**
