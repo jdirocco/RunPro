@@ -11,7 +11,7 @@ Commands:
   start <N> [--worktree]
                       assign issue N, mark it In Progress, create branch issue-<N>-<slug>
                       (--worktree: in ../RunPro-worktrees/<branch> instead of this checkout)
-  agent [N|next] [claude|codex] [--model M] [--complexity C] [--auto] [--headless] [--worktree] [--prompt TEXT] [--dry-run] [-- ARGS]
+  agent [N|next] [claude|codex|agy] [--model M] [--complexity C] [--auto] [--headless] [--worktree] [--prompt TEXT] [--dry-run] [-- ARGS]
                       start issue N (default: next ready, optionally filtered by --complexity) and launch a coding agent on it.
                       Runner and model default to plan/config.json "agents" (model null = tool default).
                       --auto: the agent never asks for confirmation and opens the PR itself.
@@ -493,11 +493,21 @@ def cmd_start(args):
         sys.exit("usage: ./rp start <issue> [--worktree]")
     n = int(args[0].lstrip("#"))
     _, branch, cwd = start_issue(n, worktree="--worktree" in args)
+    session = detect_agent_session(os.environ, cwd=cwd)
+    if session:
+        write_agent_run({
+            "issue": n, "runner": session["runner"], "model": session["model"],
+            "provider": session["provider"], "location": session["location"],
+            "mode": "session", "session_id": session["session_id"],
+            "cwd": cwd, "started": time.time(), "ended": None, "exit_code": None,
+        })
     print(f"On branch {branch} in {cwd}. Issue #{n} is In Progress.")
     print(f"Read it: gh issue view {n}")
 
 
 # ---------- agents ----------
+
+RUNNERS = ("claude", "codex", "agy")
 
 AGENT_DEFAULTS = {
     "default_runner": "claude",
@@ -515,6 +525,11 @@ AGENT_DEFAULTS = {
         "network_access": True,
         "headless_args": [],
         "auto_args": ["-a", "never"],
+    },
+    "agy": {
+        "model": None,
+        "headless_args": ["--mode", "auto"],
+        "auto_args": ["--dangerously-skip-permissions"],
     },
 }
 
@@ -573,11 +588,25 @@ def codex_sandbox_args(acfg, cwd=ROOT):
     return args
 
 
+def agy_command(acfg, model, headless, auto, cwd, extra_cli, prompt):
+    cmd = ["agy"]
+    if model:
+        cmd += ["--model", model]
+    if auto:
+        cmd += acfg["agy"]["auto_args"]
+    elif headless:
+        cmd += acfg["agy"]["headless_args"]
+    if worktree_git_dir(cwd):
+        cmd += ["--add-dir", git_common_dir()]
+    cmd += extra_cli + (["-p", prompt] if headless else ["-i", prompt])
+    return cmd
+
+
 def agent_config():
     cfg = load_config().get("agents", {})
     out = json.loads(json.dumps(AGENT_DEFAULTS))
     out["default_runner"] = cfg.get("default_runner", out["default_runner"])
-    for runner in ("claude", "codex"):
+    for runner in RUNNERS:
         out[runner].update(cfg.get(runner, {}))
     return out
 
@@ -625,7 +654,7 @@ def parse_agent_args(args):
             opts["complexity"] = a.split("=", 1)[1]
         elif a in ("--headless", "--worktree", "--dry-run", "--auto"):
             flags.add(a[2:])
-        elif a in ("claude", "codex") and opts["runner"] is None:
+        elif a in RUNNERS and opts["runner"] is None:
             opts["runner"] = a
         else:
             target = a
@@ -672,6 +701,17 @@ def _read_json(path):
         return {}
 
 
+def _read_inline_or_file_json(value):
+    if not value:
+        return {}
+    if value.lstrip().startswith("{"):
+        try:
+            return json.loads(value)
+        except ValueError:
+            return {}
+    return _read_json(value)
+
+
 def is_local_url(url):
     from urllib.parse import urlparse
     host = (urlparse(url).hostname or "") if url else ""
@@ -700,6 +740,17 @@ def resolve_agent_target(runner, model, extra_cli, cwd=ROOT, env=None, home=None
         base_url = cfg.get("model_providers", {}).get(provider, {}).get("base_url", "")
         local = provider in LOCAL_CODEX_PROVIDERS or is_local_url(base_url)
         return model, provider, "local" if local else "cloud"
+    if runner == "agy":
+        settings = _read_json(os.path.join(home, ".gemini", "antigravity-cli", "settings.json"))
+        settings.update(_read_inline_or_file_json(_flag_value(extra_cli, "--settings")))
+        model = model or _flag_value(extra_cli, "--model") or env.get("GEMINI_MODEL") or settings.get("model") \
+            or "(agy default)"
+        if "--remote-agent" in extra_cli:
+            return model, "google-remote", "cloud"
+        base_url = env.get("GOOGLE_GEMINI_BASE_URL", "") or settings.get("baseUrl", "")
+        if is_local_url(base_url):
+            return model, base_url, "local"
+        return model, "google", "cloud"
     settings = {}
     for path in (os.path.join(home, ".claude", "settings.json"), os.path.join(cwd, ".claude", "settings.json"),
                  os.path.join(cwd, ".claude", "settings.local.json")):
@@ -714,6 +765,29 @@ def resolve_agent_target(runner, model, extra_cli, cwd=ROOT, env=None, home=None
     if is_local_url(base_url):
         return model, base_url, "local"
     return model, "anthropic", "cloud"
+
+
+def detect_agent_session(env=None, cwd=ROOT, home=None):
+    """Active IDE/desktop agent environment when ./rp start runs inside an agent turn, or None."""
+    env = os.environ if env is None else env
+    if env.get("ANTIGRAVITY_AGENT"):
+        cid = (env.get("ANTIGRAVITY_CONVERSATION_ID") or "")[:8] or None
+        base_url = env.get("GOOGLE_GEMINI_BASE_URL", "")
+        model = env.get("ANTIGRAVITY_MODEL") or env.get("GEMINI_MODEL") or "(desktop)"
+        provider, location = (base_url, "local") if is_local_url(base_url) else ("google", "cloud")
+        return {"runner": "agy-app", "model": model, "provider": provider, "location": location,
+                "mode": "session", "session_id": cid}
+    if env.get("CLAUDECODE"):
+        sid = (env.get("CLAUDE_SESSION_ID") or "")[:8] or None
+        model, provider, location = resolve_agent_target("claude", None, [], cwd=cwd, env=env, home=home)
+        return {"runner": "claude-ide", "model": model, "provider": provider, "location": location,
+                "mode": "session", "session_id": sid}
+    if env.get("CODEX_THREAD_ID"):
+        sid = env["CODEX_THREAD_ID"][:8] or None
+        model, provider, location = resolve_agent_target("codex", None, [], cwd=cwd, env=env, home=home)
+        return {"runner": "codex-app", "model": model, "provider": provider, "location": location,
+                "mode": "session", "session_id": sid}
+    return None
 
 
 # ---------- agent run records (shared by all worktrees) ----------
@@ -791,9 +865,18 @@ def _where(model, provider, location):
     return f"{model} on {provider} ({location})"
 
 
+def session_status_line(run, now):
+    what = f"{run['runner']} {_where(run['model'], run['provider'], run['location'])}"
+    ago = f" {_duration(now - run['started'])} ago" if run.get("started") else ""
+    sid = f", session {run['session_id']}" if run.get("session_id") else ""
+    return f"session started{ago}: {what}{sid}"
+
+
 def agent_status_line(n, run, live, now=None):
     """One line saying whether an agent works on issue N and where it runs."""
     now = now or time.time()
+    if run and run.get("mode") == "session" and (not live or live == UNKNOWN):
+        return session_status_line(run, now)
     if live == UNKNOWN:
         return unknown_status_line(run, now)
     if run and live and live["pid"] == run.get("pid"):
@@ -831,8 +914,8 @@ def cmd_agent(args):
     opts, flags, target, extra_cli = parse_agent_args(args)
     acfg = agent_config()
     runner = opts["runner"] or acfg["default_runner"]
-    if runner not in ("claude", "codex"):
-        sys.exit("runner must be claude or codex")
+    if runner not in RUNNERS:
+        sys.exit("runner must be claude, codex or agy")
     model = opts["model"] or acfg[runner].get("model")
     headless = "headless" in flags
 
@@ -867,6 +950,8 @@ def cmd_agent(args):
         if headless:
             cmd += ["-p"]
         cmd += extra_cli + [prompt]
+    elif runner == "agy":
+        cmd = agy_command(acfg, model, headless, auto, cwd, extra_cli, prompt)
     else:
         cmd = ["codex"]
         if auto and not headless:
