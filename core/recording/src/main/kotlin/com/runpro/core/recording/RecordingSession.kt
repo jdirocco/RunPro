@@ -55,10 +55,10 @@ class RecordingSession internal constructor(
 
     private fun persist(input: EngineInput, previousEvents: Int) {
         if (state.run == null) return // Preparing samples are not part of the run.
-        persistEvents(previousEvents)
         if (input is EngineInput.SampleReceived) {
             journal?.append(JournalRecord.Samples(listOf(input.sample)))
         }
+        persistEvents(previousEvents)
         if (input is EngineInput.Tick) journal?.append(JournalRecord.Checkpoint(input.time))
     }
 
@@ -67,7 +67,7 @@ class RecordingSession internal constructor(
         for (event in run.events.drop(previousEvents)) {
             journal?.append(
                 if (event is RunEvent.Started) {
-                    JournalRecord.RunStarted(run.id, event.time)
+                    JournalRecord.RunStarted(run.id, event.time, state.workoutSettings)
                 } else {
                     JournalRecord.Event(event)
                 }

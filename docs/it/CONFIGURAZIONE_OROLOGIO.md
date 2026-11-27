@@ -164,6 +164,21 @@ l'orologio ha chiuso RunPro: segnalalo con una issue **Field report**.
 4. In Samsung Health disattiva **Rileva automaticamente gli allenamenti** per la corsa, così non parte un
    secondo allenamento in parallelo.
 
+### Giri automatici e ripetute
+
+Prima di **Avvia**, il pulsante **Allenamento** alterna corsa libera e ripetute. Nella corsa libera,
+**Giro automatico** passa fra 500 m, 1000 m (predefinito), 2000 m e disattivato. Il giro manuale non
+sposta il prossimo chilometro automatico. Un riepilogo mostra distanza e tempo del giro per cinque
+secondi; puoi chiuderlo toccandolo.
+
+Nelle ripetute, tocca i pulsanti per cambiare numero di ripetizioni (1–20) e obiettivo di ogni fase:
+30/60/120/180/300/600 secondi oppure 100/200/400/800/1000 metri. Riscaldamento e defaticamento possono
+anche essere disattivati. Ogni ripetizione comprende lavoro e recupero, anche l’ultima. Le impostazioni
+restano salvate. La pausa ferma il conteggio della fase; il giro manuale non passa alla fase successiva.
+L’orologio vibra negli ultimi tre secondi e al cambio fase, anche con l’app chiusa; mostra tempo o metri
+rimanenti. Al termine dell’allenamento la registrazione continua: premi **Stop** per salvarla.
+La prova sul campo è F9 in `docs/FIELD_TESTING.md`; i risultati fisici devono ancora essere verificati.
+
 ## 8. Prima di una prova sul campo
 
 Segui `docs/FIELD_TESTING.md`. In breve:

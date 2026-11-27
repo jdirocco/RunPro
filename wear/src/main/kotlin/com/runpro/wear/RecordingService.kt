@@ -41,6 +41,7 @@ class RecordingService : Service() {
         Executors.newSingleThreadScheduledExecutor { task ->
             Thread(task, "runpro-tick").apply { isDaemon = true }
         }
+    private lateinit var feedback: WorkoutFeedback
     private lateinit var notification: RunNotification
     private lateinit var foreground: ForegroundController
     private var recovery: RunRecovery = RunRecovery.NONE
@@ -56,6 +57,7 @@ class RecordingService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        feedback = WorkoutFeedback(this)
         notification = RunNotification(this).also { it.createChannel() }
         foreground = ForegroundController(this, notification)
         ticker.scheduleWithFixedDelay(::tick, 1, 1, TimeUnit.SECONDS)
@@ -100,6 +102,7 @@ class RecordingService : Service() {
         requestedRun = true
         if (engine.state.value.phase == RunPhase.STOPPED) engine.submit(EngineInput.Reset)
         val now = now()
+        engine.submit(EngineInput.ConfigureWorkout(WorkoutPreferences.load(this)))
         engine.submit(EngineInput.Prepare(now))
         engine.submit(EngineInput.Start(now))
     }
@@ -145,8 +148,9 @@ class RecordingService : Service() {
     private fun onProcessed(state: RunState) {
         val changed = state.phase != lastPhase
         lastPhase = state.phase
-        if (!changed) return
         main.post {
+            feedback.update(state)
+            if (!changed) return@post
             when {
                 ServiceStartPolicy.needsForeground(state.phase) -> notification.update(state)
 

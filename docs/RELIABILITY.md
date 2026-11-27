@@ -94,6 +94,16 @@ and platform exercise shutdown on the watch are tracked in #71 after #10/#12; no
 These are JVM guarantees. The `ChannelClient` adapters and the 20-run check with the real watch and phone
 need journals written during a run (#60) and are the owner field test #75; ADR 0010.
 
+## Workout evidence
+
+- `WorkoutTest` checks real journal settings/laps survive recovery and rebuild identically for export,
+  without duplicate automatic marks (R2/R3). Auto-laps count admitted active distance only; pauses,
+  rejected sources and source resets do not fabricate laps, and interval completion keeps recording (R4).
+- `IntervalWorkoutReplayTest` replays the committed 45-minute intervals trace into fourteen timed laps.
+  Automatic marks use the existing synced event path; `JournaledEngineTest`, `RecordingThreadingTest`
+  and `LowResourceReplayTest` continue to cover start-before-publication, worker isolation and emergency
+  saves (R1/R6/R7). No sensor arbitration or BLE reconnect policy is changed (R5/R8).
+
 ## Failure catalogue
 
 Every real failure seen in the field gets a row here, a recorded trace in `testdata/traces/`, and a test.

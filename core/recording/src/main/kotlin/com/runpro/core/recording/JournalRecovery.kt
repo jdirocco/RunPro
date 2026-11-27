@@ -6,6 +6,7 @@ import com.runpro.core.journal.JournalRecord
 import com.runpro.core.journal.JournalWriter
 import com.runpro.core.journal.MonotonicClock
 import com.runpro.core.model.StopReason
+import com.runpro.core.model.WorkoutSettings
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
@@ -59,10 +60,12 @@ object JournalRecovery {
         val start = contents.records.firstOrNull() as? JournalRecord.RunStarted
         requireNotNull(start) { "The journal must begin with a run start" }
         // Validate/rebuild before opening for writes so invalid histories remain untouched.
-        val rebuilt = RecordingStateMachine(config) { start.runId }
+        val rebuilt = RecordingStateMachine(config, automaticLaps = false) { start.runId }
+        rebuilt.handle(EngineInput.ConfigureWorkout(start.workout ?: WorkoutSettings()))
         rebuilt.handle(EngineInput.Prepare(start.time))
         rebuilt.handle(EngineInput.Start(start.time))
         val last = replayJournal(contents, rebuilt)
+        rebuilt.automaticLaps = mode == RecoveryMode.RESUME_SAME_BOOT
         val session = RecordingSession(rebuilt, JournalWriter.resume(file, clock, policy))
         if (mode == RecoveryMode.SAVE) {
             try {

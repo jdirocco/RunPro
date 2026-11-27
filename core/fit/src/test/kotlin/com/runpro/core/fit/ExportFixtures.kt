@@ -29,6 +29,7 @@ import com.runpro.core.model.SpeedSample
 import com.runpro.core.model.StopReason
 import com.runpro.core.model.SwitchReason
 import com.runpro.core.model.Timestamp
+import com.runpro.core.model.WorkoutSettings
 import com.runpro.core.recording.EngineInput
 import com.runpro.core.recording.RecordingSession
 import com.runpro.tools.replay.Trace
@@ -68,6 +69,7 @@ internal fun recordJournal(
     RecordingSession(runIds = {
         RunId(runId)
     }, journal = JournalWriter.create(file)).use { session ->
+        session.handle(EngineInput.ConfigureWorkout(WorkoutSettings(autoLapMeters = null)))
         check(session.handle(EngineInput.Prepare(start)))
         check(session.handle(EngineInput.Start(start)))
         for (record in trace.records) {

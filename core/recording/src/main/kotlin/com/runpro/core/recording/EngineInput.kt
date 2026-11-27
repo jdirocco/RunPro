@@ -4,12 +4,16 @@ import com.runpro.core.model.PauseReason
 import com.runpro.core.model.Sample
 import com.runpro.core.model.StopReason
 import com.runpro.core.model.Timestamp
+import com.runpro.core.model.WorkoutSettings
 
 /**
  * Everything the recording engine reacts to, processed strictly in the order received.
  * Times come from the caller (monotonic clock); the engine has no clock of its own, so replay is deterministic.
  */
 sealed interface EngineInput {
+    /** Settings are accepted only while idle or preparing, before the durable start. */
+    data class ConfigureWorkout(val settings: WorkoutSettings) : EngineInput
+
     /** Idle → Preparing: the runner opened the start screen; sensors and GPS warm up. */
     data class Prepare(val time: Timestamp) : EngineInput
 

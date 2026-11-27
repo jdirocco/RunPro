@@ -13,6 +13,7 @@ import com.runpro.core.model.Run
 import com.runpro.core.model.Sample
 import com.runpro.core.model.Speed
 import com.runpro.core.model.SpeedSample
+import com.runpro.core.model.WorkoutSettings
 import kotlin.time.Duration
 import kotlin.time.DurationUnit
 
@@ -38,7 +39,9 @@ data class RunState(
     val totals: Totals = Totals(),
     val laps: List<LapTotals> = emptyList(),
     val current: CurrentValues = CurrentValues(),
-    val resources: ResourceState = ResourceState()
+    val resources: ResourceState = ResourceState(),
+    val workoutSettings: WorkoutSettings = WorkoutSettings(),
+    val workout: WorkoutProgress? = null
 )
 
 data class LapTotals(val lap: Lap, val totals: Totals)

@@ -9,6 +9,7 @@ import com.runpro.core.model.SensorEvent
 import com.runpro.core.model.SensorListener
 import com.runpro.core.model.SourceId
 import com.runpro.core.model.Timestamp
+import com.runpro.core.model.WorkoutSettings
 import com.runpro.core.recording.EngineInput
 import com.runpro.core.recording.RecordingStateMachine
 import com.runpro.core.recording.RunPhase
@@ -173,6 +174,9 @@ class TraceGoldenTotalsTest {
             require(commands.lastOrNull()?.input == GoldenInput.STOP) {
                 "The last command must be stop"
             }
+            // The golden files describe the runner's manual laps; auto-lap is covered by its own replay.
+            val manualLaps = WorkoutSettings(autoLapMeters = null)
+            assertTrue(machine.handle(EngineInput.ConfigureWorkout(manualLaps)))
             assertTrue(machine.handle(EngineInput.Prepare(start)))
             assertTrue(machine.handle(EngineInput.Start(start)))
         }
