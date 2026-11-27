@@ -19,6 +19,8 @@ class FileJournalOutput internal constructor(
     private val writeChannel: (ByteBuffer) -> Int = channel::write,
     private val syncChannel: () -> Unit = { channel.force(false) }
 ) : JournalOutput {
+    private var deletableOnDiscard: Boolean = true
+
     override var storageFull: Boolean = false
         private set
 
@@ -55,6 +57,24 @@ class FileJournalOutput internal constructor(
         channel.use { reserve?.close() }
     }
 
+    /** Closes the output and deletes a newly created file that never received RunStarted. */
+    internal fun discard() {
+        var failure: IOException? = null
+        try {
+            close()
+        } catch (e: IOException) {
+            failure = e
+        }
+        if (deletableOnDiscard) {
+            try {
+                Files.deleteIfExists(file)
+            } catch (e: IOException) {
+                if (failure != null) failure.addSuppressed(e) else failure = e
+            }
+        }
+        failure?.let { throw it }
+    }
+
     companion object {
         internal fun resume(file: Path): FileJournalOutput {
             val channel = FileChannel.open(file, StandardOpenOption.READ, StandardOpenOption.WRITE)
@@ -68,7 +88,9 @@ class FileJournalOutput internal constructor(
                 channel.truncate(contents.validLength)
                 channel.position(contents.validLength)
                 channel.force(true)
-                val output = FileJournalOutput(channel, StorageReserve.create(file))
+                val output = FileJournalOutput(channel, StorageReserve.create(file)).apply {
+                    deletableOnDiscard = false
+                }
                 opened = true
                 return output
             } finally {
@@ -91,7 +113,16 @@ class FileJournalOutput internal constructor(
                 syncDirectory(file.toAbsolutePath().parent)
                 return FileJournalOutput(channel, reserve, file)
             } catch (e: IOException) {
-                channel.close()
+                try {
+                    channel.close()
+                } catch (closing: IOException) {
+                    e.addSuppressed(closing)
+                }
+                try {
+                    Files.deleteIfExists(file)
+                } catch (deleting: IOException) {
+                    e.addSuppressed(deleting)
+                }
                 throw e
             }
         }

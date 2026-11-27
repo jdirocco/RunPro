@@ -16,6 +16,7 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
@@ -236,5 +237,45 @@ class JournalWriterTest {
         assertEquals(everyRecord, contents.records)
         assertEquals(JournalEnd.Clean, contents.end)
         assertEquals(Files.size(file), contents.validLength)
+    }
+
+    @Test
+    fun `abort removes a created file and reserve when RunStarted was never written`(
+        @TempDir dir: Path
+    ) {
+        val file = dir.resolve("unstarted.journal")
+        val reserve = file.resolveSibling("${file.fileName}.reserve")
+        val writer = JournalWriter.create(file, clock)
+        clock.advanceTo(2.seconds)
+        writer.tick()
+        assertTrue(Files.exists(file))
+        assertTrue(Files.exists(reserve))
+
+        writer.abort()
+        writer.abort()
+        writer.close()
+
+        assertFalse(Files.exists(file))
+        assertFalse(Files.exists(reserve))
+    }
+
+    @Test
+    fun `abort keeps the journal file once RunStarted has been written or resumed`(
+        @TempDir dir: Path
+    ) {
+        val file = dir.resolve("started.journal")
+        val reserve = file.resolveSibling("${file.fileName}.reserve")
+        val writer = JournalWriter.create(file, clock)
+        writer.append(started())
+        writer.abort()
+        assertTrue(Files.exists(file))
+        assertFalse(Files.exists(reserve))
+        assertEquals(listOf(started()), JournalReader.read(file).records)
+
+        val resumed = JournalWriter.resume(file, clock)
+        resumed.abort()
+        assertTrue(Files.exists(file))
+        assertFalse(Files.exists(reserve))
+        assertEquals(listOf(started()), JournalReader.read(file).records)
     }
 }

@@ -94,6 +94,7 @@ class JournalWriter private constructor(
     private var lastFlush = clock.nanos()
     private var lastSync = lastFlush
     private var unsynced = false
+    private var hasRunStarted = header == null
     private var closed = false
     private var failed: IOException? = null
 
@@ -111,6 +112,7 @@ class JournalWriter private constructor(
         val framed = JournalFormat.frame(JournalCodec.encode(record))
         synchronized(lock) {
             checkUsable()
+            if (record is JournalRecord.RunStarted) hasRunStarted = true
             buffer.write(framed)
             if (record is JournalRecord.RunStarted || record is JournalRecord.Event) {
                 guarded {
@@ -155,12 +157,19 @@ class JournalWriter private constructor(
         }
     }
 
-    /** Discards memory buffers and closes the output, as when the recording process dies. */
+    /**
+     * Discards memory buffers and closes the output, as when the recording process dies.
+     * Removes a newly created file only if [JournalRecord.RunStarted] was never appended (R3).
+     */
     fun abort() = synchronized(lock) {
         if (!closed) {
             closed = true
             buffer.reset()
-            output.close()
+            if (!hasRunStarted && output is FileJournalOutput) {
+                output.discard()
+            } else {
+                output.close()
+            }
         }
     }
 

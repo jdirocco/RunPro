@@ -124,8 +124,9 @@ data class CurrentValues(
 data class ResourceState(val batteryPercent: Int? = null, val availableBytes: Long? = null) {
     val lowBattery: Boolean get() = batteryPercent?.let { it <= BATTERY_WARNING_PERCENT } == true
     val lowStorage: Boolean get() = availableBytes?.let { it < STORAGE_WARNING_BYTES } == true
-    val canStart: Boolean get() =
-        batteryPercent?.let { it > BATTERY_STOP_PERCENT } != false && availableBytes != 0L
+    internal val batteryCritical: Boolean
+        get() = batteryPercent?.let { it <= BATTERY_STOP_PERCENT } == true
+    val canStart: Boolean get() = !batteryCritical && availableBytes != 0L
 
     companion object {
         const val BATTERY_WARNING_PERCENT = 15

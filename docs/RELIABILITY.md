@@ -43,7 +43,10 @@ persistence and recovery evidence follows below; R7 evidence is in the low-resou
   thread without blocking submission (R1/R6); persistence failures are exposed to callers.
 - `RecordingJournalTest` checks real threaded start-input-to-file latency (< 1 s), one-second sample
   flushing and five-second sync during sensor silence, exact synthetic run read-back, closure before
-  stop publication and distinct files for successive runs. `EngineJournalReplayTest` compares the
+  stop publication, distinct files for successive runs, and no leftover journal/reserve files after a
+  rejected start (while `JournalWriterTest` and `ReservedStorageTest` confirm `abort()` removes only
+  newly created files that never received `RunStarted`, preserving started/resumed journals under R3).
+  `EngineJournalReplayTest` compares the
   committed dropout trace's accepted samples, adapter events, run events, laps and totals after reading
   the actual engine-written journal. `RecordingServiceTest` checks the watch service writes these files
   to the phone outbox and releases reserves on stop (R1/R2/R3/R6; ADR 0011).
