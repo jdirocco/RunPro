@@ -128,7 +128,7 @@ class ChaosPlan(vararg faults: ReplayFault) {
             offset < (fault.at + fault.duration).inWholeNanoseconds && when (fault) {
                 is ReplayFault.BleDisconnect -> true
 
-                is ReplayFault.SilentStall -> record is TraceRecord.SampleRecord
+                is ReplayFault.SilentStall -> record !is TraceRecord.EventRecord
 
                 is ReplayFault.GpsLoss -> when (record) {
                     is TraceRecord.SampleRecord -> record.sample.metric in GPS_METRICS
@@ -136,6 +136,8 @@ class ChaosPlan(vararg faults: ReplayFault) {
                     is TraceRecord.EventRecord ->
                         record.event is SensorEvent.GpsAcquired ||
                             record.event is SensorEvent.GpsLost
+
+                    is TraceRecord.ImuRecord -> false
                 }
             }
     }

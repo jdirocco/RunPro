@@ -1,5 +1,6 @@
 package com.runpro.tools.replay
 
+import com.runpro.core.model.ImuBatch
 import com.runpro.core.model.ModelJson
 import com.runpro.core.model.Sample
 import com.runpro.core.model.SensorEvent
@@ -13,11 +14,13 @@ import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * One JSON object per line. Records are the [Sample] and [SensorEvent] JSON of `:core:model` (ADR 0003),
- * told apart by their `type`; the header is a [TraceHeader] with `"type":"trace_header"`.
+ * told apart by their `type`; the header is a [TraceHeader] with `"type":"trace_header"` and an IMU batch
+ * is an [ImuBatch] with `"type":"imu_batch"` (ADR 0012). Readers before it skip IMU lines as unknown.
  */
 internal object TraceCodec {
     private const val TYPE = "type"
     private const val HEADER_TYPE = "trace_header"
+    private const val IMU_TYPE = "imu_batch"
 
     private val json = ModelJson.json
     private val sampleTypes = subtypeNames(Sample.serializer().descriptor)
@@ -27,16 +30,25 @@ internal object TraceCodec {
     private fun subtypeNames(descriptor: SerialDescriptor): Set<String> =
         descriptor.getElementDescriptor(1).elementNames.toSet()
 
-    fun encodeHeader(header: TraceHeader): String {
-        val fields = json.encodeToJsonElement(TraceHeader.serializer(), header).jsonObject
-        val line = JsonObject(mapOf(TYPE to JsonPrimitive(HEADER_TYPE)) + fields)
-        return json.encodeToString(JsonObject.serializer(), line)
-    }
+    fun encodeHeader(header: TraceHeader): String =
+        typed(HEADER_TYPE, json.encodeToJsonElement(TraceHeader.serializer(), header).jsonObject)
 
     fun encodeRecord(record: TraceRecord): String = when (record) {
         is TraceRecord.SampleRecord -> json.encodeToString(Sample.serializer(), record.sample)
+
         is TraceRecord.EventRecord -> json.encodeToString(SensorEvent.serializer(), record.event)
+
+        is TraceRecord.ImuRecord ->
+            typed(
+                IMU_TYPE,
+                json.encodeToJsonElement(ImuBatch.serializer(), record.batch).jsonObject
+            )
     }
+
+    private fun typed(type: String, fields: JsonObject): String = json.encodeToString(
+        JsonObject.serializer(),
+        JsonObject(mapOf(TYPE to JsonPrimitive(type)) + fields)
+    )
 
     /** @throws IllegalArgumentException when [line] is not a valid header. */
     fun decodeHeader(line: String): TraceHeader {
@@ -64,6 +76,10 @@ internal object TraceCodec {
 
             in eventTypes -> TraceRecord.EventRecord(
                 json.decodeFromJsonElement(SensorEvent.serializer(), obj)
+            )
+
+            IMU_TYPE -> TraceRecord.ImuRecord(
+                json.decodeFromJsonElement(ImuBatch.serializer(), obj)
             )
 
             else -> null

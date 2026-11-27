@@ -109,6 +109,9 @@ internal fun replayJournal(
                 machine.handle(EngineInput.Tick(record.time))
                 last = maxOf(last, record.time)
             }
+
+            // IMU batches belong to the IMU stream (ADR 0012); they never change the run.
+            is JournalRecord.Imu -> Unit
         }
     }
     machine.handle(EngineInput.Tick(last))
