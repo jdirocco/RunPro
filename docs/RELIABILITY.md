@@ -94,6 +94,20 @@ and platform exercise shutdown on the watch are tracked in #71 after #10/#12; no
 These are JVM guarantees. The `ChannelClient` adapters and the 20-run check with the real watch and phone
 need journals written during a run (#60) and are the owner field test #75; ADR 0010.
 
+## Health Services evidence
+
+- `ExerciseControllerTest`: an exercise ended by another app (`AUTO_END_SUPERSEDED`) or by a revoked
+  permission is reported and loses the GPS fix, but later pause/resume of the run send nothing and the
+  run is never paused or stopped by the adapter (R4). Failed checks, starts and registrations are reported
+  and not retried in a loop; our exercise is adopted after a restart instead of started twice; requests
+  never overlap and commands never block (R6: the listener runs on the Health Services thread).
+- `ExerciseSampleMapperTest`: invalid readings are dropped at the edge, distance deltas add up, both
+  clocks are set from the monotonic time.
+- `HealthServicesSyntheticRunTest` (emulator, `./gradlew :wear:connectedDebugAndroidTest`) records a run
+  with synthetic data through `RecordingService` and the real `ExerciseClient`, then stops it.
+
+Watch behaviour (real GPS and wrist HR, another app taking over) is a field result (#14). ADR 0011.
+
 ## Failure catalogue
 
 Every real failure seen in the field gets a row here, a recorded trace in `testdata/traces/`, and a test.

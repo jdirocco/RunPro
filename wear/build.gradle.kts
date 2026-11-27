@@ -14,6 +14,7 @@ android {
         targetSdk = 37
         versionCode = 1
         versionName = "0.1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
@@ -43,6 +44,7 @@ dependencies {
     implementation(project(":core:recording"))
     implementation(project(":core:sync"))
     implementation(libs.play.services.wearable)
+    implementation(libs.androidx.health.services)
     constraints {
         // Play services brings Fragment 1.0; registerForActivityResult needs 1.3+ (lint, ADR 0010).
         implementation(libs.androidx.fragment)
@@ -50,5 +52,7 @@ dependencies {
     testImplementation(libs.junit4)
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.junit)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
