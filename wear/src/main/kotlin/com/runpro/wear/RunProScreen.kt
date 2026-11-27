@@ -37,6 +37,7 @@ fun RunProScreen(setup: SetupState, runState: StateFlow<RunState>, actions: Setu
                 batteryItems(setup.advice, actions)
                 runItems(setup, state, actions)
             }
+            LapSummaryPopup(state) // Drawn last so it covers the list.
         }
     }
 }
@@ -80,6 +81,7 @@ private fun ScalingLazyListScope.runItems(
 ) {
     when (state.phase) {
         RunPhase.IDLE, RunPhase.STOPPED -> {
+            workoutSetup(setup.workoutSettings, actions.configureWorkout)
             if (state.phase == RunPhase.STOPPED) {
                 item {
                     Paragraph(stringResource(R.string.run_stopped_after, clock(state.totals.timer)))
@@ -98,6 +100,10 @@ private fun ScalingLazyListScope.runItems(
 
         RunPhase.RUNNING, RunPhase.PAUSED -> {
             item { Text(clock(state.totals.timer), style = MaterialTheme.typography.displayMedium) }
+            item { WorkoutCountdown(state) }
+            item {
+                WideButton(stringResource(R.string.run_lap)) { actions.command(ServiceCommand.LAP) }
+            }
             val paused = state.phase == RunPhase.PAUSED
             item {
                 WideButton(
@@ -121,7 +127,7 @@ private fun Paragraph(text: String) {
 }
 
 @Composable
-private fun WideButton(label: String, onClick: () -> Unit) {
+internal fun WideButton(label: String, onClick: () -> Unit) {
     Button(onClick = onClick, modifier = Modifier.fillMaxWidth()) { Text(label) }
 }
 

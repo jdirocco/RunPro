@@ -36,7 +36,8 @@ internal class TimeProto(
 @Serializable
 internal class RunStartedProto(
     @ProtoNumber(1) val runId: String = "",
-    @ProtoNumber(2) val time: TimeProto = TimeProto()
+    @ProtoNumber(2) val time: TimeProto = TimeProto(),
+    @ProtoNumber(3) val workoutJson: String? = null
 )
 
 @Serializable

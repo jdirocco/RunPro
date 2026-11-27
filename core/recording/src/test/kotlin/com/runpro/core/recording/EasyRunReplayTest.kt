@@ -2,6 +2,7 @@ package com.runpro.core.recording
 
 import com.runpro.core.model.HeartRate
 import com.runpro.core.model.LapTrigger
+import com.runpro.core.model.WorkoutSettings
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.Duration
@@ -88,7 +89,7 @@ class EasyRunReplayTest {
 
     @Test
     fun `the 30 min easy run produces the golden totals`() {
-        val state = machine().feed(SyntheticTraces.easyThirtyMinutes())
+        val state = manualLapMachine().feed(SyntheticTraces.easyThirtyMinutes())
         assertEquals(RunPhase.STOPPED, state.phase)
         assertMatches(run, state.totals, "run")
         assertEquals(laps.size, state.laps.size)
@@ -99,7 +100,7 @@ class EasyRunReplayTest {
 
     @Test
     fun `the laps of the state are the laps derived from the run events`() {
-        val state = machine().feed(SyntheticTraces.easyThirtyMinutes())
+        val state = manualLapMachine().feed(SyntheticTraces.easyThirtyMinutes())
         assertEquals(state.run?.laps, state.laps.map { it.lap })
         assertEquals(
             listOf(LapTrigger.MANUAL, LapTrigger.MANUAL, LapTrigger.STOP),
@@ -109,8 +110,13 @@ class EasyRunReplayTest {
 
     @Test
     fun `the average pace matches distance over timer time`() {
-        val totals = machine().feed(SyntheticTraces.easyThirtyMinutes()).totals
+        val totals = manualLapMachine().feed(SyntheticTraces.easyThirtyMinutes()).totals
         assertEquals(1800.0 / 5.160, totals.averagePace!!.secondsPerKilometer, TOLERANCE)
+    }
+
+    // This golden fixture describes manual laps; auto-lap has its own golden replay.
+    private fun manualLapMachine() = machine().also {
+        it.handle(EngineInput.ConfigureWorkout(WorkoutSettings(autoLapMeters = null)))
     }
 
     private fun assertMatches(golden: Golden, totals: Totals, what: String) {

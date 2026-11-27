@@ -51,6 +51,7 @@ class RecordingService : Service() {
         Executors.newSingleThreadScheduledExecutor { task ->
             Thread(task, "runpro-tick").apply { isDaemon = true }
         }
+    private lateinit var feedback: WorkoutFeedback
     private lateinit var notification: RunNotification
     private lateinit var exercise: ExerciseController
     private lateinit var foreground: ForegroundController
@@ -69,6 +70,7 @@ class RecordingService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        feedback = WorkoutFeedback(this)
         engine = RecordingEngine(
             sessionFactory = {
                 RecordingSession.create(
@@ -125,6 +127,7 @@ class RecordingService : Service() {
         requestedRun = true
         if (engine.state.value.phase == RunPhase.STOPPED) engine.submit(EngineInput.Reset)
         val now = now()
+        engine.submit(EngineInput.ConfigureWorkout(WorkoutPreferences.load(this)))
         engine.submit(EngineInput.Prepare(now))
         engine.submit(EngineInput.Start(now))
     }
@@ -170,10 +173,11 @@ class RecordingService : Service() {
     private fun onProcessed(state: RunState) {
         val changed = state.phase != lastPhase
         lastPhase = state.phase
-        if (!changed) return
         // Non-blocking: the controller only queues requests to Health Services.
-        exercise.follow(state.phase)
+        if (changed) exercise.follow(state.phase)
         main.post {
+            feedback.update(state)
+            if (!changed) return@post
             when {
                 ServiceStartPolicy.needsForeground(state.phase) -> notification.update(state)
 

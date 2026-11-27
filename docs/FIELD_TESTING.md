@@ -23,8 +23,21 @@ Watch setup step by step (in Italian, for the owner): `docs/it/CONFIGURAZIONE_OR
 | F5 | 2–3 h long run | Battery %/h, no drops, file exported |
 | F6 | Track or treadmill with footpod | Footpod distance vs GPS vs real |
 | F7 | Run with the phone left at home | Watch-only GPS, sync later |
+| F9 | Auto-lap and time/distance intervals | Correct lap summaries, countdowns and haptics with screen on/off; pauses freeze targets (see below) |
 | F8 | Phone sync: phone app installed, several runs with the phone out of range for some of them, then in range | Every run in the phone's `files/runs` once, journals gone from the watch (see below) |
 | F9 | Start a workout in Gear Tracker (or another Health Services app), then a RunPro run; during it start a workout in the other app again | RunPro takes over at its start; when the other app takes over, the run keeps recording (timer, strap) without wrist HR and GPS, and the log shows it |
+
+## Auto-lap and interval check (F9)
+
+When the sensor adapter delivers distance, select **Workout: Free run**, leave **Auto lap: 1000 m**,
+and cross a kilometre. Check one vibration pattern and a five-second lap summary with distance/time;
+a manual lap must not reset the next kilometre target. Repeat with auto-lap off.
+
+Select **Workout: Intervals** before starting. Each target button cycles time then distance presets;
+repetitions cycle 1–20 and warm-up/cool-down can be off. Try short timed stages (30 s), then 100 m work
+with timed recovery. Check stage/repetition, remaining time/metres, 3–2–1 countdown vibrations and
+transition vibration with the screen off. Pause mid-stage: countdown must freeze. Completion must show
+that recording continues until Stop. Report actual observations; JVM replay is not a physical result.
 
 ## FIT file acceptance (no watch needed)
 

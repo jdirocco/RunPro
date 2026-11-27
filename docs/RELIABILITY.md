@@ -119,6 +119,16 @@ are the owner field test #75; live journals are wired by #60 (ADR 0011); sync pr
 
 Watch behaviour (real GPS and wrist HR, another app taking over) is a field result (#14). ADR 0011.
 
+## Workout evidence
+
+- `WorkoutTest` checks real journal settings/laps survive recovery and rebuild identically for export,
+  without duplicate automatic marks (R2/R3). Auto-laps count admitted active distance only; pauses,
+  rejected sources and source resets do not fabricate laps, and interval completion keeps recording (R4).
+- `IntervalWorkoutReplayTest` replays the committed 45-minute intervals trace into fourteen timed laps.
+  Automatic marks use the existing synced event path; `JournaledEngineTest`, `RecordingThreadingTest`
+  and `LowResourceReplayTest` continue to cover start-before-publication, worker isolation and emergency
+  saves (R1/R6/R7). No sensor arbitration or BLE reconnect policy is changed (R5/R8).
+
 ## Failure catalogue
 
 Every real failure seen in the field gets a row here, a recorded trace in `testdata/traces/`, and a test.
