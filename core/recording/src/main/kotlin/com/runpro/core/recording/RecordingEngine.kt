@@ -57,7 +57,7 @@ class RecordingEngine(
 
     val state: StateFlow<RunState> = mutableState.asStateFlow()
 
-    /** A persistence/recovery failure closes the input queue; callers can surface it to the runner. */
+    /** The latest failure. Journal I/O errors leave submission open; factory/processing errors close it. */
     val failure: StateFlow<Throwable?> = mutableFailure.asStateFlow()
 
     init {
@@ -79,16 +79,19 @@ class RecordingEngine(
     private suspend fun processInputs() {
         var session: RecordingSession? = null
         try {
-            val recording = sessionFactory()
+            var recording = sessionFactory()
             session = recording
             mutableState.value = recording.state
             for (input in inputs) {
-                recording.handle(input)
+                recording = process(input, recording)
+                session = recording
                 var next = inputs.tryReceive().getOrNull()
                 while (next != null) {
-                    recording.handle(next)
+                    recording = process(next, recording)
+                    session = recording
                     next = inputs.tryReceive().getOrNull()
                 }
+                mutableFailure.value = recording.failure
                 val snapshot = recording.state
                 mutableState.value = snapshot
                 onProcessed(snapshot)
@@ -102,6 +105,15 @@ class RecordingEngine(
             inputs.close()
             session?.abort()
         }
+    }
+
+    private fun process(input: EngineInput, recording: RecordingSession): RecordingSession {
+        if (input == EngineInput.Reset && recording.state.phase == RunPhase.STOPPED) {
+            recording.close()
+            return sessionFactory()
+        }
+        recording.handle(input)
+        return recording
     }
 
     companion object {

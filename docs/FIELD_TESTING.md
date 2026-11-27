@@ -25,6 +25,7 @@ Watch setup step by step (in Italian, for the owner): `docs/it/CONFIGURAZIONE_OR
 | F7 | Run with the phone left at home | Watch-only GPS, sync later |
 | F9 | Auto-lap and time/distance intervals | Correct lap summaries, countdowns and haptics with screen on/off; pauses freeze targets (see below) |
 | F8 | Phone sync: phone app installed, several runs with the phone out of range for some of them, then in range | Every run in the phone's `files/runs` once, journals gone from the watch (see below) |
+| F9 | Start a workout in Gear Tracker (or another Health Services app), then a RunPro run; during it start a workout in the other app again | RunPro takes over at its start; when the other app takes over, the run keeps recording (timer, strap) without wrist HR and GPS, and the log shows it |
 
 ## Auto-lap and interval check (F9)
 
@@ -50,7 +51,7 @@ that recording continues until Stop. Report actual observations; JVM replay is n
 
 ## Phone sync check (F8)
 
-Needs journals written during a run (#60). Watch and phone apps must be the same kind of build (both debug
+The recording service writes journals during a run (#60). Watch and phone apps must be the same kind of build (both debug
 from this Mac, or both release): the Data Layer pairs them by application id and signing key.
 
 1. Install the phone app: `./gradlew :mobile:installDebug` with only the phone on adb (or

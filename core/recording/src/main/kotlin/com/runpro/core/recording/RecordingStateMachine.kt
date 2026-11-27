@@ -65,8 +65,9 @@ class RecordingStateMachine(
         // Laps due before a runner command belong before it, so pause/lap/stop never swallow them.
         if (input is EngineInput.Command) markAutomaticLaps(input.time)
         val accepted = when (input) {
+            // Workout settings can change only before the run starts.
             is EngineInput.ConfigureWorkout ->
-                (phase == RunPhase.IDLE || phase == RunPhase.PREPARING).also { allowed ->
+                (phase in CONFIGURABLE_PHASES).also { allowed ->
                     if (allowed) {
                         settings = input.settings
                         workout = WorkoutController(settings)
@@ -74,6 +75,8 @@ class RecordingStateMachine(
                 }
 
             is EngineInput.SampleReceived -> onSample(input.sample)
+
+            is EngineInput.SensorReceived -> advanceClock(input.event.time)
 
             is EngineInput.Tick -> advanceClock(input.time)
 
@@ -250,3 +253,6 @@ class RecordingStateMachine(
         return recording
     }
 }
+
+/** Phases in which the workout settings of the next run can still change. */
+private val CONFIGURABLE_PHASES = setOf(RunPhase.IDLE, RunPhase.PREPARING)

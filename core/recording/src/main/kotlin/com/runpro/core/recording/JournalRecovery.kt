@@ -70,6 +70,7 @@ object JournalRecovery {
         if (mode == RecoveryMode.SAVE) {
             try {
                 session.handle(EngineInput.Stop(last, StopReason.RECOVERY))
+                session.failure?.let { throw it }
             } catch (e: IOException) {
                 session.abort()
                 throw e

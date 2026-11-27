@@ -2,6 +2,7 @@ package com.runpro.core.recording
 
 import com.runpro.core.model.PauseReason
 import com.runpro.core.model.Sample
+import com.runpro.core.model.SensorEvent
 import com.runpro.core.model.StopReason
 import com.runpro.core.model.Timestamp
 import com.runpro.core.model.WorkoutSettings
@@ -25,6 +26,9 @@ sealed interface EngineInput {
 
     /** A sensor reading. Samples are used by their own timestamp, so late (batched) samples still count. */
     data class SampleReceived(val sample: Sample) : EngineInput
+
+    /** An adapter status report, retained alongside samples while running or paused. */
+    data class SensorReceived(val event: SensorEvent) : EngineInput
 
     /** The clock moved on (UI timer); updates elapsed and timer time without new samples. */
     data class Tick(val time: Timestamp) : EngineInput

@@ -46,7 +46,9 @@ SensorManager accelerometer ────┘                           │       
   It owns the engine. The UI binds to it and only reads `StateFlow`s. The decisions are pure Kotlin in
   `:core:recording` (`service` package, ADR 0007): `ServicePermissions` picks only the service types whose
   permissions are granted (fewer from the background), `ServiceStartPolicy` maps start commands, and a
-  `START_STICKY` restart (null intent) goes to `RunRecovery` (#9). `BatteryGuidance` lists the battery
+  `START_STICKY` restart (null intent) goes to `RunRecovery` (#9). The service supplies the journal
+  directory (`files/journals`) and Android boot clock; the core creates one file per run on Start.
+  `BatteryGuidance` lists the battery
   settings the setup screen asks the runner to change (battery optimisation, exempted with adb because the
   watch has no screen for it, and Samsung "Sleeping apps").
 - Source arbitration: per metric a priority list (e.g. HR: strap → wrist). A source is *stale* after a
@@ -66,6 +68,19 @@ testdata/traces/*.jsonl.gz ─► TraceReader ─► Trace ─► Replayer ─�
 real or replayed SensorSource ─► TraceRecorder ─► *.jsonl.gz              ▼
                                                                  engine / test consumer
 ```
+
+## BLE protocol parsers (`:core:ble`)
+
+`GattParsers.parse(characteristic, bytes)` decodes Heart Rate Measurement (0x2A37: uint8/uint16 value,
+sensor contact, energy expended, RR intervals in 1/1024 s), RSC Measurement (0x2A53: speed, cadence,
+stride length, total distance, walking/running), Cycling Power Measurement (0x2A63, every optional field;
+Stryd sends running power here) and Battery Level (0x2A19). UUIDs are in `GattUuids`. Parsers never
+throw: a value that ends early is `ParseResult.Malformed` (for the sensor log); reserved flag bits and
+extra trailing bytes are ignored, and a dangling half RR interval is skipped so the heart rate is kept.
+`BleSamples.from` maps measurements to model samples and drops what the model cannot hold at the edge:
+heart rate above 300 bpm and negative power are dropped, lost skin contact becomes 0 bpm, RSC cadence is
+taken as steps per minute (footpods that send strides are a device quirk for #21), battery level gives no
+sample.
 
 ## BLE connection state machine
 
@@ -115,7 +130,12 @@ record:  length (int32) | CRC32 (int32) | protobuf Record { one of: run_started,
 `RecordingSession` connects the engine to `JournalWriter`: accepted run samples, run events and tick
 checkpoints are persisted before publication. Supply it through `RecordingEngine.sessionFactory` so
 creation/recovery and journal I/O run on the recording thread. Submit ticks at least once a second.
-Persistence failures close submission and are exposed in `RecordingEngine.failure`.
+`EngineInput.SensorReceived` retains adapter reports while running or paused. The stopped journal is
+synced and closed before publishing `RunState.journalSaved`. A stopped phase alone is not proof of a save.
+Journal I/O failures disable further writes, retain the readable prefix and appear in
+`RecordingEngine.failure` and `RunState.journalFailed`; in-memory processing and submission continue.
+Factory/recovery or unexpected processing failures close submission. Reset after Stopped creates a fresh
+session/file through the factory. Details and evidence: ADR 0011.
 
 At startup, `JournalRecovery.scan(directory)` finds unfinished `.journal` files without changing them.
 `JournalRecovery.restore(file)` rebuilds state and saves with `StopReason.RECOVERY` at the latest retained
@@ -125,6 +145,26 @@ After reboot or when boot continuity is unknown, offer to save; never compare ti
 Unknown records are refused, completed journals are not reopened, and recovery never deletes a file.
 The Android service/startup adapter follows in #10/#11; policy and evidence are in ADR 0007.
 
+## Health Services exercise (`:core:recording` exercise / `:wear` health)
+
+`ExerciseController` drives the `ExerciseClient` running exercise through `ExercisePort` (fakeable; the
+`:wear` adapter is `HealthServicesExercisePort`) and is a `SensorSource` of `watch:health-services`.
+`RecordingService` calls `follow(phase)` on every engine phase change: warm-up while preparing, start,
+pause, resume, end when stopped. One request is in flight at a time; `ExerciseSession` picks the next.
+
+```
+engine phase ─► ExerciseController.follow ─► ExerciseSession.next ─► ExercisePort ─► ExerciseClient
+                         ▲                                                              │ updates
+                         └─ ExerciseSampleMapper (Samples) / ExerciseSignals (GPS events) ◄┘
+```
+
+- `ExercisePlan` requests only data types that are supported and permitted; no auto-pause.
+- Our exercise still running after a restart is adopted; another app's exercise is reported during
+  warm-up and taken over at the start; an exercise ended by the platform is reported in
+  `ExerciseStatus`, loses the GPS fix and never pauses or stops the run (R4).
+- The mapper drops invalid readings and sums distance deltas into the cumulative `DistanceSample`.
+  Decisions: ADR 0011.
+
 ## Low resources (`:core:recording` / `:core:journal`)
 
 `EngineInput.Resources` supplies battery and journal-filesystem capacity. `RunState.resources` exposes
@@ -132,7 +172,8 @@ warnings at <= 15% battery and < 50 MB (50,000,000 bytes). At <= 3% or zero spac
 and the stop is synced before publication. Journal sessions query space before each valid start attempt.
 `FileJournalOutput` holds a physically allocated 1 MiB reserve beside each journal. ENOSPC releases it,
 rolls back a partial write and retries once; the session immediately saves with `STORAGE_FULL`. Other
-I/O failures and exhausted reserves remain observable failures with a recoverable prefix. ADR 0008
+I/O failures and exhausted reserves remain observable unsaved states with a recoverable prefix; the
+engine continues processing inputs without writing to the failed journal. ADR 0008
 explains the limits. Watch resource monitoring and warning UI integration are tracked in #71.
 
 ## Phone sync (`:core:sync`)
