@@ -113,10 +113,7 @@ class RecordingStateMachine(
         )
         val reason = when {
             resources.availableBytes == 0L -> StopReason.STORAGE_FULL
-
-            resources.batteryPercent?.let { it <= ResourceState.BATTERY_STOP_PERCENT } == true ->
-                StopReason.LOW_BATTERY
-
+            resources.batteryCritical -> StopReason.LOW_BATTERY
             else -> return true
         }
         record(EngineInput.Stop(maxOf(input.time, now ?: input.time), reason))

@@ -54,10 +54,14 @@ class RecordingSession internal constructor(
     private fun handlePersisted(input: EngineInput): Boolean {
         var accepted = false
         try {
-            checkStartStorage(input)
+            val createdJournal = checkStartStorage(input)
             val previousEvents = state.run?.events?.size ?: 0
             accepted = machine.handle(input)
-            if (accepted) persist(input, previousEvents)
+            if (accepted) {
+                persist(input, previousEvents)
+            } else if (createdJournal) {
+                discardCreatedJournal()
+            }
             finishPersistence()
         } catch (e: IOException) {
             failure = e
@@ -70,18 +74,33 @@ class RecordingSession internal constructor(
         return accepted
     }
 
-    private fun checkStartStorage(input: EngineInput) {
-        if (input is EngineInput.Start && journaled && state.phase == RunPhase.PREPARING) {
-            val writer = journal ?: requireNotNull(journalFactory).invoke().also { journal = it }
-            machine.handle(
-                EngineInput.Resources(input.time, availableBytes = writer.availableBytes)
-            )
+    private fun canCreateOrQueryJournal(): Boolean =
+        journal != null || (journalFactory != null && !state.resources.batteryCritical)
+
+    private fun checkStartStorage(input: EngineInput): Boolean {
+        if (input !is EngineInput.Start ||
+            state.phase != RunPhase.PREPARING ||
+            !canCreateOrQueryJournal()
+        ) {
+            return false
         }
+        val created = journal == null
+        val writer = journal ?: requireNotNull(journalFactory).invoke().also { journal = it }
+        machine.handle(
+            EngineInput.Resources(input.time, availableBytes = writer.availableBytes)
+        )
+        return created
+    }
+
+    private fun discardCreatedJournal() {
+        val created = journal ?: return
+        journal = null
+        created.abort()
     }
 
     private fun finishPersistence() {
         if (closed) return
-        journal?.tick()
+        if (state.run != null) journal?.tick()
         if (journal?.storageFull == true) {
             val beforeStop = state.run?.events?.size ?: 0
             if (machine.stopForStorageFull()) persistEvents(beforeStop)
@@ -121,7 +140,7 @@ class RecordingSession internal constructor(
     /** Orderly shutdown; successful stops close before publication, including resource-triggered stops. */
     override fun close() {
         if (!closed) {
-            journal?.close()
+            if (state.run == null) journal?.abort() else journal?.close()
             closed = true
         }
     }
