@@ -34,7 +34,8 @@ expose a `StateFlow<RunState>`. Replay tests (#4, #5) need the same engine to be
     `maxSampleHold` (default 10 s); 0 bpm and 0 spm are ignored;
   - ascent and descent with a hysteresis of `elevationThreshold` (default 2 m), restarted after pauses;
   - average pace = distance / timer time.
-- Until source arbitration exists (#19) the first source that reports a metric is its only source.
+- Originally the first source reporting a metric was its only source; ADR 0013 (#19) replaces this
+  with per-metric priority, stale fallback and return.
 
 ## Consequences
 

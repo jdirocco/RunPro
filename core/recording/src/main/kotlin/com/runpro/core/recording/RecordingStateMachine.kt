@@ -1,10 +1,12 @@
 package com.runpro.core.recording
 
 import com.runpro.core.model.LapTrigger
+import com.runpro.core.model.Metric
 import com.runpro.core.model.Run
 import com.runpro.core.model.RunEvent
 import com.runpro.core.model.RunId
 import com.runpro.core.model.Sample
+import com.runpro.core.model.SensorEvent
 import com.runpro.core.model.StopReason
 import com.runpro.core.model.Timestamp
 import com.runpro.core.model.WorkoutSettings
@@ -14,8 +16,11 @@ import com.runpro.core.model.WorkoutSettings
  * tests feed it directly; [RecordingEngine] runs it on its own thread for the app.
  *
  * Inputs that do not apply to the current phase are rejected ([handle] returns false) and change nothing;
+ * standby or invalid-contact samples may update source availability without admitting a measurement;
  * the engine never throws for a valid input in the wrong phase.
  */
+// One serialized transition owner, including explicit journal restoration of those transitions.
+@Suppress("TooManyFunctions")
 class RecordingStateMachine(
     private val config: EngineConfig = EngineConfig(),
     private val requireStorageCheck: Boolean = false,
@@ -28,7 +33,7 @@ class RecordingStateMachine(
     private var run: Run? = null
     private var metrics: RunMetrics? = null
     private var now: Timestamp? = null
-    private var gate = SampleGate()
+    private var gate = SampleGate(config.sourcePolicy)
     private var resources = ResourceState()
     private var current = CurrentValues()
 
@@ -45,7 +50,8 @@ class RecordingStateMachine(
                     phase,
                     current = current,
                     resources = resources,
-                    workoutSettings = settings
+                    workoutSettings = settings,
+                    activeSources = gate.activeSources
                 )
             }
             return RunState(
@@ -56,11 +62,12 @@ class RecordingStateMachine(
                 current = current,
                 resources = resources,
                 workoutSettings = settings,
-                workout = workout.progress(metrics.totals(now))
+                workout = workout.progress(metrics.totals(now)),
+                activeSources = gate.activeSources
             )
         }
 
-    /** Applies [input]; returns false when it does not apply to the current phase. */
+    /** Applies [input]; false means a command was rejected or a measurement was not admitted. */
     fun handle(input: EngineInput): Boolean {
         // Laps due before a runner command belong before it, so pause/lap/stop never swallow them.
         if (input is EngineInput.Command) markAutomaticLaps(input.time)
@@ -76,9 +83,9 @@ class RecordingStateMachine(
 
             is EngineInput.SampleReceived -> onSample(input.sample)
 
-            is EngineInput.SensorReceived -> advanceClock(input.event.time)
+            is EngineInput.SensorReceived -> onSensor(input.event)
 
-            is EngineInput.Tick -> advanceClock(input.time)
+            is EngineInput.Tick -> onTick(input.time)
 
             is EngineInput.Prepare -> moveTo(RunPhase.PREPARING, RunPhase.IDLE)
 
@@ -140,7 +147,7 @@ class RecordingStateMachine(
         val started = moveTo(RunPhase.RUNNING, RunPhase.PREPARING)
         if (started) {
             // Warmup readings are not part of the persisted run or its source choices.
-            gate = SampleGate()
+            gate = SampleGate(config.sourcePolicy)
             current = CurrentValues()
             run = Run(runIds(), listOf(RunEvent.Started(time)))
             metrics = RunMetrics(config, time)
@@ -156,7 +163,7 @@ class RecordingStateMachine(
             run = null
             metrics = null
             now = null
-            gate = SampleGate()
+            gate = SampleGate(config.sourcePolicy)
             current = CurrentValues()
         }
         return reset
@@ -226,21 +233,71 @@ class RecordingStateMachine(
                 phase = RunPhase.STOPPED
             }
 
-            is RunEvent.SourceSwitched, is RunEvent.SensorConnected, is RunEvent.SensorLost -> Unit
+            is RunEvent.SourceSwitched -> {
+                gate.restore(event)
+                metrics.sourceSwitched(event.metric, event.time)
+                current = current.cleared(event.metric)
+            }
+
+            is RunEvent.SensorConnected, is RunEvent.SensorLost -> Unit
         }
         this.run = run + event
     }
 
     private fun onSample(sample: Sample): Boolean {
-        val accepted = phase != RunPhase.IDLE && phase != RunPhase.STOPPED && gate.admit(sample)
-        if (accepted) {
-            current = current.updatedWith(sample)
-            metrics?.let {
-                it.onSample(sample)
-                advanceClock(sample.time)
+        val collecting = phase != RunPhase.IDLE && phase != RunPhase.STOPPED
+        if (!collecting || run?.startedAt?.let {
+                sample.time < it
+            } == true || !gate.observe(sample)
+        ) {
+            return false
+        }
+        val time = maxOf(sample.time, now ?: sample.time)
+        arbitrate(time, listOf(sample.metric))
+        val accepted = gate.admit(sample)
+        if (accepted) applySample(sample)
+        return accepted
+    }
+
+    private fun applySample(sample: Sample) {
+        current = current.updatedWith(sample)
+        metrics?.onSample(sample)
+        advanceClock(sample.time)
+    }
+
+    private fun onTick(time: Timestamp): Boolean = advanceClock(time).also { recording ->
+        if (recording) arbitrate(requireNotNull(now))
+    }
+
+    private fun onSensor(event: SensorEvent): Boolean {
+        if (!advanceClock(event.time)) return false
+        gate.sensor(event)
+        arbitrate(requireNotNull(now))
+        return true
+    }
+
+    private fun arbitrate(time: Timestamp, metrics: Iterable<Metric> = Metric.entries) {
+        gate.switches(time, metrics).forEach { event ->
+            if (run == null) {
+                current = current.cleared(event.metric)
+            } else {
+                restoreEvent(event.copy(time = maxOf(event.time, run!!.events.last().time)))
             }
         }
-        return accepted
+    }
+
+    /** Journal decisions are authoritative: do not recompute switches from an admitted-only history. */
+    internal fun restoreSample(sample: Sample): Boolean = gate.restoreSample(sample).also {
+        if (it) applySample(sample)
+    }
+
+    internal fun restoreSensor(event: SensorEvent) {
+        gate.sensor(event)
+        advanceClock(event.time)
+    }
+
+    internal fun restoreClock(time: Timestamp) {
+        advanceClock(time)
     }
 
     /** Moves "now" forward while the run is recording; it never goes back. */

@@ -70,7 +70,7 @@ class ChaosRecordingReplayTest {
                 } else {
                     assertEquals(RunPhase.RUNNING, consumer.engine.state.value.phase, "$fault")
                     assertEquals(
-                        9.seconds,
+                        trace.records.last().time.elapsedSince(start),
                         consumer.engine.state.value.totals.timer,
                         "$fault"
                     )

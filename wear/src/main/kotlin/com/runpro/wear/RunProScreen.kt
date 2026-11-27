@@ -102,6 +102,7 @@ private fun ScalingLazyListScope.runItems(
 
         RunPhase.RUNNING, RunPhase.PAUSED -> {
             item { Text(clock(state.totals.timer), style = MaterialTheme.typography.displayMedium) }
+            item { HeartRateSource(state) }
             item { WorkoutCountdown(state) }
             item {
                 WideButton(stringResource(R.string.run_lap)) { actions.command(ServiceCommand.LAP) }

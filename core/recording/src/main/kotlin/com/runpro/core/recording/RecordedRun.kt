@@ -91,7 +91,7 @@ internal fun replayJournal(
             is JournalRecord.RunStarted -> error("Multiple run starts in one journal")
 
             is JournalRecord.Samples -> record.samples.forEach {
-                onSample(it, machine.handle(EngineInput.SampleReceived(it)))
+                onSample(it, machine.restoreSample(it))
                 last = maxOf(last, it.time)
             }
 
@@ -101,12 +101,13 @@ internal fun replayJournal(
             }
 
             is JournalRecord.Sensor -> {
+                machine.restoreSensor(record.event)
                 onSensorEvent(record.event)
                 last = maxOf(last, record.event.time)
             }
 
             is JournalRecord.Checkpoint -> {
-                machine.handle(EngineInput.Tick(record.time))
+                machine.restoreClock(record.time)
                 last = maxOf(last, record.time)
             }
 
@@ -114,6 +115,6 @@ internal fun replayJournal(
             is JournalRecord.Imu -> Unit
         }
     }
-    machine.handle(EngineInput.Tick(last))
+    machine.restoreClock(last)
     return last
 }

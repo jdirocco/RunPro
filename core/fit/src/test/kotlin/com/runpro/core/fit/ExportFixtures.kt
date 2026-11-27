@@ -109,8 +109,8 @@ internal val FOOTPOD = SourceId.ble("11:22:33:44:55:66")
 /**
  * A short run with every kind of journal record: all sample types from three sources, every run event
  * (auto and manual pauses, laps of every trigger, source switches both ways, sensor loss and reconnect),
- * every sensor event (GATT 133 included) and checkpoints. Strap samples after the switch are not admitted
- * by the engine yet (#19), so the switch events must survive even though the totals stay on the wrist.
+ * every sensor event (GATT 133 included) and checkpoints. These hand-written legacy records exercise
+ * explicit switch replay; live engine-generated switch ordering is covered by SourceSwitchEventTest.
  *
  * [wallJumpMillis] moves the wall clock (only) forward from second 30 on.
  */

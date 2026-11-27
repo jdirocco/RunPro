@@ -49,6 +49,10 @@ internal class DistanceTracker(private val minMovingSpeed: Double) {
     private var lastTime: Long? = null
     private var lastTotal = 0.0
 
+    fun reset() {
+        lastTime = null
+    }
+
     fun update(time: Long, total: Double, timeline: RunTimeline): DistanceStep? {
         val previousTime = lastTime
         val delta = total - lastTotal
@@ -71,6 +75,11 @@ internal class DistanceTracker(private val minMovingSpeed: Double) {
 internal class ElevationTracker(private val threshold: Double) {
     private var lastTime: Long? = null
     private var reference: Double? = null
+
+    fun reset() {
+        lastTime = null
+        reference = null
+    }
 
     /** The counted change (positive ascent, negative descent), or 0 when nothing counts. */
     fun update(time: Long, elevation: Double, timeline: RunTimeline): Double {

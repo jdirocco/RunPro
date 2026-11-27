@@ -45,4 +45,8 @@
     <string name="imu_mode">IMU: %1$s</string>
     <string name="imu_accelerometer">accelerometer</string>
     <string name="imu_accelerometer_gyroscope">accel + gyro</string>
+    <string name="source_strap">HR strap</string>
+    <string name="source_wrist">Wrist HR</string>
+    <string name="source_no_heart_rate">No HR source</string>
+    <string name="source_heart_rate">%1$d bpm</string>
 </resources>
