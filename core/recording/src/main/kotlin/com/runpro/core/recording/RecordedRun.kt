@@ -110,6 +110,9 @@ internal fun replayJournal(
                 machine.restoreClock(record.time)
                 last = maxOf(last, record.time)
             }
+
+            // IMU batches belong to the IMU stream (ADR 0012); they never change the run.
+            is JournalRecord.Imu -> Unit
         }
     }
     machine.restoreClock(last)

@@ -16,6 +16,7 @@ import com.runpro.core.model.Timestamp
 internal fun TraceRecord.withTime(time: Timestamp): TraceRecord = when (this) {
     is TraceRecord.SampleRecord -> TraceRecord.SampleRecord(sample.withTime(time))
     is TraceRecord.EventRecord -> TraceRecord.EventRecord(event.withTime(time))
+    is TraceRecord.ImuRecord -> TraceRecord.ImuRecord(batch.copy(time = time))
 }
 
 private fun Sample.withTime(time: Timestamp): Sample = when (this) {

@@ -31,15 +31,19 @@ Android code in `:wear` and `:mobile` is a thin adapter layer.
   GATT status, GPS lost / acquired). Inputs to the engine, unlike `RunEvent`s, which are its decisions.
 - `SensorSource` / `SensorListener`: the callback contract every producer of samples implements (Health
   Services, GATT, accelerometer, replayed trace). `start(listener)` until `stop()`; listeners never block (R6).
+- `ImuBatch`: about one second of one IMU sensor (`ImuSensor`: accelerometer, gyroscope) at 50 Hz, as
+  offsets and floats. Not a `Sample`: IMU data bypasses the engine (ADR 0012); `SensorListener.onImu`.
 
 ## Recording data flow
 
 ```
 Health Services ExerciseClient ─┐
-Android GATT (strap, footpod) ──┼─► SensorSource flows ─► RecordingEngine ─► Journal (disk)
-SensorManager accelerometer ────┘                           │                    │
+Android GATT (strap, footpod) ──┴─► SensorSource flows ─► RecordingEngine ─► Journal (disk)
+                                                           │                    │
                                                            ▼                    ▼
                                                      UI state (StateFlow)   FIT export ─► phone
+                                                           │ follow
+SensorManager accel/gyro 50 Hz ─► ImuCapture (runpro-imu) ◄┘ ─► IMU stream files/imu/<run>.imu
 ```
 
 - `RecordingService` is a foreground service (`health|location|connectedDevice`) with an Ongoing Activity.
@@ -59,10 +63,23 @@ SensorManager accelerometer ────┘                           │       
   distance/elevation baselines restart across switches. `RunState.activeSources` drives the HR
   strap/wrist icon. Defaults, late data and recovery semantics: ADR 0013.
 
+## IMU capture (`:core:recording` imu / `:core:journal` / `:wear` imu)
+
+`ImuCapture` follows the published `RunState` on its own executor (the `runpro-imu` thread): sensors on
+while running, off while paused, stream closed on stop. `ImuPort` is the platform seam (`AndroidImuPort`:
+`SensorManager`, 20 ms period, 1 s report latency, wake-up sensors preferred). `ImuBatcher` makes one
+batch per sensor and second; `ImuStream` writes them as compact `JournalRecord.Imu` records (delta encoded,
+packed, about 10 bytes a reading) into per-run segment files with the `RPIM` magic, apart from the run
+journal: recovery and phone sync never touch them. No sensor, a storage error, free space under 100 MB or
+the battery warning end the capture for that run only (`ImuStatus.problem`); the run never depends on it.
+Old streams are pruned to 300 MB. The runner picks accelerometer, accelerometer + gyroscope or off on the
+setup screen. `./gradlew :tools:replay:imuReport` summarises and exports streams copied from the watch.
+Decisions: ADR 0012.
+
 ## Replay traces (`:tools:replay`)
 
-A trace is gzip-compressed JSON Lines: a `trace_header` line, then one `Sample` or `SensorEvent` per line in
-delivery order (ADR 0004). `TraceRecorder` is a `SensorListener` that writes one (thread safe, gzip sync
+A trace is gzip-compressed JSON Lines: a `trace_header` line, then one `Sample`, `SensorEvent` or
+`imu_batch` per line in delivery order (ADR 0004, ADR 0012). `TraceRecorder` is a `SensorListener` that writes one (thread safe, gzip sync
 flush); `TraceReader` reads it back and keeps every complete record of a trace whose recorder was killed.
 `Replayer` exposes one fake `SensorSource` per source in the trace and delivers the records in file order,
 paced by a `ReplayClock` at real time, N× or without waiting. Traces live in `testdata/traces/`.

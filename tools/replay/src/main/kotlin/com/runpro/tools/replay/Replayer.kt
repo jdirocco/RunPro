@@ -34,6 +34,7 @@ class ReplaySensorSource internal constructor(override val id: SourceId) : Senso
         when (record) {
             is TraceRecord.SampleRecord -> target.onSample(record.sample)
             is TraceRecord.EventRecord -> target.onEvent(record.event)
+            is TraceRecord.ImuRecord -> target.onImu(record.batch)
         }
         return true
     }

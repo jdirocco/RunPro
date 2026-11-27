@@ -1,8 +1,8 @@
 # Replay traces
 
 Sensor traces replayed by `:tools:replay` (format: `docs/adr/0004-replay-trace-format.md`).
-Each file is gzip-compressed JSON Lines: a `trace_header` line, then one `Sample` or `SensorEvent`
-per line in delivery order. Read one with `gzcat <file> | head`.
+Each file is gzip-compressed JSON Lines: a `trace_header` line, then one `Sample`, `SensorEvent` or
+IMU batch (`"type":"imu_batch"`, ADR 0012) per line in delivery order. Read one with `gzcat <file> | head`.
 
 ## Synthetic traces
 

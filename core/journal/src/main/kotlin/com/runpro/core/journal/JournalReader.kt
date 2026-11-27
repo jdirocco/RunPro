@@ -68,14 +68,17 @@ object JournalReader {
     fun read(file: Path): JournalContents = Files.newInputStream(file).use(::read)
 
     /** Reads the whole journal from [input]; does not close it. */
-    fun read(input: InputStream): JournalContents {
+    fun read(input: InputStream): JournalContents = read(input, JournalFormat.MAGIC)
+
+    /** Reads a file of the journal layout whose header starts with [magic] (journal or IMU stream). */
+    internal fun read(input: InputStream, magic: ByteArray): JournalContents {
         val stream = BufferedInputStream(input, BUFFER_SIZE)
         val header = stream.readNBytes(JournalFormat.HEADER_SIZE)
         if (header.size < JournalFormat.HEADER_SIZE) {
-            checkMagic(header)
+            checkMagic(header, magic)
             return JournalContents(emptyList(), JournalEnd.Truncated, validLength = 0)
         }
-        checkMagic(header)
+        checkMagic(header, magic)
         val version = ByteBuffer.wrap(header).getInt(JournalFormat.MAGIC.size)
         if (version !in 1..JournalFormat.VERSION) {
             throw JournalFormatException(
@@ -85,10 +88,11 @@ object JournalReader {
         return readRecords(stream)
     }
 
-    private fun checkMagic(header: ByteArray) {
-        val present = minOf(header.size, JournalFormat.MAGIC.size)
-        if (!header.copyOf(present).contentEquals(JournalFormat.MAGIC.copyOf(present))) {
-            throw JournalFormatException("Not a RunPro journal")
+    private fun checkMagic(header: ByteArray, magic: ByteArray) {
+        val present = minOf(header.size, magic.size)
+        if (!header.copyOf(present).contentEquals(magic.copyOf(present))) {
+            val kind = if (magic.contentEquals(JournalFormat.MAGIC)) "journal" else "IMU stream"
+            throw JournalFormatException("Not a RunPro $kind")
         }
     }
 

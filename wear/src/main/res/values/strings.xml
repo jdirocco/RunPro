@@ -42,6 +42,9 @@
     <string name="workout_complete">Workout complete — recording continues</string>
     <string name="workout_progress">%1$s %2$d/%3$d · %4$s remaining</string>
     <string name="workout_lap_summary">Lap %1$d\n%2$d m · %3$s</string>
+    <string name="imu_mode">IMU: %1$s</string>
+    <string name="imu_accelerometer">accelerometer</string>
+    <string name="imu_accelerometer_gyroscope">accel + gyro</string>
     <string name="source_strap">HR strap</string>
     <string name="source_wrist">Wrist HR</string>
     <string name="source_no_heart_rate">No HR source</string>

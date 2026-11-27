@@ -40,6 +40,9 @@
     <string name="workout_complete">Allenamento completato — registrazione in corso</string>
     <string name="workout_progress">%1$s %2$d/%3$d · restano %4$s</string>
     <string name="workout_lap_summary">Giro %1$d\n%2$d m · %3$s</string>
+    <string name="imu_mode">IMU: %1$s</string>
+    <string name="imu_accelerometer">accelerometro</string>
+    <string name="imu_accelerometer_gyroscope">accel. + giroscopio</string>
     <string name="source_strap">Fascia cardio</string>
     <string name="source_wrist">Cardio dal polso</string>
     <string name="source_no_heart_rate">Nessuna fonte cardio</string>

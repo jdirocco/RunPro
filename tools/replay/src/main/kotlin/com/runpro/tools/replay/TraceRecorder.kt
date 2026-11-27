@@ -1,5 +1,6 @@
 package com.runpro.tools.replay
 
+import com.runpro.core.model.ImuBatch
 import com.runpro.core.model.Sample
 import com.runpro.core.model.SensorEvent
 import com.runpro.core.model.SensorListener
@@ -42,6 +43,8 @@ class TraceRecorder(output: OutputStream, header: TraceHeader, compress: Boolean
     override fun onSample(sample: Sample) = record(TraceRecord.SampleRecord(sample))
 
     override fun onEvent(event: SensorEvent) = record(TraceRecord.EventRecord(event))
+
+    override fun onImu(batch: ImuBatch) = record(TraceRecord.ImuRecord(batch))
 
     /** @throws IllegalStateException after [close]. */
     fun record(record: TraceRecord) {

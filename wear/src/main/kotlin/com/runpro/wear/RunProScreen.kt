@@ -15,6 +15,7 @@ import androidx.wear.compose.material3.ScreenScaffold
 import androidx.wear.compose.material3.Text
 import com.runpro.core.recording.RunPhase
 import com.runpro.core.recording.RunState
+import com.runpro.core.recording.imu.ImuMode
 import com.runpro.core.recording.service.BatteryAdvice
 import com.runpro.core.recording.service.RunPermission
 import com.runpro.core.recording.service.ServiceCommand
@@ -82,6 +83,7 @@ private fun ScalingLazyListScope.runItems(
     when (state.phase) {
         RunPhase.IDLE, RunPhase.STOPPED -> {
             workoutSetup(setup.workoutSettings, actions.configureWorkout)
+            item { ImuButton(setup.imuMode, actions.configureImu) }
             if (state.phase == RunPhase.STOPPED) {
                 item {
                     Paragraph(stringResource(R.string.run_stopped_after, clock(state.totals.timer)))
@@ -119,6 +121,21 @@ private fun ScalingLazyListScope.runItems(
                 }
             }
         }
+    }
+}
+
+/** Cycles the IMU capture setting (ADR 0012): accelerometer, accelerometer + gyroscope, off. */
+@Composable
+internal fun ImuButton(mode: ImuMode, change: (ImuMode) -> Unit) {
+    val text = stringResource(
+        when (mode) {
+            ImuMode.OFF -> R.string.workout_off
+            ImuMode.ACCELEROMETER -> R.string.imu_accelerometer
+            ImuMode.ACCELEROMETER_AND_GYROSCOPE -> R.string.imu_accelerometer_gyroscope
+        }
+    )
+    WideButton(stringResource(R.string.imu_mode, text)) {
+        change(ImuMode.entries[(mode.ordinal + 1) % ImuMode.entries.size])
     }
 }
 
