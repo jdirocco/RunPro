@@ -26,7 +26,7 @@ ADR 0013 already prefers fresh BLE samples over the wrist; nothing reached the e
     whenever a session streams. Stop is never counted. Two, not more: a stale cache fails every attempt,
     and each extra attempt costs a backoff step of the R8 budget;
   - **bond check**: discovery is held while the device reports `BONDING` and released on the first tick
-    after the bond ends, within the unchanged 2 s discovery deadline (a timeout recovers as before and the
+    after the bond ends, within the unchanged discovery deadline (5 s since #120) (a timeout recovers as before and the
     held request is dropped by close). A platform rejection of the held request is reported as
     `STATUS_REJECTED` so it cannot hang. The bond state is logged at every discovery.
   - **stale bond** (#117): a session that closes before streaming on a disconnect with an

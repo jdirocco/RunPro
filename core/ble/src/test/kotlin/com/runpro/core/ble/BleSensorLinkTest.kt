@@ -143,7 +143,7 @@ class BleSensorLinkTest {
         rig.port.bond = BondState.BONDING
         rig.link.start(rig.listener, rig.time())
         rig.completeUntil(GattOperation.DISCOVER_SERVICES)
-        rig.advance(2_000)
+        rig.advance(5_000) // the discovery deadline (#120)
         assertEquals(BleConnectionState.BACKOFF, rig.link.state)
         rig.port.bond = BondState.BONDED
         rig.advance(100)

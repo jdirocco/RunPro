@@ -18,7 +18,10 @@ internal class GattOperationQueue(private val port: GattPort) {
     ) {
         val timeout = when (operation) {
             GattOperation.CONNECT -> 3_000L
-            GattOperation.DISCOVER_SERVICES -> 2_000L
+
+            // A Polar H10 takes 2.0-2.2 s on an encrypted link with no robust caching (#120).
+            GattOperation.DISCOVER_SERVICES -> 5_000L
+
             GattOperation.SUBSCRIBE -> 1_000L
         }
         waiting.addLast(

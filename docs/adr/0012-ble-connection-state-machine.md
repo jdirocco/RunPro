@@ -19,7 +19,8 @@ is #20. This issue implements the policy already specified in `ARCHITECTURE.md`,
   subscription per required measurement characteristic. A subscription includes local notification
   enablement and a CCCD write; completion means that write succeeded. Missing services/descriptors,
   immediate platform rejection, nonzero statuses and absent callbacks all enter recovery.
-- Deadlines are 3 s for connect, 2 s for discovery and 1 s per subscription. Completions at or after a
+- Deadlines are 3 s for connect, 5 s for discovery (2 s until #120: a Polar H10 takes 2.0–2.2 s on an
+  encrypted link) and 1 s per subscription. Completions at or after a
   deadline fail even if the next periodic tick has not run. A callback reports the request id assigned
   by the controller. Disconnects and notifications report the GATT session id. The adapter must bind
   callbacks to their original ids, rather than substituting the currently active request/session.

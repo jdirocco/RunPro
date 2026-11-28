@@ -126,6 +126,18 @@ class BleReconnectStateMachineTest {
     }
 
     @Test
+    fun `a Polar H10 discovery of 2_2 s on an encrypted link still streams`() {
+        // #120: onSearchComplete arrived 2.03-2.2 s after discoverServices on the watch.
+        val rig = Rig()
+        rig.machine.start(0)
+        rig.complete()
+        assertEquals(GattOperation.DISCOVER_SERVICES, rig.port.requests.last().operation)
+        rig.advance(2_190)
+        rig.ready()
+        assertEquals(BleConnectionState.STREAMING, rig.machine.state)
+    }
+
+    @Test
     fun `discovery just before deadline succeeds and errors at every stage recover`() {
         val slow = Rig()
         slow.machine.start(0)
