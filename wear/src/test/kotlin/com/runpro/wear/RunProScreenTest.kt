@@ -2,15 +2,18 @@ package com.runpro.wear
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.runpro.core.model.Distance
 import com.runpro.core.model.HeartRate
 import com.runpro.core.model.Lap
 import com.runpro.core.model.LapTrigger
+import com.runpro.core.model.Metric
 import com.runpro.core.model.Run
 import com.runpro.core.model.RunEvent
 import com.runpro.core.model.RunId
+import com.runpro.core.model.SourceId
 import com.runpro.core.model.Speed
 import com.runpro.core.model.StopReason
 import com.runpro.core.model.Timestamp
@@ -46,12 +49,14 @@ class RunProScreenTest {
     private var dataScreensOpened = 0
     private val runState = MutableStateFlow(RunState())
     private val exercise = MutableStateFlow(ExerciseStatus())
+    private var strapPaired = false
 
     private fun show() {
         val setup = SetupState(
             ServicePermissions.readiness(RunPermission.entries.toSet()),
             advice = emptyList(),
-            backgroundLocationSkipped = false
+            backgroundLocationSkipped = false,
+            strapPaired = strapPaired
         )
         val actions = SetupActions(
             {},
@@ -99,6 +104,39 @@ class RunProScreenTest {
         click("Start")
         click("Back")
         assertEquals(listOf(ServiceCommand.START, ServiceCommand.CANCEL), commands)
+    }
+
+    @Test
+    fun `the warm-up says the paired strap is not streaming yet while the wrist is used`() {
+        // #123: "Heart rate: ready" is the wrist; the runner could not tell the strap was in use.
+        strapPaired = true
+        runState.value = RunState(
+            phase = RunPhase.PREPARING,
+            current = CurrentValues(heartRate = HeartRate(72)),
+            activeSources = mapOf(Metric.HEART_RATE to SourceId.HEALTH_SERVICES)
+        )
+        exercise.value = ExerciseStatus(heartRate = Readiness.READY)
+        show()
+
+        compose.onNodeWithContentDescription("Wrist HR").assertIsDisplayed()
+        shows("HR strap: connecting")
+
+        runState.value = runState.value.copy(
+            activeSources = mapOf(Metric.HEART_RATE to SourceId.ble("A0:9E:1A:D6:D2:10"))
+        )
+        compose.onNodeWithContentDescription("HR strap").assertIsDisplayed()
+        compose.onNodeWithText("HR strap: connecting").assertDoesNotExist()
+    }
+
+    @Test
+    fun `without a paired strap the warm-up shows only the heart rate source`() {
+        runState.value = RunState(
+            phase = RunPhase.PREPARING,
+            activeSources = mapOf(Metric.HEART_RATE to SourceId.HEALTH_SERVICES)
+        )
+        show()
+        compose.onNodeWithContentDescription("Wrist HR").assertIsDisplayed()
+        compose.onNodeWithText("HR strap: connecting").assertDoesNotExist()
     }
 
     @Test

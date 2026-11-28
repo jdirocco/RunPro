@@ -239,7 +239,10 @@ il polso se i suoi dati sono ancora recenti. Torna alla fascia al primo dato val
 mette in pausa la corsa e viene salvato nel giornale e nel FIT. Se non resta nessuna fonte, appare
 «Nessuna fonte cardio»; al cambio il valore attende la prossima misura.
 
-L’icona segue i dati ricevuti dalla fascia associata (issue #17). Se la fascia si disconnette RunPro
+L’icona segue i dati ricevuti dalla fascia associata (issue #17). La stessa riga compare già nel
+riscaldamento (**Preparati**): «Battito: pronto» riguarda il sensore al polso, mentre l’icona e la scritta
+sotto dicono quale fonte è in uso. Se hai associato una fascia e non trasmette ancora, il riscaldamento
+mostra «Fascia: in collegamento» finché non arriva il primo dato (issue #123). Se la fascia si disconnette RunPro
 riprova da solo (entro 10 secondi quando torna a portata). La verifica fisica di questi passaggi resta
 la prova F1/F2 dell’issue #22.
 

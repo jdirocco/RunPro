@@ -19,6 +19,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
+import com.runpro.core.ble.BleSensorKind
 import com.runpro.core.model.WorkoutSettings
 import com.runpro.core.recording.RunPhase
 import com.runpro.core.recording.RunState
@@ -30,6 +31,7 @@ import com.runpro.core.recording.service.PermissionReadiness
 import com.runpro.core.recording.service.RunPermission
 import com.runpro.core.recording.service.ServiceCommand
 import com.runpro.core.recording.service.ServicePermissions
+import com.runpro.wear.ble.BlePreferences
 import com.runpro.wear.ble.SensorActivity
 import com.runpro.wear.history.RunHistoryHost
 import com.runpro.wear.history.WatchHistory
@@ -49,6 +51,7 @@ class MainActivity : ComponentActivity() {
         MutableStateFlow(ExerciseStatus())
     )
     private var backgroundLocationSkipped by mutableStateOf(false)
+    private var strapPaired by mutableStateOf(false)
     private var showingSettings by mutableStateOf(false)
     private var showingHistory by mutableStateOf(false)
     private var showingDataScreens by mutableStateOf(false)
@@ -133,7 +136,8 @@ class MainActivity : ComponentActivity() {
                     advice,
                     backgroundLocationSkipped,
                     workoutSettings,
-                    imuMode
+                    imuMode,
+                    strapPaired
                 ),
                 runState,
                 exercise,
@@ -193,6 +197,8 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun refresh() {
+        // The runner comes back here from the sensors screen.
+        strapPaired = BlePreferences.load(this).any { it.kind == BleSensorKind.HEART_RATE }
         readiness = ServicePermissions.readiness(AndroidPermissions.granted(this))
         val power = getSystemService(PowerManager::class.java)
         advice = BatteryGuidance.advice(
@@ -231,7 +237,9 @@ data class SetupState(
     val advice: List<BatteryAdvice>,
     val backgroundLocationSkipped: Boolean,
     val workoutSettings: WorkoutSettings = WorkoutSettings(),
-    val imuMode: ImuMode = ImuPreferences.DEFAULT
+    val imuMode: ImuMode = ImuPreferences.DEFAULT,
+    /** A heart rate strap is paired: the warm-up says when it is not streaming yet (#123). */
+    val strapPaired: Boolean = false
 )
 
 class SetupActions(

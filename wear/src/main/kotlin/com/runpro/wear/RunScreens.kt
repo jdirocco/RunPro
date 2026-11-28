@@ -12,6 +12,7 @@ import androidx.wear.compose.foundation.lazy.ScalingLazyListScope
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
 import com.runpro.core.model.DisplayUnits
+import com.runpro.core.model.Metric
 import com.runpro.core.model.RunEvent
 import com.runpro.core.model.StopReason
 import com.runpro.core.recording.ResourceState
@@ -22,17 +23,25 @@ import com.runpro.core.recording.exercise.ExerciseStatus
 import com.runpro.core.recording.exercise.Readiness
 import com.runpro.core.recording.service.ServiceCommand
 
-/** GPS and heart rate acquire; the runner starts when ready, or earlier, or goes back. */
+/**
+ * GPS and heart rate acquire; the runner starts when ready, or earlier, or goes back. The heart rate
+ * source is the engine's, as during the run; a paired strap that is not the source yet is said so (#123).
+ */
 internal fun ScalingLazyListScope.warmUpItems(
     status: ExerciseStatus,
     state: RunState,
     actions: SetupActions,
-    countdownSeconds: Int = 0
+    countdownSeconds: Int = 0,
+    strapPaired: Boolean = false
 ) {
     item { Paragraph(stringResource(R.string.warmup_title)) }
     resourceItems(state, beforeStart = true)
     item { SensorLine(stringResource(R.string.warmup_gps), status.gps) }
     item { SensorLine(stringResource(R.string.warmup_heart_rate), status.heartRate) }
+    item { HeartRateSource(state) }
+    if (strapPaired && state.activeSources[Metric.HEART_RATE]?.isBle != true) {
+        item { Paragraph(stringResource(R.string.warmup_strap_connecting)) }
+    }
     warmUpNote(status)?.let { note -> item { Paragraph(stringResource(note)) } }
     if (state.journalFailed) {
         item { Paragraph(stringResource(R.string.summary_not_saved)) }
