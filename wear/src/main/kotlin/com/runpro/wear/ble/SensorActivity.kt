@@ -18,8 +18,9 @@ import com.runpro.wear.R
 
 /**
  * Pairs the strap and the footpod (#17): the companion device chooser where the watch has one,
- * otherwise a short scan. A chooser that fails or closes without an association (on the Galaxy
- * Watch 5 Pro it closes at once, #115) falls back to the scan, which the screen then uses directly.
+ * otherwise a short scan. A chooser that fails or closes without an association (Wear OS refuses
+ * third-party associations on the Galaxy Watch 5 Pro, #115) falls back to the scan, which the screen
+ * then uses directly.
  * The choice is saved in [BlePreferences]; a run already recording keeps its sensors and the next
  * warm-up connects to the new ones.
  */
