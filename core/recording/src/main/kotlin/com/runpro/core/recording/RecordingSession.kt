@@ -43,7 +43,8 @@ class RecordingSession internal constructor(
         }
 
     fun handle(input: EngineInput): Boolean = when {
-        journaled && input == EngineInput.Reset -> false
+        // A journal belongs to one run. Only a warm-up, which has no run and journals nothing, may reset.
+        journaled && input == EngineInput.Reset && machine.state.run != null -> false
 
         // After a terminal write error keep accepting inputs, but never reuse the failed writer.
         failure != null -> machine.handle(input)

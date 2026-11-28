@@ -151,6 +151,13 @@ può leggere dall'app: RunPro te la ricorda finché non tocchi **Fatto, controll
    può metterla da solo in **Applicazioni in sospensione** (successo nella prova di #10). Toglila
    (**⋮ → Rimuovi**) e aggiungila ad **Applicazioni mai in sospensione**.
 
+**Come si registra una corsa.** Tocca **Preparati**: RunPro cerca il GPS e il battito e mostra se sono
+pronti. Aspetta **GPS: pronto** e tocca **Avvia** (puoi avviare anche prima: la distanza parte quando arriva il
+GPS) oppure **Indietro** per rinunciare. Durante la corsa vedi tempo, distanza, passo e battito, con **Giro**,
+**Pausa**/**Riprendi** e **Stop**. Stop chiede conferma: **Continua a correre** è la prima scelta, la corsa
+si ferma solo con **Ferma e salva**. Alla fine il riepilogo mostra i totali e **Salvata**; se mostra
+**Non salvata**, apri una issue **Field report**.
+
 **Durante una corsa** RunPro mostra un'icona sul quadrante (Ongoing Activity) con il tempo che scorre:
 toccala per tornare all'app. La notifica fissa esiste ma il Galaxy Watch non la mostra nel pannello
 notifiche (scorrendo da sinistra): la mostra come quell'icona. Se l'icona sparisce a corsa in corso,
@@ -185,7 +192,7 @@ La verifica fisica di questi passaggi resta la prova F1/F2 dell’issue #22.
 
 ### Giri automatici e ripetute
 
-Prima di **Avvia**, il pulsante **Allenamento** alterna corsa libera e ripetute. Nella corsa libera,
+Prima di **Preparati**, il pulsante **Allenamento** alterna corsa libera e ripetute. Nella corsa libera,
 **Giro automatico** passa fra 500 m, 1000 m (predefinito), 2000 m e disattivato. Il giro manuale non
 sposta il prossimo chilometro automatico. Un riepilogo mostra distanza e tempo del giro per cinque
 secondi; puoi chiuderlo toccandolo.
