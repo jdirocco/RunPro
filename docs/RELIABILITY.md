@@ -175,7 +175,7 @@ Gaps, real rate and battery cost on the Galaxy Watch 5 Pro are field results (F1
   Policy and budgets: ADR 0012. Physical validation remains #22, scenarios F1/F2. The controller never issues recording commands; R4 recording evidence remains
   `SensorDropoutReplayTest` and `ChaosRecordingReplayTest`.
 
-## BLE adapter evidence (#17, ADR 0017)
+## BLE adapter evidence (#17, ADR 0018)
 
 - R8: `BleSensorLinkTest` reconnects a strap after GATT 133 with `autoConnect=true` and streams again in
   < 10 s through the link (events, parsing and the bond/cache checks in the path). A cache refresh after

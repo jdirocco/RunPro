@@ -32,7 +32,7 @@ data class BleLogLine(
 
 /**
  * The link to one paired sensor: the [BleConnectionStateMachine] over the platform [GattDevicePort],
- * plus what the adapter adds around it (ADR 0017):
+ * plus what the adapter adds around it (ADR 0018):
  *
  * - measurement bytes are parsed and delivered as samples only while the link streams, from the
  *   current session ([BleSamples] drops what the model cannot hold);

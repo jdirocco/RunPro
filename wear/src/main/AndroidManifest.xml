@@ -32,7 +32,7 @@
         tools:targetApi="s" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
-    <!-- Strap and footpod association (#17, ADR 0017): the companion association keeps RunPro's
+    <!-- Strap and footpod association (#17, ADR 0018): the companion association keeps RunPro's
          background rights with the sensor. Watches without companion device setup use a scan. -->
     <uses-feature
         android:name="android.software.companion_device_setup"

@@ -26,7 +26,7 @@ import com.runpro.core.ble.BleSensorKind
 import com.runpro.core.ble.PairedSensor
 
 /**
- * Pairs a sensor through `CompanionDeviceManager` (ADR 0017). The association is what keeps RunPro's
+ * Pairs a sensor through `CompanionDeviceManager` (ADR 0018). The association is what keeps RunPro's
  * background rights with the sensor (`REQUEST_COMPANION_RUN_IN_BACKGROUND`,
  * `REQUEST_COMPANION_START_FOREGROUND_SERVICES_FROM_BACKGROUND`); the system chooser needs no scan
  * permission. Main thread only. [supported] is false when the watch has no companion device setup:

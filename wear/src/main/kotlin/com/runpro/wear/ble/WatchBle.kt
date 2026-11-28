@@ -18,7 +18,7 @@ import com.runpro.wear.AndroidPermissions
 import java.util.UUID
 
 /**
- * The BLE sensors of `RecordingService` (#17, ADR 0017): one [BleSensorLink] per paired sensor while a
+ * The BLE sensors of `RecordingService` (#17, ADR 0018): one [BleSensorLink] per paired sensor while a
  * run prepares, records or is paused; none otherwise.
  *
  * Everything runs on [looper] (the `runpro-ble` thread): links, GATT callbacks, the 100 ms tick. [follow]

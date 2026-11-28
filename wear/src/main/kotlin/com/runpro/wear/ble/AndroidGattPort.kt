@@ -27,7 +27,7 @@ internal interface GattEvents {
 }
 
 /**
- * The real [GattDevicePort] of one device over `BluetoothGatt` (ADR 0012, ADR 0017).
+ * The real [GattDevicePort] of one device over `BluetoothGatt` (ADR 0012, ADR 0018).
  *
  * Every method runs on the BLE thread. Binder callbacks copy their arguments and [post] themselves to
  * that thread, so completions are never inline from [execute] and no state is shared across threads.

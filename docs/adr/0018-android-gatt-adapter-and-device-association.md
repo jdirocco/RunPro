@@ -1,4 +1,4 @@
-# ADR 0017: Android GATT adapter and device association
+# ADR 0018: Android GATT adapter and device association
 
 - Status: proposed (accepted when issue #17 is merged)
 - Date: 2026-11-28
