@@ -215,8 +215,10 @@ Every real failure seen in the field gets a row here, a recorded trace in `testd
 - `RunSettingsTest` in recording and `RecordingServiceTest` verify that saved settings reach the next
   run, configuration cannot change an active snapshot, and settings survive real journal recovery (R2).
 - `AutoPauseReplayTest` writes real journals with automatic pause/resume events, verifies exact rebuilt
-  totals/events, and injects a silent speed sensor without causing a pause (R2/R4). Recording
-  `RunSettingsTest` also covers manual pauses, hysteresis and late batches. Stored events remain the
+  totals/events and moving time/distance after resume with speed delivered 700 ms behind one-second
+  ticks and a separate HR source, and injects a silent speed sensor without causing a pause (R2/R4).
+  Recording `RunSettingsTest` also covers manual pauses, hysteresis, the inclusive three-second freshness
+  bound, and old batches that cannot pause or resume. Stored events remain the
   authority for recovery/export; automatic decisions are never regenerated while rebuilding.
 - `DebugTraceTest` verifies opt-in raw capture and failure isolation. Trace I/O runs on its own bounded
   worker, cannot block sensor/engine submission, and never changes journal retention (R3/R6).

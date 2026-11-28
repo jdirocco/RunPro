@@ -19,8 +19,10 @@ internal class AutoPause {
         source = null
     }
 
-    fun command(sample: SpeedSample, state: RunState, fresh: Boolean): EngineInput.Command? {
-        if (!fresh) {
+    fun command(sample: SpeedSample, state: RunState, now: Timestamp): EngineInput.Command? {
+        // Ticks and other sensors can lead ordinary Health Services delivery by about a second.
+        // Allow that latency, but never make automatic decisions from an old screen-off batch.
+        if (now.elapsedSince(sample.time) > MAX_GAP) {
             reset()
             return null
         }

@@ -258,7 +258,6 @@ class RecordingStateMachine(
         ) {
             return false
         }
-        val fresh = sample.time >= (now ?: sample.time)
         val time = maxOf(sample.time, now ?: sample.time)
         arbitrate(time, listOf(sample.metric))
         val accepted = gate.admit(sample)
@@ -266,7 +265,7 @@ class RecordingStateMachine(
         if (accepted) {
             applySample(sample, display = gate.isLive(sample.metric))
             if (settings.runSettings.autoPause && sample is SpeedSample) {
-                autoPause.command(sample, state, fresh)?.let { command ->
+                autoPause.command(sample, state, time)?.let { command ->
                     markAutomaticLaps(command.time)
                     record(command)
                 }

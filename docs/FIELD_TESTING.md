@@ -186,7 +186,9 @@ strava.callbackHost=localhost
    recording starts at expiry. Leaving the activity during the countdown must cancel it. With countdown
    off, Start must retain its immediate behavior.
 3. Run with speed data; stand still for at least 5 s and verify automatic pause. Move above 1 m/s and
-   verify resume. Manually pause and move: it must remain paused until Resume. A GPS/speed dropout must
+   verify resume and increasing distance/moving time afterward. Normal delivery latency (up to 3 s)
+   must allow both transitions; a screen-off batch older than 3 s must not trigger either transition.
+   Manually pause and move: it must remain paused until Resume. A GPS/speed dropout must
    never itself cause a pause. Stop/save and confirm distance/pace units in the summary.
 4. Copy the optional raw traces and inspect/replay the JSONL. They contain location when GPS is available:
 

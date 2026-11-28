@@ -2,6 +2,10 @@ package com.runpro.tools.replay
 
 import com.runpro.core.journal.JournalReader
 import com.runpro.core.journal.JournalWriter
+import com.runpro.core.model.Distance
+import com.runpro.core.model.DistanceSample
+import com.runpro.core.model.HeartRate
+import com.runpro.core.model.HeartRateSample
 import com.runpro.core.model.PauseReason
 import com.runpro.core.model.RunEvent
 import com.runpro.core.model.RunSettings
@@ -21,6 +25,8 @@ import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import org.junit.jupiter.api.io.TempDir
 
@@ -49,25 +55,45 @@ class AutoPauseReplayTest {
         assertEquals(15.seconds, state.totals.timer)
     }
 
-    private fun record(file: Path, chaos: ChaosPlan): RunState {
+    @Test
+    fun `delayed speed pauses and resumes with ticks and HR ahead and preserves moving totals`(
+        @TempDir dir: Path
+    ) {
+        val file = dir.resolve("delayed.journal")
+        val state = record(file, ChaosPlan(), latency = 700.milliseconds)
+        val events = state.run!!.events
+        val pause = events.filterIsInstance<RunEvent.Paused>().single()
+        assertEquals(PauseReason.AUTO, pause.reason)
+        assertEquals(at(5), pause.time)
+        assertEquals(at(10), events.filterIsInstance<RunEvent.Resumed>().single().time)
+        assertEquals(10.seconds + 700.milliseconds, state.totals.timer)
+        assertEquals(5.seconds, state.totals.moving)
+        assertEquals(Distance(10.0), state.totals.distance)
+        val rebuilt = RecordedRun.from(JournalReader.read(file)).state
+        assertEquals(state.run, rebuilt.run)
+        assertEquals(state.totals, rebuilt.totals)
+        assertEquals(state.laps, rebuilt.laps)
+    }
+
+    private fun record(file: Path, chaos: ChaosPlan, latency: Duration = Duration.ZERO): RunState {
         val trace = Trace(
             TraceHeader(name = "Auto-pause at a traffic light"),
-            (0..15).map { second ->
-                TraceRecord.SampleRecord(
+            (0..15).flatMap { second ->
+                // Establish sources at start, then deliver speed/distance behind ticks and the strap.
+                val delivery = at(second) + if (second == 0) Duration.ZERO else latency
+                listOf(
+                    HeartRateSample(delivery, SourceId("ble:strap"), HeartRate(140)),
                     SpeedSample(
                         at(second),
                         SourceId.HEALTH_SERVICES,
-                        Speed(
-                            if (second <
-                                10
-                            ) {
-                                0.0
-                            } else {
-                                2.0
-                            }
-                        )
+                        Speed(if (second < 10) 0.0 else 2.0)
+                    ),
+                    DistanceSample(
+                        at(second),
+                        SourceId.HEALTH_SERVICES,
+                        Distance(maxOf(0, second - 10) * 2.0)
                     )
-                )
+                ).map(TraceRecord::SampleRecord)
             }
         )
         RecordingSession(journal = JournalWriter.create(file)).use { session ->
@@ -80,6 +106,7 @@ class AutoPauseReplayTest {
             session.handle(EngineInput.Start(at(0)))
             val listener = object : SensorListener {
                 override fun onSample(sample: Sample) {
+                    if (sample is HeartRateSample) session.handle(EngineInput.Tick(sample.time))
                     session.handle(EngineInput.SampleReceived(sample))
                 }
                 override fun onEvent(event: SensorEvent) {
@@ -89,7 +116,7 @@ class AutoPauseReplayTest {
             val replayer = Replayer(trace, chaos = chaos)
             replayer.sources.forEach { it.start(listener) }
             replayer.run()
-            session.handle(EngineInput.Stop(at(15)))
+            session.handle(EngineInput.Stop(at(15) + latency))
             assertTrue(session.state.journalSaved)
             return session.state
         }
