@@ -32,7 +32,7 @@ class ExerciseControllerTest {
     fun `prepare checks capabilities and ownership, then warms up GPS and heart rate`() {
         controller.follow(RunPhase.PREPARING)
 
-        assertEquals(listOf("inspect", "setListener", "prepare"), port.calls)
+        assertEquals(listOf("inspect", "prepare", "setListener"), port.calls)
         assertEquals(ExerciseData.entries.toSet(), port.preparedPlan?.dataTypes)
         val warming = controller.status.value
         assertEquals(ExercisePhase.WARMING_UP, warming.phase)
@@ -47,6 +47,16 @@ class ExerciseControllerTest {
         port.listener.onAvailability(ExerciseData.LOCATION, DataAvailability.AVAILABLE)
         assertEquals(Readiness.READY, controller.status.value.gps)
         assertTrue(controller.status.value.warmedUp)
+    }
+
+    @Test
+    fun `listener registers after prepare so initial GPS availability has requested data types`() {
+        port.initialAvailabilityOnRegister = ExerciseData.LOCATION to DataAvailability.AVAILABLE
+
+        controller.follow(RunPhase.PREPARING)
+
+        assertEquals(listOf("inspect", "prepare", "setListener"), port.calls)
+        assertEquals(Readiness.READY, controller.status.value.gps)
     }
 
     @Test
@@ -81,8 +91,8 @@ class ExerciseControllerTest {
         assertEquals(
             listOf(
                 "inspect",
-                "setListener",
                 "prepare",
+                "setListener",
                 "start",
                 "pause",
                 "resume",
@@ -107,10 +117,10 @@ class ExerciseControllerTest {
 
         // The start is already wanted when the inspection completes, so the warm-up is skipped.
         port.completeNext()
-        assertEquals(listOf("inspect", "setListener", "start"), port.calls)
+        assertEquals(listOf("inspect", "start"), port.calls)
         assertEquals(ExercisePhase.STARTING, controller.status.value.phase)
         port.completeNext()
-        assertEquals(listOf("inspect", "setListener", "start", "pause"), port.calls)
+        assertEquals(listOf("inspect", "start", "setListener", "pause"), port.calls)
         port.completeNext()
         assertEquals(ExercisePhase.PAUSED, controller.status.value.phase)
         assertTrue(port.pending.isEmpty())
@@ -120,7 +130,7 @@ class ExerciseControllerTest {
     fun `a start without warm-up skips prepare`() {
         controller.follow(RunPhase.RUNNING)
 
-        assertEquals(listOf("inspect", "setListener", "start"), port.calls)
+        assertEquals(listOf("inspect", "start", "setListener"), port.calls)
     }
 
     @Test
@@ -171,13 +181,13 @@ class ExerciseControllerTest {
         port.ownership = ExerciseOwnership.OTHER_APP
 
         controller.follow(RunPhase.PREPARING)
-        assertEquals(listOf("inspect", "setListener"), port.calls)
+        assertEquals(listOf("inspect"), port.calls)
         assertEquals(ExercisePhase.OTHER_APP_ACTIVE, controller.status.value.phase)
         assertTrue(controller.status.value.otherAppActive)
 
         // The runner pressed start in RunPro: RunPro records, the other app's exercise ends.
         controller.follow(RunPhase.RUNNING)
-        assertEquals(listOf("inspect", "setListener", "start"), port.calls)
+        assertEquals(listOf("inspect", "start", "setListener"), port.calls)
         assertEquals(ExercisePhase.ACTIVE, controller.status.value.phase)
         assertTrue(controller.status.value.tookOverFromOtherApp)
         assertFalse(controller.status.value.otherAppActive)
@@ -199,9 +209,9 @@ class ExerciseControllerTest {
         // R4: the adapter never tries to pause or stop the run; it also does not fight the other app.
         controller.follow(RunPhase.PAUSED)
         controller.follow(RunPhase.RUNNING)
-        assertEquals(listOf("inspect", "setListener", "start"), port.calls)
+        assertEquals(listOf("inspect", "start", "setListener"), port.calls)
         controller.follow(RunPhase.STOPPED)
-        assertEquals(listOf("inspect", "setListener", "start", "clearListener"), port.calls)
+        assertEquals(listOf("inspect", "start", "setListener", "clearListener"), port.calls)
     }
 
     @Test
@@ -254,10 +264,10 @@ class ExerciseControllerTest {
 
         assertEquals(ExercisePhase.FAILED, controller.status.value.phase)
         assertEquals("no permission", controller.status.value.error)
-        assertEquals(listOf("inspect", "setListener", "prepare", "start"), port.calls)
+        assertEquals(listOf("inspect", "prepare", "setListener", "start"), port.calls)
         controller.follow(RunPhase.STOPPED)
         assertEquals(
-            listOf("inspect", "setListener", "prepare", "start", "end", "clearListener"),
+            listOf("inspect", "prepare", "setListener", "start", "end", "clearListener"),
             port.calls
         )
     }
@@ -296,7 +306,7 @@ class ExerciseControllerTest {
         controller.follow(RunPhase.RUNNING)
         port.listener.onReadings(listOf(ExerciseReading.DistanceDelta(SECOND, SECOND * 2, 5.0)))
 
-        assertEquals(listOf("inspect", "setListener", "start"), port.calls)
+        assertEquals(listOf("inspect", "start", "setListener"), port.calls)
         assertEquals(5.0, (received.samples.last() as DistanceSample).total.meters)
     }
 
@@ -337,8 +347,8 @@ class ExerciseControllerTest {
         assertEquals(
             listOf(
                 "inspect",
-                "setListener",
                 "prepare",
+                "setListener",
                 "start",
                 "pause",
                 "resume",
@@ -353,7 +363,7 @@ class ExerciseControllerTest {
     fun `a run restored paused starts or adopts the exercise and pauses it`() {
         controller.follow(RunPhase.PAUSED)
 
-        assertEquals(listOf("inspect", "setListener", "start", "pause"), port.calls)
+        assertEquals(listOf("inspect", "start", "setListener", "pause"), port.calls)
         assertEquals(ExercisePhase.PAUSED, controller.status.value.phase)
     }
 
@@ -363,7 +373,7 @@ class ExerciseControllerTest {
         controller.follow(RunPhase.IDLE)
 
         assertEquals(
-            listOf("inspect", "setListener", "prepare", "end", "clearListener"),
+            listOf("inspect", "prepare", "setListener", "end", "clearListener"),
             port.calls
         )
     }
@@ -396,6 +406,8 @@ internal class FakeExercisePort : ExercisePort {
     var capabilities =
         ExerciseCapabilities(runningSupported = true, supported = ExerciseData.entries.toSet())
     var preparedPlan: ExercisePlan? = null
+    var initialAvailabilityOnRegister: Pair<ExerciseData, DataAvailability>? = null
+    private var requestedDataTypes = emptySet<ExerciseData>()
     private var registered: ExercisePortListener? = null
     val listener: ExercisePortListener get() = checkNotNull(registered) { "no listener registered" }
 
@@ -411,21 +423,28 @@ internal class FakeExercisePort : ExercisePort {
     override fun setListener(listener: ExercisePortListener) {
         calls += "setListener"
         registered = listener
+        // Matches Jetpack ExerciseUpdateListenerStub: availability updates are dropped while
+        // ServiceBackedExerciseClient.requestedDataTypes is empty (before prepare/start succeeds).
+        val initial = initialAvailabilityOnRegister
+        if (initial != null && initial.first in requestedDataTypes) {
+            listener.onAvailability(initial.first, initial.second)
+        }
     }
 
     override fun clearListener() {
         calls += "clearListener"
+        requestedDataTypes = emptySet()
     }
 
     override fun prepare(plan: ExercisePlan, done: (Result<Unit>) -> Unit) {
         calls += "prepare"
         preparedPlan = plan
-        complete(done) { }
+        complete(done) { requestedDataTypes = plan.warmUpTypes }
     }
 
     override fun start(plan: ExercisePlan, done: (Result<Unit>) -> Unit) {
         calls += "start"
-        complete(done) { }
+        complete(done) { requestedDataTypes = plan.dataTypes }
     }
 
     override fun pause(done: (Result<Unit>) -> Unit) {

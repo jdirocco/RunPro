@@ -92,10 +92,7 @@ class ExerciseController(
         }
         when (request) {
             ExerciseRequest.INSPECT -> port.inspect { result ->
-                completed(current) {
-                    current.inspected(result, grantedPermissions())
-                    if (current.registered) port.setListener(SessionListener(current))
-                }
+                completed(current) { current.inspected(result, grantedPermissions()) }
             }
 
             ExerciseRequest.PREPARE -> port.prepare(checkNotNull(plan), done)
@@ -116,6 +113,7 @@ class ExerciseController(
         if (current === session) {
             busy = false
             update()
+            if (current.registerListener()) port.setListener(SessionListener(current))
             advance()
             publish()
         }

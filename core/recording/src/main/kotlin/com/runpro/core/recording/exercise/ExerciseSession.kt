@@ -33,12 +33,13 @@ internal class ExerciseSession(source: SourceId) {
     private var adopted = false
     private var adoptionConfirmed = false
     private var tookOver = false
+    private var wantListener = false
     private var endReason: ExerciseEndReason? = null
 
     var plan: ExercisePlan? = null
         private set
 
-    /** The update listener is (to be) registered with the port. */
+    /** The update listener is registered with the port. */
     var registered = false
         private set
 
@@ -108,14 +109,19 @@ internal class ExerciseSession(source: SourceId) {
                 error =
                     "Health Services does not support running"
             }
-        } else if (target != Target.ENDED) {
-            registered = true
-            if (found.ownership == ExerciseOwnership.OURS) {
-                // The process was restarted during the run: keep the exercise that is still recording.
-                adopted = true
-                known = Known.ACTIVE
-            }
+        } else if (target != Target.ENDED && found.ownership == ExerciseOwnership.OURS) {
+            // The process was restarted during the run: keep the exercise that is still recording.
+            wantListener = true
+            adopted = true
+            known = Known.ACTIVE
         }
+    }
+
+    /** Marks the listener registered once an exercise is prepared, started or adopted. */
+    fun registerListener(): Boolean {
+        if (!wantListener || registered) return false
+        registered = true
+        return true
     }
 
     fun completed(request: ExerciseRequest, result: Result<Unit>) {
@@ -126,11 +132,15 @@ internal class ExerciseSession(source: SourceId) {
                 result.exceptionOrNull()?.let { error = describe(it) }
             }
 
-            ExerciseRequest.CLEAR_LISTENER -> registered = false
+            ExerciseRequest.CLEAR_LISTENER -> {
+                wantListener = false
+                registered = false
+            }
 
             else -> result.fold(
                 onSuccess = {
                     known = reached(request)
+                    if (target != Target.ENDED) wantListener = true
                     val otherApp = inspection?.ownership == ExerciseOwnership.OTHER_APP
                     if (request == ExerciseRequest.START && otherApp) tookOver = true
                 },
