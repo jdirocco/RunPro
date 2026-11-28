@@ -47,6 +47,7 @@ class MainActivity : ComponentActivity() {
         MutableStateFlow(ExerciseStatus())
     )
     private var backgroundLocationSkipped by mutableStateOf(false)
+    private var showingSettings by mutableStateOf(false)
     private var showingHistory by mutableStateOf(false)
     private lateinit var history: WatchHistory
 
@@ -81,12 +82,24 @@ class MainActivity : ComponentActivity() {
             val canShowHistory =
                 currentRun.phase == RunPhase.IDLE || currentRun.phase == RunPhase.STOPPED
             LaunchedEffect(canShowHistory) {
-                if (!canShowHistory) showingHistory = false
+                if (!canShowHistory) {
+                    showingHistory = false
+                    showingSettings = false
+                }
             }
             LaunchedEffect(showingHistory, canShowHistory, syncRevision) {
                 if (showingHistory && canShowHistory) history.refresh()
             }
-            if (showingHistory && canShowHistory) {
+            if (showingSettings && canShowHistory) {
+                SettingsScreen(
+                    workoutSettings.runSettings,
+                    update = {
+                        workoutSettings = workoutSettings.copy(runSettings = it)
+                        WorkoutPreferences.save(this, workoutSettings)
+                    },
+                    close = { showingSettings = false }
+                )
+            } else if (showingHistory && canShowHistory) {
                 RunHistoryHost(
                     historyState = history.state,
                     onRetryExport = history::retryExport,
@@ -105,29 +118,32 @@ class MainActivity : ComponentActivity() {
                     ),
                     runState,
                     exercise,
-                    SetupActions(
-                        askForeground = { ask(readiness.missingForeground) },
-                        askBackgroundLocation = { ask(listOf(RunPermission.BACKGROUND_LOCATION)) },
-                        skipBackgroundLocation = { backgroundLocationSkipped = true },
-                        confirmSleepingApps = ::confirmSleepingApps,
-                        command = ::send,
-                        configureWorkout = {
-                            workoutSettings = it
-                            WorkoutPreferences.save(this, it)
-                        },
-                        configureImu = {
-                            imuMode = it
-                            ImuPreferences.save(this, it)
-                        },
-                        openHistory = {
-                            showingHistory = true
-                            history.refresh()
-                        }
-                    )
+                    setupActions()
                 )
             }
         }
     }
+
+    private fun setupActions() = SetupActions(
+        askForeground = { ask(readiness.missingForeground) },
+        askBackgroundLocation = { ask(listOf(RunPermission.BACKGROUND_LOCATION)) },
+        skipBackgroundLocation = { backgroundLocationSkipped = true },
+        confirmSleepingApps = ::confirmSleepingApps,
+        command = ::send,
+        configureWorkout = {
+            workoutSettings = it
+            WorkoutPreferences.save(this, it)
+        },
+        configureImu = {
+            imuMode = it
+            ImuPreferences.save(this, it)
+        },
+        openSettings = { showingSettings = true },
+        openHistory = {
+            showingHistory = true
+            history.refresh()
+        }
+    )
 
     override fun onDestroy() {
         history.close()
@@ -205,5 +221,6 @@ class SetupActions(
     val command: (ServiceCommand) -> Unit,
     val configureWorkout: (WorkoutSettings) -> Unit = {},
     val configureImu: (ImuMode) -> Unit = {},
-    val openHistory: () -> Unit = {}
+    val openHistory: () -> Unit = {},
+    val openSettings: () -> Unit = {}
 )

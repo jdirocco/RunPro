@@ -35,7 +35,8 @@ data class IntervalWorkout(
 @Serializable
 data class WorkoutSettings(
     val autoLapMeters: Double? = DEFAULT_AUTO_LAP_METERS,
-    val workout: IntervalWorkout? = null
+    val workout: IntervalWorkout? = null,
+    val runSettings: RunSettings = RunSettings()
 ) {
     init {
         require(autoLapMeters == null || (autoLapMeters.isFinite() && autoLapMeters > 0))
