@@ -258,7 +258,8 @@ RunPro non inventa valori mancanti. Le scelte restano salvate e valgono per la p
 
 La **pausa automatica** è disattivata all'inizio. Se attiva, richiede velocità sotto 0,5 m/s per almeno
 5 secondi di misure recenti e consecutive; riparte a 1 m/s. Una pausa manuale richiede **Riprendi**.
-L'assenza di GPS o dati del sensore non mette in pausa la corsa.
+Le misure possono arrivare con un ritardo fino a 3 secondi: quelle più vecchie non attivano né la pausa
+né la ripartenza automatica. L'assenza di GPS o dati del sensore non mette in pausa la corsa.
 
 Il **conto alla rovescia** può essere disattivato o durare 3, 5 o 10 secondi. Parte dal pulsante di avvio
 nella preparazione; la corsa viene avviata solo alla fine. Tocca il conto per annullarlo. Uscire dall'app

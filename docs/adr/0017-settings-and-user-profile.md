@@ -21,8 +21,11 @@ is added. Live distance/pace and the finished-run summary use the run's selected
 ## Auto-pause
 
 Only fresh, admitted speed samples can trigger an automatic pause: below 0.5 m/s for five seconds,
-with no gap over three seconds and no source change. A fresh speed of at least 1 m/s resumes an automatic
-pause. Manual pauses never resume automatically. Stale/late batches reset the candidate; ticks and sensor
+with no gap over three seconds and no source change. Fresh means no more than three seconds old relative
+to the latest engine time (including ticks and other sensors), using the same bound as the maximum gap.
+This allows ordinary Health Services delivery latency, including speed arriving 700 ms behind ticks/HR.
+A fresh speed of at least 1 m/s resumes an automatic pause. Manual pauses never resume automatically.
+Older batches reset the candidate and cannot pause or resume; ticks and sensor
 loss cannot pause a run. A dropout while auto-paused leaves it paused until fresh movement is observed.
 The speed sample is counted before its derived pause/resume event, so recovery/export replay the same
 order. Rebuilding uses stored events, never regenerates automatic pauses, and restarts the low-speed
@@ -50,8 +53,11 @@ separate diagnostics/export UI is available.
 
 Model `RunSettingsTest` checks defaults, validation and JSON compatibility. Recording `RunSettingsTest`
 checks immutable settings, real journal recovery, hysteresis, manual pauses and silence/late batches.
-`AutoPauseReplayTest` checks exact traffic-light pause/resume timing and identical reconstruction of real
-journals, plus a silent-stall chaos case that must never pause (R2/R4). `RecordingServiceTest` proves the
+`AutoPauseReplayTest` checks exact traffic-light pause/resume timing, moving time/distance after resume,
+and identical reconstruction of real journals with 700 ms speed latency behind one-second ticks and a
+separate HR source, plus a silent-stall chaos case that must never pause (R2/R4). Recording
+`RunSettingsTest` checks the inclusive three-second age boundary and rejects older pause/resume samples.
+`RecordingServiceTest` proves the
 saved profile reaches the next durable run and active settings do not change. `SettingsTest`,
 `SettingsScreenTest`, `RunFormatTest` and `DebugTraceTest` check persistence, edits, countdown cancellation,
 unit conversions, continued exercise collection and failure isolation. Existing start latency, threading,

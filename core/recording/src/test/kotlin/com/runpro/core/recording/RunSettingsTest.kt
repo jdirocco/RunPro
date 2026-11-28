@@ -2,6 +2,8 @@ package com.runpro.core.recording
 
 import com.runpro.core.journal.JournalWriter
 import com.runpro.core.model.DisplayUnits
+import com.runpro.core.model.HeartRate
+import com.runpro.core.model.HeartRateSample
 import com.runpro.core.model.IntervalTarget
 import com.runpro.core.model.IntervalWorkout
 import com.runpro.core.model.LapTrigger
@@ -18,6 +20,8 @@ import java.nio.file.Path
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 
@@ -87,6 +91,52 @@ class RunSettingsTest {
     }
 
     @Test
+    fun `ticks and HR ahead of delayed speed still allow automatic pause and resume`() {
+        for (latency in listOf(700.milliseconds, 3.seconds)) {
+            val machine = started(true)
+            machine.handle(speed(0, 2.0))
+            machine.handle(hr(at(0)))
+            for (second in 1..10) {
+                val delivery = at(second) + latency
+                machine.handle(EngineInput.Tick(delivery))
+                machine.handle(hr(delivery))
+                assertTrue(machine.handle(speed(second, if (second < 10) 0.0 else 2.0)))
+                assertEquals(
+                    if (second in 6..9) RunPhase.PAUSED else RunPhase.RUNNING,
+                    machine.state.phase,
+                    "Speed latency $latency at second $second"
+                )
+            }
+            val events = machine.state.run!!.events
+            assertEquals(at(6), events.filterIsInstance<RunEvent.Paused>().single().time)
+            assertEquals(at(10), events.filterIsInstance<RunEvent.Resumed>().single().time)
+            assertEquals(6.seconds + latency, machine.state.totals.timer)
+        }
+    }
+
+    @Test
+    fun `old speed batches cannot pause or resume even when admitted for totals`() {
+        val running = started(true)
+        running.handle(speed(0, 2.0))
+        running.handle(EngineInput.Tick(at(20)))
+        (1..10).forEach { assertTrue(running.handle(speed(it, 0.0))) }
+        assertEquals(RunPhase.RUNNING, running.state.phase)
+        assertTrue(running.state.run!!.events.none { it is RunEvent.Paused })
+
+        val paused = started(true)
+        (0..5).forEach { paused.handle(speed(it, 0.0)) }
+        assertEquals(RunPhase.PAUSED, paused.state.phase)
+        paused.handle(EngineInput.Tick(at(20)))
+        // Just beyond the three-second freshness bound must still be rejected for auto-resume.
+        val old = SpeedSample(at(16) + 999.milliseconds, SourceId.HEALTH_SERVICES, Speed(2.0))
+        assertTrue(paused.handle(EngineInput.SampleReceived(old)))
+        assertEquals(RunPhase.PAUSED, paused.state.phase)
+        assertTrue(paused.state.run!!.events.none { it is RunEvent.Resumed })
+        assertTrue(paused.handle(speed(20, 2.0)))
+        assertEquals(RunPhase.RUNNING, paused.state.phase)
+    }
+
+    @Test
     fun `an automatic pause never swallows a workout boundary due at the same instant`() {
         val machine = RecordingStateMachine()
         val workout = IntervalWorkout(
@@ -122,4 +172,7 @@ class RunSettingsTest {
     private fun at(seconds: Int) = Timestamp(seconds * 1_000_000_000L, seconds * 1000L)
     private fun speed(seconds: Int, value: Double) =
         EngineInput.SampleReceived(SpeedSample(at(seconds), SourceId.HEALTH_SERVICES, Speed(value)))
+
+    private fun hr(time: Timestamp) =
+        EngineInput.SampleReceived(HeartRateSample(time, SourceId("ble:strap"), HeartRate(140)))
 }
