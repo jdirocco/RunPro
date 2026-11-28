@@ -132,7 +132,8 @@ the issue to you, adds `status:in-progress` and moves the card to In Progress.
 
 With `--worktree` the branch is created in `../RunPro-worktrees/<branch>` and this checkout is left alone
 (use it for parallel work). `git worktree add` does not carry ignored files, so `./rp` copies this
-checkout's `local.properties` (the `sdk.dir` line) into the new worktree; an existing one is kept.
+checkout's `local.properties` (`sdk.dir`, and the private `strava.*` keys of ADR 0015 if present) into the new
+worktree; an existing one is kept.
 
 ### `./rp runners`: inspect installed agent CLIs
 

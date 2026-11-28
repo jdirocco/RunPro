@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.health.WRITE_HEART_RATE" />
     <uses-permission android:name="android.permission.health.WRITE_DISTANCE" />
     <uses-permission android:name="android.permission.health.WRITE_STEPS" />
+    <!-- Strava OAuth and uploads (#31). -->
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <queries>
         <package android:name="com.google.android.apps.healthdata" />
@@ -29,6 +31,26 @@
                     android:scheme="wear" />
             </intent-filter>
         </service>
+
+        <!-- Strava screen and OAuth callback runpro://<strava.callbackHost>/oauth/callback (#31, ADR 0015). -->
+        <activity
+            android:name=".strava.StravaActivity"
+            android:exported="true"
+            android:launchMode="singleTask">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:host="${stravaCallbackHost}"
+                    android:path="/oauth/callback"
+                    android:scheme="runpro" />
+            </intent-filter>
+        </activity>
 
         <!-- Health Connect permissions rationale (API 30-33, #32). -->
         <activity

@@ -148,6 +148,28 @@ live Health Connect provider or Samsung Health):
 4. If Samsung Health is configured to read workouts from Health Connect, confirm whether the run appears
    in Samsung Health and report actual observations on issue #32.
 
+## Strava check (#31)
+
+Needs a phone build with Strava credentials. Add to the git-ignored `local.properties` (root of the checkout,
+or `mobile/local.properties`), never to a tracked file or an issue:
+
+```properties
+strava.clientId=205420
+strava.clientSecret=<from https://www.strava.com/settings/api>
+strava.callbackHost=localhost
+```
+
+1. Install the phone build (`./gradlew :mobile:installDebug`) and open **RunPro** from the launcher. Without
+   the keys the screen says Strava is not configured.
+2. Tap **Connect Strava**, approve in the browser or Strava app (upload permission): back in RunPro the
+   status reads "Connected to Strava as <name>".
+3. Sync a run from the watch (F8). With **Upload new runs automatically** on, it is uploaded within a minute;
+   otherwise tap **Upload pending runs**. Check `adb -s <phone> logcat -s StravaUpload`.
+4. Tap **Open on Strava** for the run: the activity is a Run whose distance and elapsed time match the
+   watch summary (Strava computes its own moving time). Tapping **Upload pending runs** again must not
+   create a second activity.
+5. Report the run id, watch distance/time and Strava distance/time on issue #31 (20 runs for M4).
+
 ## After the run
 
 1. Settings → Diagnostics → Export logs (sends trace + sensor log to the phone).
