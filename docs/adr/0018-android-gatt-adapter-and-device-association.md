@@ -97,3 +97,20 @@ ADR 0013 already prefers fresh BLE samples over the wrist; nothing reached the e
   Whether Wear OS on the watch offers companion device setup decides which pairing path the owner sees.
   The acceptance (30 min of strap HR on the watch) and R8 in the field (#22, F1/F2) are owner tests; no
   field result is claimed.
+
+## Amendment: Stryd (#21)
+
+- `BleSensorKind.STRYD` is a third kind: found by the Cycling Power service (0x1818), which a plain
+  footpod lacks, so the chooser and the scan fallback list power-capable pods only; its link requires
+  both RSC Measurement and Cycling Power Measurement, each with its own 5 s watchdog, through the
+  unchanged `BleSensorLink` / controller. Power reaches the engine as `PowerSample`s (already journaled
+  and exported).
+- "One sensor per kind" becomes one per `SensorSlot`: `CHEST` (strap) and `FOOT` (footpod or Stryd).
+  Pairing a foot sensor replaces the other one (and drops its association); the sensors screen offers
+  the other foot kind only after **Forget**. Two BLE sources of one metric would rank equally in
+  ADR 0013's arbitration. Stored preferences are unchanged (`KIND|ADDRESS|ASSOCIATION|NAME`); a later
+  line of the same slot wins on decode.
+- Stryd's proprietary characteristics (form power, ground time, vertical oscillation, leg spring
+  stiffness) are not read: their layout is not public and nobody could verify a guess (#125).
+- Unverified without a Stryd: that it advertises 0x1818, its cadence unit, its notification rate when
+  standing still (a stop longer than 5 s would resubscribe, as for a footpod). Owner scenario F14.

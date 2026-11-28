@@ -34,7 +34,10 @@ class SensorActions(
     val close: () -> Unit = {}
 )
 
-/** Pair or forget one heart rate strap and one footpod; the next warm-up connects to them. */
+/**
+ * Pair or forget one heart rate strap and one foot sensor (a footpod or a Stryd); the next warm-up
+ * connects to them.
+ */
 @Composable
 fun SensorScreen(state: SensorScreenState, actions: SensorActions) {
     MaterialTheme {
@@ -81,6 +84,8 @@ private fun ScalingLazyListScope.sensorItems(
     actions: SensorActions
 ) {
     val sensor = state.paired.firstOrNull { it.kind == kind }
+    // The slot's paired sensor shows (and forgets) itself; the other kinds of its slot wait.
+    if (sensor == null && state.paired.any { it.kind.slot == kind.slot }) return
     if (sensor == null) {
         item {
             WideButton(
@@ -97,9 +102,11 @@ private fun ScalingLazyListScope.sensorItems(
 private fun pairLabel(kind: BleSensorKind) = when (kind) {
     BleSensorKind.HEART_RATE -> R.string.sensors_pair_strap
     BleSensorKind.FOOTPOD -> R.string.sensors_pair_footpod
+    BleSensorKind.STRYD -> R.string.sensors_pair_stryd
 }
 
 private fun kindLabel(kind: BleSensorKind) = when (kind) {
     BleSensorKind.HEART_RATE -> R.string.sensors_strap
     BleSensorKind.FOOTPOD -> R.string.sensors_footpod
+    BleSensorKind.STRYD -> R.string.sensors_stryd
 }

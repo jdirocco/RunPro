@@ -116,8 +116,8 @@ throw: a value that ends early is `ParseResult.Malformed` (for the sensor log); 
 extra trailing bytes are ignored, and a dangling half RR interval is skipped so the heart rate is kept.
 `BleSamples.from` maps measurements to model samples and drops what the model cannot hold at the edge:
 heart rate above 300 bpm and negative power are dropped, lost skin contact becomes 0 bpm, RSC cadence is
-taken as steps per minute (footpods that send strides are a device quirk for #21), battery level gives no
-sample.
+taken as steps per minute (footpods that send strides would be a device quirk, unverified for Stryd, F14),
+battery level gives no sample.
 
 ## BLE connection state machine
 
@@ -143,7 +143,7 @@ Sensor-log persistence/export follows in #20.
 ## BLE adapter and pairing (`:core:ble` link, `:wear` ble)
 
 ```
-SensorActivity ─► CompanionDeviceManager (or BleScan) ─► BlePreferences (PairedSensors, one per kind)
+SensorActivity ─► CompanionDeviceManager (or BleScan) ─► BlePreferences (PairedSensors, one per slot)
                                                                 │ read when a run prepares
 RecordingService ─► WatchBle (runpro-ble thread, 100 ms tick) ──┘
                         │ one per paired sensor
@@ -153,6 +153,11 @@ RecordingService ─► WatchBle (runpro-ble thread, 100 ms tick) ──┘
                         ▼
                   engine feed (same as Health Services) ─► source arbitration (ADR 0013)
 ```
+
+Paired kinds (`BleSensorKind`): `HEART_RATE` (0x180D, chest slot), `FOOTPOD` (0x1814, RSC) and `STRYD`
+(found by 0x1818, streams RSC and Cycling Power: speed, cadence, distance, running power), both in the
+foot slot. One sensor per slot, so two BLE distance sources never compete. Stryd's proprietary metrics
+are not read (#125).
 
 `BleSensorLink` (pure) adds to the controller what is policy: samples only while streaming and from the
 current session, connect/disconnect `SensorEvent`s, a GATT cache refresh before discovery after two

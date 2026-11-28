@@ -4,12 +4,36 @@ import com.runpro.core.model.SourceId
 import java.util.UUID
 
 /**
- * What a paired sensor is used for: the service it is found by and the measurement notifications
- * its link requires ([BleConnectionStateMachine] watches each one). Stryd power follows in #21.
+ * Where a sensor is worn. One sensor per slot: a footpod and a Stryd would both report speed, cadence
+ * and distance from the foot, and two BLE sources of one metric have no defined order (ADR 0013).
  */
-enum class BleSensorKind(val service: UUID, val measurements: List<UUID>) {
-    HEART_RATE(GattUuids.HEART_RATE_SERVICE, listOf(GattUuids.HEART_RATE_MEASUREMENT)),
-    FOOTPOD(GattUuids.RUNNING_SPEED_AND_CADENCE_SERVICE, listOf(GattUuids.RSC_MEASUREMENT))
+enum class SensorSlot { CHEST, FOOT }
+
+/**
+ * What a paired sensor is used for: the service it is found by, the measurement notifications its
+ * link requires ([BleConnectionStateMachine] watches each one) and its [SensorSlot].
+ *
+ * [STRYD] is found by its Cycling Power service, which a plain footpod does not have, and streams RSC
+ * (speed, cadence, distance) and running power; both must keep arriving or the link resubscribes.
+ * Stryd's proprietary characteristics (form power, ground time, vertical oscillation, leg spring
+ * stiffness) are not read: their format is not public (#125).
+ */
+enum class BleSensorKind(val service: UUID, val measurements: List<UUID>, val slot: SensorSlot) {
+    HEART_RATE(
+        GattUuids.HEART_RATE_SERVICE,
+        listOf(GattUuids.HEART_RATE_MEASUREMENT),
+        SensorSlot.CHEST
+    ),
+    FOOTPOD(
+        GattUuids.RUNNING_SPEED_AND_CADENCE_SERVICE,
+        listOf(GattUuids.RSC_MEASUREMENT),
+        SensorSlot.FOOT
+    ),
+    STRYD(
+        GattUuids.CYCLING_POWER_SERVICE,
+        listOf(GattUuids.RSC_MEASUREMENT, GattUuids.CYCLING_POWER_MEASUREMENT),
+        SensorSlot.FOOT
+    )
 }
 
 /**
@@ -40,7 +64,7 @@ data class PairedSensor(
     }
 }
 
-/** The paired sensors as one preference string, one per kind: `KIND|ADDRESS|ASSOCIATION|NAME` lines. */
+/** The paired sensors as one preference string, one per slot: `KIND|ADDRESS|ASSOCIATION|NAME` lines. */
 object PairedSensors {
     private const val FIELDS = 4
 
@@ -49,13 +73,16 @@ object PairedSensors {
         "${it.kind.name}|${it.address}|${it.associationId ?: ""}|$name"
     }
 
-    /** Skips damaged lines; a later line of the same kind replaces an earlier one. */
+    /** Skips damaged lines; a later line of the same slot replaces an earlier one. */
     fun decode(text: String?): List<PairedSensor> =
         text.orEmpty().lines().mapNotNull(::line).fold(emptyList(), ::pair)
 
-    /** Replaces the sensor of the same kind (or address): one strap and one footpod at most. */
+    /**
+     * Replaces the sensor of the same slot (or address): one strap and one foot sensor (footpod or
+     * Stryd) at most.
+     */
     fun pair(sensors: List<PairedSensor>, sensor: PairedSensor): List<PairedSensor> =
-        sensors.filter { it.kind != sensor.kind && it.address != sensor.address } + sensor
+        sensors.filter { it.kind.slot != sensor.kind.slot && it.address != sensor.address } + sensor
 
     fun forget(sensors: List<PairedSensor>, kind: BleSensorKind): List<PairedSensor> =
         sensors.filter { it.kind != kind }

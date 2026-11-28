@@ -31,6 +31,7 @@ Watch setup step by step (in Italian, for the owner): `docs/it/CONFIGURAZIONE_OR
 | F4 | Reboot the watch during a run | Run restored after reboot |
 | F5 | 2–3 h long run | Battery %/h, no drops, file exported |
 | F6 | Track or treadmill with footpod | Footpod distance vs GPS vs real |
+| F14 | Run with a Stryd (#21, see below) | Power on the data screen and in the FIT; RunPro distance within 1 % of the Stryd app |
 | F7 | Run with the phone left at home | Watch-only GPS, sync later |
 | F9 | Auto-lap and time/distance intervals | Correct lap summaries, countdowns and haptics with screen on/off; pauses freeze targets (see below) |
 | F8 | Phone sync: phone app installed, several runs with the phone out of range for some of them, then in range | Every run in the phone's `files/runs` once, journals gone from the watch (see below) |
@@ -129,6 +130,24 @@ have deterministic real-file JVM coverage in `LowResourceReplayTest` and `Reserv
 
 Report the build, simulated levels, screen/paused state, summary and journal observations as a field
 report. These are procedures awaiting physical results, not a claim that F11 has passed.
+
+## Stryd check (F14)
+
+Needs a Stryd; the owner has none, so this waits for one (#21 is JVM-tested only).
+
+1. Remove the Stryd from the phone's Stryd app and any other watch or app that connects to it while you
+   run (it may accept one BLE connection). In RunPro: **Sensors → Pair Stryd**, wake the pod (shake it or
+   walk), choose it. A paired footpod must be forgotten first: one foot sensor at a time.
+2. Run at least 5 km outdoors with the Stryd app recording nothing else; note the Stryd's distance from
+   the Stryd app (synced afterwards) or the pod's own run record.
+3. Check during the run: a power field shows watts and changes with effort; pace and cadence follow the
+   Stryd (cadence must be steps/min, about 160–190, not half of that); power reads `--` within a few
+   seconds if the pod is out of range and returns when it is back, without pausing the run.
+4. Afterwards: RunPro distance within 1 % of the Stryd's; the FIT file has a power record every second
+   and one source-switch event per Stryd dropout (`adb logcat -s RunProBle` shows the reconnects).
+5. Report the Stryd model and firmware, cadence plausibility and the distance difference in a field
+   report. Form power, ground time, vertical oscillation and leg spring stiffness are not read yet
+   (#125).
 
 ## FIT file acceptance (no watch needed)
 
@@ -245,8 +264,8 @@ Record the watch observations in a field report. No physical result for these st
    is absolute altitude (m/ft), clock is local 24-hour time, battery is watch percentage.
 4. HR zone uses the saved maximum HR: zone 0 below 50%, then zones 1–5 starting at 50/60/70/80/90%.
    Without maximum HR or current HR it reads `--`. Missing/stale sensor values, including power without
-   a compatible sensor, must also read `--`; no dropout may pause or stop recording. Power ingestion
-   from a real footpod still depends on its sensor support.
+   a compatible sensor, must also read `--`; no dropout may pause or stop recording. Power comes from
+   a Stryd paired as **Pair Stryd** (F14).
 
 Record the reproduced Gear Tracker layout and actual readability/navigation observations in a field
 report. JVM/Robolectric coverage does not claim physical acceptance or bezel timing on the watch.

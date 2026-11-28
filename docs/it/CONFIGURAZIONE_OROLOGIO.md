@@ -219,12 +219,16 @@ controllata degli avvisi e dello stop automatico è F11 in `docs/FIELD_TESTING.m
    con RunPro. In Samsung Health (orologio e telefono) scollega la fascia dagli **Accessori**.
 2. Non abbinarla da **Impostazioni → Connessioni → Bluetooth** dell'orologio: la aggiungi da RunPro,
    che gestisce la connessione da sé. Se l'avevi abbinata lì, scegli **Dimentica**.
-   In RunPro, dalla schermata iniziale tocca **Sensori → Associa fascia cardio** (o **Associa footpod**),
+   In RunPro, dalla schermata iniziale tocca **Sensori → Associa fascia cardio** (o **Associa footpod**,
+   o **Associa Stryd** per la potenza di corsa),
    indossa la fascia (si sveglia col contatto) e sceglila nell'elenco. Se l'orologio ha la finestra di
    sistema per i dispositivi associati la vedi lì, e l'associazione dà a RunPro anche il permesso di
    restare attiva in background; altrimenti, o se quella finestra si chiude subito (succede sul Galaxy
    Watch 5 Pro), RunPro cerca da sé per 15 secondi e mostra i sensori trovati: tocca la tua fascia. Serve
-   il permesso **Dispositivi nelle vicinanze**. Si tiene una fascia e un footpod; **Dimentica** li toglie.
+   il permesso **Dispositivi nelle vicinanze**. Si tiene una fascia e un solo sensore al piede (footpod
+   oppure Stryd: per cambiarlo, prima **Dimentica** quello associato); **Dimentica** li toglie. Lo Stryd
+   dà passo, cadenza, distanza e potenza; le altre metriche Stryd (form power, tempo di contatto,
+   oscillazione verticale, rigidità) non sono ancora lette (#125). La prova è F14 in `docs/FIELD_TESTING.md`.
    RunPro si collega alla fascia da **Preparati** fino allo stop: una nuova associazione vale dal
    riscaldamento successivo. Il registro del collegamento è in logcat con il tag `RunProBle`
    (`adb logcat -s RunProBle`).
