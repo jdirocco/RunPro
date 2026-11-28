@@ -241,3 +241,15 @@ Every real failure seen in the field gets a row here, a recorded trace in `testd
 - `SettingsScreenTest` checks the countdown sends START once at expiry and sends nothing after cancel.
   Until then the service stays in warm-up; existing durable-start latency and worker tests cover START
   (R1/R6). Existing low-resource, source-switch and BLE suites continue to cover R5/R7/R8. ADR 0017.
+
+## Data screen evidence (#23)
+
+- `CurrentPowerTest` checks admitted power is published and clears on source silence while the run
+  remains RUNNING (R4); no recording commands, journal format or source policy change.
+- `DataPageTest` exercises rotary, touch and button page navigation while paused and checks the five-field
+  layout on a 192 dp watch surface. `RunProScreenTest` retains lap/pause/resume and confirmed-stop
+  coverage. The UI only reads published state; navigation never submits recording work (R6).
+- `DataScreenPreferencesTest`, `DataScreenEditorTest` and `DataFieldTest` cover saved ordering and
+  duplicate fields, safe fallback, page/field limits, editing, units, separate lap/run metrics and
+  unknown sensor/profile values. Physical Gear Tracker reproduction/readability is the owner
+  *Data screens check (#23)* in `FIELD_TESTING.md`; no field result is claimed.

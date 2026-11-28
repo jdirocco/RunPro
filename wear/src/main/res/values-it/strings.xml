@@ -139,4 +139,37 @@
     <string name="unit_mi">mi</string>
     <string name="unit_pace_mi">min/mi</string>
     <string name="summary_average_pace_mi">media min/mi</string>
+    <string name="data_screens_title">Schermate dati</string>
+    <plurals name="data_page_fields">
+        <item quantity="one">Pagina %1$d · %2$d campo</item>
+        <item quantity="many">Pagina %1$d · %2$d campi</item>
+        <item quantity="other">Pagina %1$d · %2$d campi</item>
+    </plurals>
+    <string name="data_page">%1$d / %2$d</string>
+    <string name="data_slot">Campo %1$d: %2$s</string>
+    <string name="data_add_page">Aggiungi pagina</string>
+    <string name="data_remove_page">Rimuovi pagina</string>
+    <string name="data_add_field">Aggiungi campo</string>
+    <string name="data_remove_field">Rimuovi ultimo campo</string>
+    <string name="data_move_up">Sposta pagina prima</string>
+    <string name="data_move_down">Sposta pagina dopo</string>
+    <string name="field_time">Tempo</string>
+    <string name="field_lap_time">Tempo giro</string>
+    <string name="field_distance">Distanza</string>
+    <string name="field_current_pace">Passo</string>
+    <string name="field_average_pace">Passo medio</string>
+    <string name="field_lap_pace">Passo giro</string>
+    <string name="field_heart_rate">FC</string>
+    <string name="field_hr_zone">Zona FC</string>
+    <string name="field_cadence">Cadenza</string>
+    <string name="field_power">Potenza</string>
+    <string name="field_elevation">Quota</string>
+    <string name="field_clock">Ora</string>
+    <string name="field_battery">Batteria</string>
+    <string name="field_spm">passi/min</string>
+    <string name="field_watts">W</string>
+    <string name="field_feet">ft</string>
+    <string name="field_meters">m</string>
+    <string name="data_previous_page">Pagina precedente</string>
+    <string name="data_next_page">Pagina successiva</string>
 </resources>
