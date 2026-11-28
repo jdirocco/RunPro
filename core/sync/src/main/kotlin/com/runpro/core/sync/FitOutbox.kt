@@ -27,7 +27,8 @@ class FitOutbox(
     private val journals: Path,
     private val exports: Path,
     private val config: EngineConfig = EngineConfig(),
-    private val utcOffsetSeconds: () -> Int = { 0 }
+    private val utcOffsetSeconds: () -> Int = { 0 },
+    private val storageLock: Any = Any()
 ) {
     /** The result of one [sync] pass. */
     data class Report(
@@ -58,10 +59,12 @@ class FitOutbox(
     @Synchronized
     fun sync(link: PhoneLink): Report {
         val problems = mutableListOf<String>()
-        val ready = journals.listDirectoryEntries("*$JOURNAL_SUFFIX")
-            .filter { it.isRegularFile() }
-            .sortedBy { it.name }
-            .mapNotNull { journal -> prepare(journal, problems) }
+        val ready = synchronized(storageLock) {
+            journals.listDirectoryEntries("*$JOURNAL_SUFFIX")
+                .filter { it.isRegularFile() }
+                .sortedBy { it.name }
+                .mapNotNull { journal -> prepare(journal, problems) }
+        }
         val delivered = mutableListOf<String>()
         var reachable = true
         for (export in ready) {
@@ -167,16 +170,16 @@ class FitOutbox(
             SyncProtocol.readAck(channel.input)
         }
 
-    private fun deleteJournal(journal: Path) {
+    private fun deleteJournal(journal: Path) = synchronized(storageLock) {
         verified.remove(journal)
         // The storage reserve of the recording (ADR 0008) first: a journal without it is still a valid run.
         Files.deleteIfExists(journal.resolveSibling(journal.name + RESERVE_SUFFIX))
-        Files.delete(journal)
+        Files.deleteIfExists(journal)
         syncDirectory(journals)
     }
 
     companion object {
         const val JOURNAL_SUFFIX: String = ".journal"
-        private const val RESERVE_SUFFIX = ".reserve"
+        internal const val RESERVE_SUFFIX: String = ".reserve"
     }
 }

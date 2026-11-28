@@ -11,12 +11,15 @@ import android.os.PowerManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import com.runpro.core.model.WorkoutSettings
+import com.runpro.core.recording.RunPhase
 import com.runpro.core.recording.RunState
 import com.runpro.core.recording.exercise.ExerciseStatus
 import com.runpro.core.recording.imu.ImuMode
@@ -26,12 +29,14 @@ import com.runpro.core.recording.service.PermissionReadiness
 import com.runpro.core.recording.service.RunPermission
 import com.runpro.core.recording.service.ServiceCommand
 import com.runpro.core.recording.service.ServicePermissions
+import com.runpro.wear.history.RunHistoryHost
+import com.runpro.wear.history.WatchHistory
 import com.runpro.wear.imu.ImuPreferences
 import com.runpro.wear.sync.PhoneSync
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
-/** Binds to [RecordingService] and shows [RunProScreen]: setup checks, warm-up, run and summary. */
+/** Binds to [RecordingService] and shows [RunProScreen] and [RunHistoryHost]. */
 class MainActivity : ComponentActivity() {
     private var workoutSettings by mutableStateOf(WorkoutSettings())
     private var imuMode by mutableStateOf(ImuPreferences.DEFAULT)
@@ -42,6 +47,8 @@ class MainActivity : ComponentActivity() {
         MutableStateFlow(ExerciseStatus())
     )
     private var backgroundLocationSkipped by mutableStateOf(false)
+    private var showingHistory by mutableStateOf(false)
+    private lateinit var history: WatchHistory
 
     private val askPermissions = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -65,30 +72,66 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         workoutSettings = WorkoutPreferences.load(this)
         imuMode = ImuPreferences.load(this)
+        history = WatchHistory.forContext(this)
         // Runs waiting for the phone are sent again whenever the app opens (#30).
         PhoneSync.request(this)
         setContent {
-            RunProScreen(
-                SetupState(readiness, advice, backgroundLocationSkipped, workoutSettings, imuMode),
-                runState,
-                exercise,
-                SetupActions(
-                    askForeground = { ask(readiness.missingForeground) },
-                    askBackgroundLocation = { ask(listOf(RunPermission.BACKGROUND_LOCATION)) },
-                    skipBackgroundLocation = { backgroundLocationSkipped = true },
-                    confirmSleepingApps = ::confirmSleepingApps,
-                    command = ::send,
-                    configureWorkout = {
-                        workoutSettings = it
-                        WorkoutPreferences.save(this, it)
-                    },
-                    configureImu = {
-                        imuMode = it
-                        ImuPreferences.save(this, it)
-                    }
+            val currentRun by runState.collectAsState()
+            val syncRevision by PhoneSync.revision.collectAsState()
+            val canShowHistory =
+                currentRun.phase == RunPhase.IDLE || currentRun.phase == RunPhase.STOPPED
+            LaunchedEffect(canShowHistory) {
+                if (!canShowHistory) showingHistory = false
+            }
+            LaunchedEffect(showingHistory, canShowHistory, syncRevision) {
+                if (showingHistory && canShowHistory) history.refresh()
+            }
+            if (showingHistory && canShowHistory) {
+                RunHistoryHost(
+                    historyState = history.state,
+                    onRetryExport = history::retryExport,
+                    onDelete = history::delete,
+                    onClearFeedback = history::clearFeedback,
+                    onClose = { showingHistory = false }
                 )
-            )
+            } else {
+                RunProScreen(
+                    SetupState(
+                        readiness,
+                        advice,
+                        backgroundLocationSkipped,
+                        workoutSettings,
+                        imuMode
+                    ),
+                    runState,
+                    exercise,
+                    SetupActions(
+                        askForeground = { ask(readiness.missingForeground) },
+                        askBackgroundLocation = { ask(listOf(RunPermission.BACKGROUND_LOCATION)) },
+                        skipBackgroundLocation = { backgroundLocationSkipped = true },
+                        confirmSleepingApps = ::confirmSleepingApps,
+                        command = ::send,
+                        configureWorkout = {
+                            workoutSettings = it
+                            WorkoutPreferences.save(this, it)
+                        },
+                        configureImu = {
+                            imuMode = it
+                            ImuPreferences.save(this, it)
+                        },
+                        openHistory = {
+                            showingHistory = true
+                            history.refresh()
+                        }
+                    )
+                )
+            }
         }
+    }
+
+    override fun onDestroy() {
+        history.close()
+        super.onDestroy()
     }
 
     override fun onStart() {
@@ -161,5 +204,6 @@ class SetupActions(
     val confirmSleepingApps: () -> Unit,
     val command: (ServiceCommand) -> Unit,
     val configureWorkout: (WorkoutSettings) -> Unit = {},
-    val configureImu: (ImuMode) -> Unit = {}
+    val configureImu: (ImuMode) -> Unit = {},
+    val openHistory: () -> Unit = {}
 )

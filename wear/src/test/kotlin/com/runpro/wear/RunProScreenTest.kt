@@ -37,6 +37,7 @@ class RunProScreenTest {
     val compose = createComposeRule()
 
     private val commands = mutableListOf<ServiceCommand>()
+    private var historyOpened = 0
     private val runState = MutableStateFlow(RunState())
     private val exercise = MutableStateFlow(ExerciseStatus())
 
@@ -46,7 +47,7 @@ class RunProScreenTest {
             advice = emptyList(),
             backgroundLocationSkipped = false
         )
-        val actions = SetupActions({}, {}, {}, {}, commands::add)
+        val actions = SetupActions({}, {}, {}, {}, commands::add, openHistory = { historyOpened++ })
         compose.setContent { RunProScreen(setup, runState, exercise, actions) }
     }
 
@@ -138,6 +139,8 @@ class RunProScreenTest {
         shows("Saved")
         click("Done")
         shows("Get ready")
+        click("History")
+        assertEquals(1, historyOpened)
     }
 
     @Test

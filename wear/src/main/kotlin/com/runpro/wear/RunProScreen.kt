@@ -95,6 +95,7 @@ private fun ScalingLazyListScope.startItems(setup: SetupState, actions: SetupAct
             }
         }
     }
+    item { QuietButton(stringResource(R.string.history_title), actions.openHistory) }
 }
 
 private fun ScalingLazyListScope.permissionItems(setup: SetupState, actions: SetupActions) {
@@ -150,8 +151,13 @@ internal fun Paragraph(text: String) {
 }
 
 @Composable
+internal fun WideButton(label: String, enabled: Boolean = true, onClick: () -> Unit) {
+    Button(onClick = onClick, modifier = Modifier.fillMaxWidth(), enabled = enabled) { Text(label) }
+}
+
+@Composable
 internal fun WideButton(label: String, onClick: () -> Unit) {
-    Button(onClick = onClick, modifier = Modifier.fillMaxWidth()) { Text(label) }
+    WideButton(label = label, enabled = true, onClick = onClick)
 }
 
 /** A secondary action, visually quieter than [WideButton]. */

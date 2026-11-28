@@ -225,6 +225,13 @@ acking and recognises a run it already has, so retries never duplicate it. `:wea
 backoff 30 s to 15 min); `:mobile` receives in `FitReceiverService`. Both apps share the application id
 `com.runpro.wear`. Protocol and decisions: ADR 0010.
 
+Watch history (`RunHistoryStore` in `:core:sync`, `WatchHistory` and `RunHistoryHost` in `:wear`) reads
+the same `files/journals` and `files/exports` directories on its own worker thread (`runpro-history`, R6),
+deriving each finished run's sync state (`PENDING_EXPORT`, `PENDING_SYNC`, `SYNCED`, `EXPORT_FAILED`)
+directly from disk without a separate index. Open journals are excluded and cannot be exported or deleted
+from history. Retry export re-verifies or writes the FIT file without removing the journal (R3) and triggers
+`PhoneSync`; delete requires explicit confirmation (with a warning when unsynced).
+
 ## Auto-lap and intervals (`:core:recording`)
 
 `ConfigureWorkout` selects a free run (default 1 km auto-lap) or warm-up, repeated work/recovery,
