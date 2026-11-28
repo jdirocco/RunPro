@@ -88,6 +88,28 @@ from this Mac, or both release): the Data Layer pairs them by application id and
 4. `adb logcat -s PhoneSync FitReceiver` on each device shows the passes; report the counts on the field-test
    issue.
 
+## Health Connect check (#32)
+
+Physical verification on the phone is an owner check (unit and Robolectric tests do not talk to the
+live Health Connect provider or Samsung Health):
+
+1. Install the phone build (`./gradlew :mobile:installDebug`) and sync at least one outdoor run with GPS,
+   heart rate, cadence and laps from the watch (see F8 above).
+2. Grant RunPro's Health Connect write permissions either in Android Settings → Health Connect → App
+   permissions → RunPro (exercise, exercise route, heart rate, distance, steps), or by opening the
+   rationale screen directly:
+
+   ```bash
+   adb -s <phone> shell am start -n com.runpro.wear/com.runpro.mobile.healthconnect.PermissionsRationaleActivity
+   ```
+
+   Tap **Grant Health Connect permissions** (or **Export pending runs** for runs synced earlier).
+3. Check `adb -s <phone> logcat -s HealthConnectExport` and open Health Connect → Data and access →
+   Activity → Exercise to verify the run appears as Running with route, HR series, distance, steps and
+   laps. Re-tapping **Export pending runs** must not create duplicates.
+4. If Samsung Health is configured to read workouts from Health Connect, confirm whether the run appears
+   in Samsung Health and report actual observations on issue #32.
+
 ## After the run
 
 1. Settings → Diagnostics → Export logs (sends trace + sensor log to the phone).

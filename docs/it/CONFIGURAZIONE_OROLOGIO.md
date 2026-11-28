@@ -111,6 +111,17 @@ la corsa non viene considerata salvata correttamente.
 Sull'orologio una corsa resta salvata finché il telefono non conferma di averla ricevuta; se il telefono è lontano
 la manda appena torna raggiungibile o quando riapri RunPro. La prova completa è la F8 in `docs/FIELD_TESTING.md`.
 
+Per esportare automaticamente le corse ricevute in **Connessione Salute (Health Connect)** (sessione di corsa,
+percorso GPS, battito, distanza, passi e giri; sola scrittura), concedi i permessi a RunPro da **Impostazioni →
+Connessione Salute → Autorizzazioni app → RunPro**, oppure apri sul telefono la schermata dei permessi con:
+
+```bash
+adb -s <seriale del telefono> shell am start -n com.runpro.wear/com.runpro.mobile.healthconnect.PermissionsRationaleActivity
+```
+
+I dettagli della verifica su telefono (inclusa la visibilità in Samsung Health) sono nella sezione *Health Connect check*
+di `docs/FIELD_TESTING.md`.
+
 ## 7. Impostazioni dell'orologio per correre con RunPro
 
 Da fare una volta dopo la prima installazione, e da ricontrollare dopo ogni aggiornamento di One UI Watch.

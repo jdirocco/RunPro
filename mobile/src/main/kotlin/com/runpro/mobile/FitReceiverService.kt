@@ -9,6 +9,7 @@ import com.google.android.gms.wearable.WearableListenerService
 import com.runpro.core.sync.FitInbox
 import com.runpro.core.sync.SyncChannel
 import com.runpro.core.sync.SyncProtocol
+import com.runpro.mobile.healthconnect.HealthConnectExportRunner
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
@@ -35,6 +36,9 @@ class FitReceiverService : WearableListenerService() {
             )
             Log.i(TAG, "FIT from ${channel.nodeId}: $outcome")
             output.close()
+            if (outcome is FitInbox.Outcome.Stored) {
+                HealthConnectExportRunner.scheduleExport(applicationContext, outcome.file)
+            }
         } catch (e: Exception) {
             // Nothing was acknowledged; the watch keeps the journal and sends the run again.
             Log.w(TAG, "FIT transfer failed", e)
