@@ -158,7 +158,8 @@ consecutive sessions that never streamed, and discovery held while the device is
 completes inline and closed sessions stay silent; the first connect uses `autoConnect=false`, reconnects
 `true`. `WatchBle` follows the run phases: links from the warm-up to the stop. Pairing (**Sensors** on
 the setup screen) uses a `CompanionDeviceManager` association where the watch supports it, which also
-grants the companion background rights, and a short filtered scan otherwise. Decisions: ADR 0018.
+grants the companion background rights, and a short filtered scan otherwise or when the chooser fails
+or closes (#115). Decisions: ADR 0018.
 
 ## Journal format (`:core:journal`)
 

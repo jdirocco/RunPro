@@ -1,6 +1,7 @@
 package com.runpro.wear.ble
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.IntentSenderRequest
@@ -16,14 +17,18 @@ import com.runpro.wear.AndroidPermissions
 import com.runpro.wear.R
 
 /**
- * Pairs the strap and the footpod (#17): the companion device chooser where the watch has one, otherwise
- * a short scan. The choice is saved in [BlePreferences]; a run already recording keeps its sensors and
- * the next warm-up connects to the new ones.
+ * Pairs the strap and the footpod (#17): the companion device chooser where the watch has one,
+ * otherwise a short scan. A chooser that fails or closes without an association (Wear OS refuses
+ * third-party associations on the Galaxy Watch 5 Pro, #115) falls back to the scan, which the screen
+ * then uses directly.
+ * The choice is saved in [BlePreferences]; a run already recording keeps its sensors and the next
+ * warm-up connects to the new ones.
  */
 class SensorActivity : ComponentActivity() {
     private var state by mutableStateOf(SensorScreenState())
     private lateinit var association: BleAssociation
     private lateinit var scan: BleScan
+    private var companionWorks = true
 
     private val askBluetooth = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -39,7 +44,7 @@ class SensorActivity : ComponentActivity() {
             this,
             launch = { chooser.launch(IntentSenderRequest.Builder(it).build()) },
             paired = ::save,
-            failed = { state = state.copy(searching = null, message = R.string.sensors_not_paired) }
+            failed = ::companionFailed
         )
         scan = BleScan(this) { found ->
             if (state.found.none { it.address == found.address }) {
@@ -69,7 +74,8 @@ class SensorActivity : ComponentActivity() {
     }
 
     override fun onStop() {
-        if (!association.supported) stopSearch()
+        // The companion chooser covers this screen: only an own scan stops here.
+        if (scan.active) stopSearch()
         super.onStop()
     }
 
@@ -88,10 +94,22 @@ class SensorActivity : ComponentActivity() {
 
     private fun pair(kind: BleSensorKind) {
         state = state.copy(searching = kind, found = emptyList(), message = null)
-        if (association.supported) {
+        if (association.supported && companionWorks) {
             association.pair(kind)
         } else if (!scan.start(kind) { state = state.copy(searching = null) }) {
             state = state.copy(searching = null, message = R.string.sensors_bluetooth_off)
+        }
+    }
+
+    /** The chooser failed, was refused or closed without an association: scan instead (#115). */
+    private fun companionFailed(reason: String?) {
+        Log.w(TAG, "companion association failed: ${reason ?: "chooser closed"}; scanning")
+        companionWorks = false
+        val kind = state.searching
+        when {
+            scan.active -> Unit
+            kind != null -> pair(kind)
+            else -> state = state.copy(message = R.string.sensors_not_paired)
         }
     }
 
@@ -119,5 +137,9 @@ class SensorActivity : ComponentActivity() {
         BlePreferences.save(this, paired)
         state =
             state.copy(paired = paired, searching = null, found = emptyList(), message = message)
+    }
+
+    private companion object {
+        const val TAG = "RunProBle"
     }
 }
