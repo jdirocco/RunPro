@@ -24,8 +24,9 @@ class FileJournalOutput internal constructor(
     override var storageFull: Boolean = false
         private set
 
+    // File.usableSpace queries statvfs directly; Files.getFileStore scans /proc/mounts and fails on Android (#12).
     override val availableBytes: Long
-        get() = if (storageFull) 0 else Files.getFileStore(file).usableSpace
+        get() = if (storageFull) 0 else file.toFile().usableSpace
 
     override fun write(bytes: ByteArray, offset: Int, length: Int) {
         val position = channel.position()

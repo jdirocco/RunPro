@@ -7,11 +7,44 @@
     <string name="run_recording">Recording</string>
     <string name="run_paused">Paused</string>
     <string name="run_stopped">Stopped</string>
-    <string name="run_stopped_after">Stopped after %1$s</string>
     <string name="run_start">Start</string>
     <string name="run_pause">Pause</string>
     <string name="run_resume">Resume</string>
     <string name="run_stop">Stop</string>
+
+    <string name="run_get_ready">Get ready</string>
+    <string name="run_lap_button">Lap</string>
+    <string name="run_lap">Lap %1$d · %2$s</string>
+    <string name="unit_km">km</string>
+    <string name="unit_pace">min/km</string>
+    <string name="unit_bpm">bpm</string>
+
+    <string name="warmup_title">Getting GPS and heart rate</string>
+    <string name="warmup_gps">GPS</string>
+    <string name="warmup_heart_rate">Heart rate</string>
+    <string name="warmup_ready">ready</string>
+    <string name="warmup_waiting">searching</string>
+    <string name="warmup_unavailable">unavailable</string>
+    <string name="warmup_not_used">off</string>
+    <string name="warmup_other_app">Another app is recording a workout: starting the run ends it.</string>
+    <string name="warmup_no_health_services">No GPS or wrist heart rate from the watch: the run records time only.</string>
+    <string name="warmup_cancel">Back</string>
+
+    <string name="stop_question">Stop and save the run?</string>
+    <string name="stop_keep_running">Keep running</string>
+    <string name="stop_confirm">Stop and save</string>
+
+    <string name="summary_title">Run done</string>
+    <string name="summary_average_pace">average min/km</string>
+    <string name="summary_average_hr">average bpm</string>
+    <plurals name="summary_laps">
+        <item quantity="one">%1$d lap</item>
+        <item quantity="other">%1$d laps</item>
+    </plurals>
+    <string name="summary_saved">Saved</string>
+    <string name="summary_saving">Saving…</string>
+    <string name="summary_not_saved">Not saved: the run could not be written to the watch storage.</string>
+    <string name="summary_done">Done</string>
 
     <string name="setup_permissions_intro">RunPro needs:</string>
     <string name="permission_location">Location, for GPS distance and pace</string>
@@ -26,7 +59,6 @@
     <string name="setup_battery_unrestricted">RunPro is not exempt from battery optimisation, so the watch can stop it during a run. The watch has no setting for this: from the computer, run</string>
     <string name="setup_sleeping_apps">On the phone, open Galaxy Wearable, Watch settings, Battery: RunPro must not be in Sleeping apps or Deep sleeping apps.</string>
     <string name="setup_checked">Done, checked</string>
-    <string name="run_lap">Lap</string>
     <string name="workout_mode">Workout: %1$s</string>
     <string name="workout_free">Free run</string>
     <string name="workout_intervals">Intervals</string>

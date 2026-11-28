@@ -113,8 +113,9 @@ are the owner field test #75; live journals are wired by #60 (ADR 0011); sync pr
 - `ExerciseControllerTest`: an exercise ended by another app (`AUTO_END_SUPERSEDED`) or by a revoked
   permission is reported and loses the GPS fix, but later pause/resume of the run send nothing and the
   run is never paused or stopped by the adapter (R4). Failed checks, starts and registrations are reported
-  and not retried in a loop; our exercise is adopted after a restart instead of started twice; requests
-  never overlap and commands never block (R6: the listener runs on the Health Services thread).
+  and not retried in a loop; our exercise is adopted after a restart instead of started twice; the update
+  listener registers after `prepare`/`start` completes so initial sensor availability is not dropped;
+  requests never overlap and commands never block (R6: the listener runs on the Health Services thread).
 - `ExerciseSampleMapperTest`: invalid readings are dropped at the edge, distance deltas add up, both
   clocks are set from the monotonic time.
 - `HealthServicesSyntheticRunTest` (emulator, `./gradlew :wear:connectedDebugAndroidTest`) records a run
@@ -192,3 +193,5 @@ Every real failure seen in the field gets a row here, a recorded trace in `testd
 |---|---|---|---|---|
 | 2026-11-26 | #10 | Setup screen: "Open settings" for battery did nothing on the Galaxy Watch 5 Pro. On Wear OS `ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS` resolves to a placeholder activity that closes at once, so the fallback never ran. Now opens the app details page. | none (UI, no sensor data) | `BatterySettingsTest` |
 | 2026-11-26 | #10 | The app details page has no Battery entry on the watch either, and `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` is also a placeholder: no screen can exempt RunPro. The setup screen now shows the adb command instead of a button. | none (UI, no sensor data) | `BatterySettingsTest` |
+| 2026-11-27 | #12 | Warm-up screen: tapping "Start" ("Avvia") did nothing on the Galaxy Watch 5 Pro while "Back" returned to the start screen, leaving a 0-byte `.journal` file in `files/journals`. `FileJournalOutput.availableBytes` called `Files.getFileStore(path)`, which scans `/proc/mounts` and throws `IOException` ("Mount point not found") on Android `/data/user/0/...` before `RunStarted` is written; `RecordingSession` caught it, set `journalFailed` and stayed in `PREPARING` with no error shown on the warm-up screen. `FileJournalOutput` now queries `File.usableSpace` (`statvfs`), the warm-up screen shows storage errors, and `Reset` replaces a failed warm-up session. | none (pre-start storage check, no sensor data) | `ReservedStorageTest`, `JournalFailureTest`, `RunProScreenTest` |
+| 2026-11-28 | #12 | Warm-up logged `W/ExerciseUpdateListener: Availability received without any requested DataTypes` on the Galaxy Watch 5 Pro and dropped initial availability events. `ExerciseController` called `setUpdateCallback` right after `inspect`, before `prepareExerciseAsync` / `startExerciseAsync` populated `ServiceBackedExerciseClient.requestedDataTypes`. The controller now registers the listener once `prepare` or `start` completes (or immediately when adopting an already-active exercise). | none (Health Services warm-up handshake, no sensor data) | `ExerciseControllerTest` |

@@ -19,7 +19,9 @@ import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import com.runpro.core.model.WorkoutSettings
+import com.runpro.core.recording.RunPhase
 import com.runpro.core.recording.RunState
+import com.runpro.core.recording.exercise.ExerciseStatus
 import com.runpro.core.recording.imu.ImuMode
 import com.runpro.core.recording.service.BatteryAdvice
 import com.runpro.core.recording.service.BatteryGuidance
@@ -34,16 +36,16 @@ import com.runpro.wear.sync.PhoneSync
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
-/**
- * Setup checks before a run (permissions, battery settings) and minimal run controls. The real run screens
- * are issue #12.
- */
+/** Binds to [RecordingService] and shows [RunProScreen] and [RunHistoryHost]. */
 class MainActivity : ComponentActivity() {
     private var workoutSettings by mutableStateOf(WorkoutSettings())
     private var imuMode by mutableStateOf(ImuPreferences.DEFAULT)
     private var readiness by mutableStateOf(ServicePermissions.readiness(emptySet()))
     private var advice by mutableStateOf(emptyList<BatteryAdvice>())
     private var runState by mutableStateOf<StateFlow<RunState>>(MutableStateFlow(RunState()))
+    private var exercise by mutableStateOf<StateFlow<ExerciseStatus>>(
+        MutableStateFlow(ExerciseStatus())
+    )
     private var backgroundLocationSkipped by mutableStateOf(false)
     private var showingHistory by mutableStateOf(false)
     private lateinit var history: WatchHistory
@@ -54,11 +56,15 @@ class MainActivity : ComponentActivity() {
 
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
-            (binder as? RecordingService.LocalBinder)?.let { runState = it.state }
+            (binder as? RecordingService.LocalBinder)?.let {
+                runState = it.state
+                exercise = it.exercise
+            }
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
             runState = MutableStateFlow(RunState())
+            exercise = MutableStateFlow(ExerciseStatus())
         }
     }
 
@@ -70,11 +76,17 @@ class MainActivity : ComponentActivity() {
         // Runs waiting for the phone are sent again whenever the app opens (#30).
         PhoneSync.request(this)
         setContent {
+            val currentRun by runState.collectAsState()
             val syncRevision by PhoneSync.revision.collectAsState()
-            LaunchedEffect(showingHistory, syncRevision) {
-                if (showingHistory) history.refresh()
+            val canShowHistory =
+                currentRun.phase == RunPhase.IDLE || currentRun.phase == RunPhase.STOPPED
+            LaunchedEffect(canShowHistory) {
+                if (!canShowHistory) showingHistory = false
             }
-            if (showingHistory) {
+            LaunchedEffect(showingHistory, canShowHistory, syncRevision) {
+                if (showingHistory && canShowHistory) history.refresh()
+            }
+            if (showingHistory && canShowHistory) {
                 RunHistoryHost(
                     historyState = history.state,
                     onRetryExport = history::retryExport,
@@ -92,6 +104,7 @@ class MainActivity : ComponentActivity() {
                         imuMode
                     ),
                     runState,
+                    exercise,
                     SetupActions(
                         askForeground = { ask(readiness.missingForeground) },
                         askBackgroundLocation = { ask(listOf(RunPermission.BACKGROUND_LOCATION)) },
@@ -154,7 +167,8 @@ class MainActivity : ComponentActivity() {
 
     private fun send(command: ServiceCommand) {
         val intent = RecordingService.intent(this, command)
-        if (command == ServiceCommand.START) {
+        // These may enter the foreground; the others only reach a service that already is.
+        if (command == ServiceCommand.PREPARE || command == ServiceCommand.START) {
             ContextCompat.startForegroundService(this, intent)
         } else {
             startService(intent)

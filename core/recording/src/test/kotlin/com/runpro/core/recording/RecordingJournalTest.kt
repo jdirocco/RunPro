@@ -170,6 +170,48 @@ class RecordingJournalTest {
     }
 
     @Test
+    fun `a cancelled warm-up writes nothing and the next start journals one run`(
+        @TempDir dir: Path
+    ) {
+        val directory = dir.resolve("journals")
+        RecordingEngine(
+            dispatcher = Dispatchers.Unconfined,
+            sessionFactory = { RecordingSession.create(directory) }
+        ).use { engine ->
+            engine.submit(prepare(0))
+            engine.submit(EngineInput.Reset)
+            assertEquals(RunPhase.IDLE, engine.state.value.phase)
+            assertFalse(Files.exists(directory))
+
+            engine.submit(prepare(1))
+            engine.submit(start(1))
+            val run = engine.state.value.run!!.id
+            engine.submit(stop(2))
+            assertTrue(engine.state.value.journalSaved)
+            assertEquals(
+                listOf("$run.journal"),
+                Files.list(directory).use { files ->
+                    files.map { it.fileName.toString() }.toList()
+                }
+            )
+        }
+    }
+
+    @Test
+    fun `a recording run refuses reset, so its journal is never dropped`(@TempDir dir: Path) {
+        val directory = dir.resolve("journals")
+        RecordingEngine(
+            dispatcher = Dispatchers.Unconfined,
+            sessionFactory = { RecordingSession.create(directory) }
+        ).use { engine ->
+            engine.submit(prepare(0))
+            engine.submit(start(0))
+            engine.submit(EngineInput.Reset)
+            assertEquals(RunPhase.RUNNING, engine.state.value.phase)
+        }
+    }
+
+    @Test
     fun `rejected start on low battery creates no journal and allows a later start`(
         @TempDir dir: Path
     ) {

@@ -11,9 +11,69 @@ class ServiceStartPolicyTest {
         for (phase in listOf(RunPhase.IDLE, RunPhase.STOPPED)) {
             assertEquals(Decision.START_RUN, ServiceStartPolicy.decide(ServiceCommand.START, phase))
         }
-        for (phase in listOf(RunPhase.PREPARING, RunPhase.RUNNING, RunPhase.PAUSED)) {
+        for (phase in listOf(RunPhase.RUNNING, RunPhase.PAUSED)) {
             val decision = ServiceStartPolicy.decide(ServiceCommand.START, phase)
             assertEquals(Decision.KEEP_RUNNING, decision)
+        }
+    }
+
+    @Test
+    fun `a start command during the warm-up starts the prepared run`() {
+        assertEquals(
+            Decision.FORWARD,
+            ServiceStartPolicy.decide(ServiceCommand.START, RunPhase.PREPARING)
+        )
+    }
+
+    @Test
+    fun `a prepare command warms up the sensors only when no run is active`() {
+        for (phase in listOf(RunPhase.IDLE, RunPhase.STOPPED)) {
+            assertEquals(
+                Decision.PREPARE_RUN,
+                ServiceStartPolicy.decide(ServiceCommand.PREPARE, phase)
+            )
+        }
+        for (phase in listOf(RunPhase.PREPARING, RunPhase.RUNNING, RunPhase.PAUSED)) {
+            assertEquals(
+                Decision.KEEP_RUNNING,
+                ServiceStartPolicy.decide(ServiceCommand.PREPARE, phase)
+            )
+        }
+    }
+
+    @Test
+    fun `cancel ends a warm-up but never a recording run`() {
+        assertEquals(
+            Decision.FORWARD,
+            ServiceStartPolicy.decide(ServiceCommand.CANCEL, RunPhase.PREPARING)
+        )
+        // R1: a run that records is only ever stopped (and saved), never discarded.
+        for (phase in listOf(RunPhase.RUNNING, RunPhase.PAUSED)) {
+            assertEquals(
+                Decision.KEEP_RUNNING,
+                ServiceStartPolicy.decide(ServiceCommand.CANCEL, phase)
+            )
+        }
+        for (phase in listOf(RunPhase.IDLE, RunPhase.STOPPED)) {
+            assertEquals(
+                Decision.STOP_SERVICE,
+                ServiceStartPolicy.decide(ServiceCommand.CANCEL, phase)
+            )
+        }
+    }
+
+    @Test
+    fun `run commands during the warm-up do not touch the prepared run`() {
+        for (command in listOf(
+            ServiceCommand.PAUSE,
+            ServiceCommand.RESUME,
+            ServiceCommand.LAP,
+            ServiceCommand.STOP
+        )) {
+            assertEquals(
+                Decision.KEEP_RUNNING,
+                ServiceStartPolicy.decide(command, RunPhase.PREPARING)
+            )
         }
     }
 

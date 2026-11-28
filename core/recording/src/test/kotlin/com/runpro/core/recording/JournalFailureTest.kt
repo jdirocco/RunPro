@@ -89,4 +89,33 @@ class JournalFailureTest {
             assertEquals("keep", Files.readString(directory))
         }
     }
+
+    @Test
+    fun `reset after a failed start during warm-up creates a fresh session that can start`(
+        @TempDir dir: Path
+    ) {
+        var directory = dir.resolve("not-a-directory")
+        Files.writeString(directory, "keep")
+        RecordingEngine(
+            dispatcher = Dispatchers.Unconfined,
+            sessionFactory = { RecordingSession.create(directory) }
+        ).use { engine ->
+            engine.submit(prepare(0))
+            engine.submit(start(0))
+            assertTrue(engine.state.value.journalFailed)
+            assertEquals(RunPhase.PREPARING, engine.state.value.phase)
+
+            directory = dir.resolve("journals")
+            engine.submit(EngineInput.Reset)
+            assertEquals(RunPhase.IDLE, engine.state.value.phase)
+            assertFalse(engine.state.value.journalFailed)
+
+            engine.submit(prepare(1))
+            engine.submit(start(1))
+            assertEquals(RunPhase.RUNNING, engine.state.value.phase)
+            assertFalse(engine.state.value.journalFailed)
+            engine.submit(stop(2))
+            assertTrue(engine.state.value.journalSaved)
+        }
+    }
 }
