@@ -29,6 +29,7 @@ import com.runpro.core.recording.service.PermissionReadiness
 import com.runpro.core.recording.service.RunPermission
 import com.runpro.core.recording.service.ServiceCommand
 import com.runpro.core.recording.service.ServicePermissions
+import com.runpro.wear.ble.SensorActivity
 import com.runpro.wear.history.RunHistoryHost
 import com.runpro.wear.history.WatchHistory
 import com.runpro.wear.imu.ImuPreferences
@@ -142,6 +143,9 @@ class MainActivity : ComponentActivity() {
         openHistory = {
             showingHistory = true
             history.refresh()
+        },
+        openSensors = {
+            startActivity(Intent(this, SensorActivity::class.java))
         }
     )
 
@@ -222,5 +226,6 @@ class SetupActions(
     val configureWorkout: (WorkoutSettings) -> Unit = {},
     val configureImu: (ImuMode) -> Unit = {},
     val openHistory: () -> Unit = {},
-    val openSettings: () -> Unit = {}
+    val openSettings: () -> Unit = {},
+    val openSensors: () -> Unit = {}
 )

@@ -30,6 +30,7 @@ import com.runpro.core.recording.service.ServiceCommand
 import com.runpro.core.recording.service.ServiceStartPolicy
 import com.runpro.core.recording.service.ServiceStartPolicy.Decision
 import com.runpro.core.recording.service.WarmUpTimeout
+import com.runpro.wear.ble.WatchBle
 import com.runpro.wear.health.HealthServicesExercise
 import com.runpro.wear.imu.ImuPreferences
 import com.runpro.wear.imu.WatchImu
@@ -50,6 +51,9 @@ import kotlinx.coroutines.flow.StateFlow
  *   intent, and [RunRecovery] restores the run (the journal implementation is #9).
  * - The Health Services exercise follows the phases of the engine ([ExerciseController.follow], #11) and
  *   its samples go to the engine. A refused or lost exercise never pauses or stops the run (R4).
+ * - Paired BLE sensors ([WatchBle], #17) connect on their own thread from the warm-up to the stop; their
+ *   samples and connect/disconnect events go to the engine. A sensor that drops never pauses or stops the
+ *   run (R4); the engine falls back to the wrist (R5).
  * - The IMU capture ([ImuCapture], #33) follows the run on its own thread into `files/imu`, apart from
  *   the journal; it never affects the run (ADR 0012).
  * - A warm-up left alone ends after [WarmUpTimeout.DEFAULT_LIMIT] (#82): the service resets the engine and
@@ -70,6 +74,8 @@ class RecordingService : Service() {
     private val imuThread = HandlerThread("runpro-imu").apply { start() }
     private lateinit var imu: ImuCapture
     private lateinit var battery: WatchBattery
+    private val bleThread = HandlerThread("runpro-ble").apply { start() }
+    private lateinit var ble: WatchBle
     private lateinit var debugTrace: DebugTrace
 
     internal var createSession: () -> RecordingSession = {
@@ -81,6 +87,7 @@ class RecordingService : Service() {
     internal var createExercise: () -> ExerciseController = {
         HealthServicesExercise.create(this, ::now)
     }
+    internal var createBle: (Looper) -> WatchBle = { looper -> WatchBle(this, looper, ::now) }
 
     // Match the journal's ordinary free-byte policy; reclaimable cache is not reserved capacity.
     @SuppressLint("UsableSpace")
@@ -127,6 +134,7 @@ class RecordingService : Service() {
         notification = RunNotification(this).also { it.createChannel() }
         foreground = ForegroundController(this, notification)
         exercise = createExercise().also { it.start(EngineFeed()) }
+        ble = createBle(bleThread.looper).also { it.start(EngineFeed()) }
         battery = WatchBattery(this) { percent ->
             engine.submit(EngineInput.Resources(now(), batteryPercent = percent))
         }.also { it.start() }
@@ -156,6 +164,8 @@ class RecordingService : Service() {
     override fun onDestroy() {
         // The exercise is not ended here: after a restart its owner adopts it (ExerciseController).
         exercise.stop()
+        ble.close()
+        bleThread.quitSafely()
         battery.close()
         ticker.shutdownNow()
         engine.close()
@@ -267,6 +277,8 @@ class RecordingService : Service() {
         lastJournalFailed = state.journalFailed
         // Non-blocking: the controller only queues requests to Health Services.
         if (changed) exercise.follow(exercisePhase(state))
+        // Only posts to the BLE thread: paired sensors connect from the warm-up to the stop.
+        if (changed) ble.follow(state.phase)
         // Only queues to the IMU thread, and only when something changed.
         imu.follow(state, imuMode)
         main.post {
@@ -298,7 +310,7 @@ class RecordingService : Service() {
         }
     }
 
-    /** Health Services samples and sensor events go to the engine, which journals both (#60). */
+    /** Health Services and BLE samples and sensor events go to the engine, which journals both (#60). */
     private inner class EngineFeed : SensorListener {
         override fun onSample(sample: Sample) {
             engine.submit(EngineInput.SampleReceived(sample))

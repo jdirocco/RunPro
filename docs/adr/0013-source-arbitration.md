@@ -51,7 +51,7 @@ late batches, and recovery sees admitted samples rather than every standby readi
   baseline. Replaying checkpoints cannot invent additional switches or laps.
 - `RunState.activeSources` is an immutable snapshot. The run screen uses its HR selection for distinct
   strap/wrist icons with localized accessibility descriptions, and removes the icon when no source is
-  available. Actual BLE watch ingestion/association follows in #17.
+  available. Actual BLE watch ingestion/association: ADR 0018 (#17).
 
 ## Evidence
 

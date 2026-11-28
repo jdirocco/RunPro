@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Schermata sensori BLE (#17). -->
+<resources>
+    <string name="sensors_title">Sensori</string>
+    <string name="sensors_open">Sensori</string>
+    <string name="sensors_pair_strap">Associa fascia cardio</string>
+    <string name="sensors_pair_footpod">Associa footpod</string>
+    <string name="sensors_strap">Fascia: %1$s</string>
+    <string name="sensors_footpod">Footpod: %1$s</string>
+    <string name="sensors_forget">Dimentica</string>
+    <string name="sensors_searching">Ricerca in corso. Sveglia il sensore (indossa la fascia).</string>
+    <string name="sensors_stop_search">Interrompi ricerca</string>
+    <string name="sensors_paired">Associato</string>
+    <string name="sensors_not_paired">Non associato</string>
+    <string name="sensors_bluetooth_off">Attiva il Bluetooth per cercare</string>
+    <string name="sensors_next_run">Usato dal prossimo riscaldamento</string>
+    <string name="sensors_close">Fatto</string>
+</resources>

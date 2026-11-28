@@ -12,6 +12,7 @@
 :core:ble          BLE protocol parsers (0x180D, 0x1814, 0x1818, Stryd) and the connection state machine,
                    behind a GattPort interface (fakeable)
 :wear              Wear OS app: Compose UI, RecordingService, Health Services adapter, Android GATT adapter
+                   and sensor pairing
 :mobile            Phone companion: Data Layer receiver, Strava, Health Connect
 :tools:replay      trace format, recorder, replayer, chaos injector (JVM)
 ```
@@ -134,7 +135,30 @@ every 100 ms using monotonic milliseconds. Each required measurement characteris
 five-second watchdog; resubscription must restore real notifications within one second after its last
 CCCD write. Backoff resets only after every required stream sends data. Failed close stays in Closing;
 stop cancels pending work and retries. Defaults, port contract and R8 timing limits: ADR 0012.
-The Android adapter and sensor-log persistence/export follow in #17 and #20.
+Sensor-log persistence/export follows in #20.
+
+## BLE adapter and pairing (`:core:ble` link, `:wear` ble)
+
+```
+SensorActivity ─► CompanionDeviceManager (or BleScan) ─► BlePreferences (PairedSensors, one per kind)
+                                                                │ read when a run prepares
+RecordingService ─► WatchBle (runpro-ble thread, 100 ms tick) ──┘
+                        │ one per paired sensor
+                        ▼
+                  BleSensorLink ─► BleConnectionStateMachine ─► AndroidGattPort ─► BluetoothGatt (TRANSPORT_LE)
+                        │ parsed samples, Connected / Disconnected(status)
+                        ▼
+                  engine feed (same as Health Services) ─► source arbitration (ADR 0013)
+```
+
+`BleSensorLink` (pure) adds to the controller what is policy: samples only while streaming and from the
+current session, connect/disconnect `SensorEvent`s, a GATT cache refresh before discovery after two
+consecutive sessions that never streamed, and discovery held while the device is bonding. The Android
+`AndroidGattPort` posts every `BluetoothGattCallback` (one per session) to the BLE thread, so nothing
+completes inline and closed sessions stay silent; the first connect uses `autoConnect=false`, reconnects
+`true`. `WatchBle` follows the run phases: links from the warm-up to the stop. Pairing (**Sensors** on
+the setup screen) uses a `CompanionDeviceManager` association where the watch supports it, which also
+grants the companion background rights, and a short filtered scan otherwise. Decisions: ADR 0018.
 
 ## Journal format (`:core:journal`)
 

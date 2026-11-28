@@ -98,6 +98,7 @@ private fun ScalingLazyListScope.startItems(setup: SetupState, actions: SetupAct
         }
     }
     item { QuietButton(stringResource(R.string.settings_title), actions.openSettings) }
+    item { QuietButton(stringResource(R.string.sensors_open), actions.openSensors) }
     item { QuietButton(stringResource(R.string.history_title), actions.openHistory) }
 }
 
