@@ -80,6 +80,7 @@ fun RunProScreen(
                         status,
                         state,
                         actions = actions,
+                        strapPaired = setup.strapPaired,
                         countdownSeconds = setup.workoutSettings.runSettings.countdownSeconds
                     )
 

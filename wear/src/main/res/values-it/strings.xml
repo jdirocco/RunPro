@@ -26,6 +26,7 @@
     <string name="warmup_not_used">spento</string>
     <string name="warmup_other_app">Un\'altra app sta registrando un allenamento: avviando la corsa si chiude.</string>
     <string name="warmup_no_health_services">Niente GPS né battito dal polso: la corsa registra solo il tempo.</string>
+    <string name="warmup_strap_connecting">Fascia: in collegamento</string>
     <string name="warmup_cancel">Indietro</string>
 
     <string name="stop_question">Fermare e salvare la corsa?</string>
