@@ -12,7 +12,7 @@ Everything runs from the repository root: `/Users/juridirocco/development/RunPro
 | Milestones | GitHub milestones M0–M7, with due dates | Release phases (see `docs/PLAN.md`) |
 | Board | https://github.com/users/jdirocco/projects/1 | Todo / In Progress / Done |
 | Agent rules | `AGENTS.md` (loaded natively by Codex and Antigravity, and by Claude Code through `CLAUDE.md`) | The loop and the rules every agent follows |
-| Skills | `.agents/skills/` (symlinked in `.claude/skills/`) | `runpro-task` (implement an issue), `runpro-review` (PR + R1–R8 review), `runpro-triage` (field-report triage) |
+| Skills | `.agents/skills/` (symlinked in `.claude/skills/`) | `runpro-task` (implement an issue), `runpro-orchestrate` (parallel multi-agent dispatch), `runpro-review` (PR + R1–R8 review), `runpro-triage` (field-report triage) |
 | Invariants | `docs/RELIABILITY.md` | R1–R8: what can never break |
 | Field tests | `docs/FIELD_TESTING.md` + "Field report" issue template | Your runs on the watch, fed back to agents |
 | Watch setup (Italian) | `docs/it/CONFIGURAZIONE_OROLOGIO.md` | Developer options, Wi-Fi ADB, install, permissions, battery, strap |
@@ -411,7 +411,7 @@ Or open Antigravity, Claude Code or Codex in `/Users/juridirocco/development/Run
 against R1–R8 and `runpro-triage` turns field reports into replay tests). Either way the agent implements
 with tests, runs `./rp check`, asks before `./rp pr`, and you review and merge on GitHub.
 
-### B. Several agents in parallel
+### B. Several agents in parallel (manual or orchestrated)
 
 Only on issues with no dependency on each other and in different modules (for example #3 `:core:model`
 and #6 watch setup docs). Give each one its own worktree, in separate terminals:
@@ -423,6 +423,22 @@ $ ./rp agent 6 codex --worktree
 
 Each works in `../RunPro-worktrees/<branch>`. When done, run `./rp pr` inside that folder, and after the
 merge remove it with `git worktree remove ../RunPro-worktrees/<branch>`.
+
+To let Antigravity (or another coordinating agent) drive a parallel batch automatically, open it in
+`/Users/juridirocco/development/RunPro` and ask it to act as orchestrator (for example,
+"Orchestrate the next ready RunPro batch"). The `runpro-orchestrate` skill surveys `./rp status` and
+`./rp next --all`, picks 2–3 conflict-free issues across disjoint modules, routes each by complexity to an
+installed runner in `--auto --headless --worktree` mode, and audits every opened PR with `runpro-review`
+without merging:
+
+```
+$ ./rp agent 82 codex --auto --headless --worktree -- --oss --local-provider ollama   # XS/S on local Ollama (or agy --model flash)
+$ ./rp agent 71 codex --auto --headless --worktree                                    # M on cloud Codex / AGY
+$ ./rp agent 17 agy --auto --headless --worktree -- --effort high                     # M-L/L or reliability on frontier Claude / Codex / AGY
+```
+
+Ensure the orchestrator's project permissions allow network access (`gh`, `git`, Gradle) and file access to
+`../RunPro-worktrees` and build caches (`~/.gradle`, `~/.android`) so background workers run unattended.
 
 ### C. A field test
 
