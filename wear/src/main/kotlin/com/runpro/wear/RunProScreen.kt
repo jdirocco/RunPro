@@ -96,6 +96,7 @@ private fun ScalingLazyListScope.runItems(
                     }
                 }
             }
+            item { WideButton(stringResource(R.string.history_title), actions.openHistory) }
         }
 
         RunPhase.PREPARING -> item { Paragraph(stringResource(R.string.run_starting)) }
@@ -145,8 +146,13 @@ private fun Paragraph(text: String) {
 }
 
 @Composable
+internal fun WideButton(label: String, enabled: Boolean = true, onClick: () -> Unit) {
+    Button(onClick = onClick, modifier = Modifier.fillMaxWidth(), enabled = enabled) { Text(label) }
+}
+
+@Composable
 internal fun WideButton(label: String, onClick: () -> Unit) {
-    Button(onClick = onClick, modifier = Modifier.fillMaxWidth()) { Text(label) }
+    WideButton(label = label, enabled = true, onClick = onClick)
 }
 
 private fun permissionText(permission: RunPermission): Int = when (permission) {

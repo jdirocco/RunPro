@@ -10,9 +10,14 @@ import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 /** Where the watch keeps journals and FIT exports. The recording service supplies [journals] to the engine. */
 object WatchStorage {
+    /** Coordinates local journal/export file mutations between [PhoneSync] and watch history. */
+    internal val lock: Any = Any()
+
     fun journals(context: Context): File = File(context.filesDir, "journals")
 
     fun exports(context: Context): File = File(context.filesDir, "exports")
@@ -34,6 +39,10 @@ object PhoneSync {
     private val executor: ScheduledExecutorService = daemonThread("runpro-sync")
     private val watchdog: ScheduledExecutorService = daemonThread("runpro-sync-watchdog")
     private val queued = AtomicBoolean(false)
+    private val _revision = MutableStateFlow(0L)
+
+    /** Increments after every sync pass so UI observers (such as watch history) can refresh. */
+    val revision: StateFlow<Long> = _revision
 
     // Only touched on the sync thread.
     private var outbox: FitOutbox? = null
@@ -60,7 +69,8 @@ object PhoneSync {
                 utcOffsetSeconds = {
                     TimeZone.getDefault().getOffset(System.currentTimeMillis()) /
                         1000
-                }
+                },
+                storageLock = WatchStorage.lock
             ).also { outbox = it }
             val report = outbox.sync(DataLayerPhoneLink(context, watchdog))
             Log.i(
@@ -73,6 +83,8 @@ object PhoneSync {
             // Play services missing or a storage error: the journals stay, try again later.
             Log.w(TAG, "sync pass failed", e)
             true
+        } finally {
+            _revision.value += 1
         }
         if (needsRetry) {
             retry = executor.schedule({ pass(context) }, retryDelayS, TimeUnit.SECONDS)
