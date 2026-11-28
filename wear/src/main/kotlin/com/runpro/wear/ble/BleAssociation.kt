@@ -30,7 +30,7 @@ import com.runpro.core.ble.PairedSensor
  * background rights with the sensor (`REQUEST_COMPANION_RUN_IN_BACKGROUND`,
  * `REQUEST_COMPANION_START_FOREGROUND_SERVICES_FROM_BACKGROUND`); the system chooser needs no scan
  * permission. Main thread only. [supported] is false when the watch has no companion device setup:
- * [BleScan] is the fallback.
+ * [BleScan] is the fallback, also when [failed] reports a chooser that failed or closed (#115).
  */
 internal class BleAssociation(
     private val context: Context,
@@ -168,6 +168,9 @@ internal class BleScan(context: Context, private val found: (PairedSensor) -> Un
     private val seen = mutableSetOf<String>()
     private var kind = BleSensorKind.HEART_RATE
     private var callback: ScanCallback? = null
+
+    /** True from a successful [start] until [stop] or the end of the scan. */
+    val active: Boolean get() = callback != null
 
     /** False when Bluetooth is off or unavailable. */
     fun start(kind: BleSensorKind, finished: () -> Unit): Boolean {

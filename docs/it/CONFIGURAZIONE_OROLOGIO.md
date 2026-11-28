@@ -217,7 +217,8 @@ controllata degli avvisi e dello stop automatico è F11 in `docs/FIELD_TESTING.m
    In RunPro, dalla schermata iniziale tocca **Sensori → Associa fascia cardio** (o **Associa footpod**),
    indossa la fascia (si sveglia col contatto) e sceglila nell'elenco. Se l'orologio ha la finestra di
    sistema per i dispositivi associati la vedi lì, e l'associazione dà a RunPro anche il permesso di
-   restare attiva in background; altrimenti RunPro cerca per 15 secondi e mostra i sensori trovati. Serve
+   restare attiva in background; altrimenti, o se quella finestra si chiude subito (succede sul Galaxy
+   Watch 5 Pro), RunPro cerca da sé per 15 secondi e mostra i sensori trovati: tocca la tua fascia. Serve
    il permesso **Dispositivi nelle vicinanze**. Si tiene una fascia e un footpod; **Dimentica** li toglie.
    RunPro si collega alla fascia da **Preparati** fino allo stop: una nuova associazione vale dal
    riscaldamento successivo. Il registro del collegamento è in logcat con il tag `RunProBle`
