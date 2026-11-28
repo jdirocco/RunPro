@@ -1,5 +1,6 @@
 package com.runpro.wear
 
+import android.annotation.SuppressLint
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -65,6 +66,26 @@ class RecordingService : Service() {
     private lateinit var foreground: ForegroundController
     private val imuThread = HandlerThread("runpro-imu").apply { start() }
     private lateinit var imu: ImuCapture
+    private lateinit var battery: WatchBattery
+
+    internal var createSession: () -> RecordingSession = {
+        RecordingSession.create(
+            WatchStorage.journals(this).toPath(),
+            SystemClock::elapsedRealtimeNanos
+        )
+    }
+    internal var createExercise: () -> ExerciseController = {
+        HealthServicesExercise.create(this, ::now)
+    }
+
+    // Match the journal's ordinary free-byte policy; reclaimable cache is not reserved capacity.
+    @SuppressLint("UsableSpace")
+    internal var readAvailableBytes: () -> Long = {
+        // Before the first Start the journals directory does not exist yet. Its parent is on the
+        // same filesystem; never query an unrelated volume or create files on the main thread.
+        val directory = WatchStorage.journals(this)
+        (if (directory.exists()) directory else filesDir).usableSpace
+    }
 
     /** The IMU setting of the current run, read when it starts (or is restored). */
     @Volatile private var imuMode = ImuMode.OFF
@@ -92,18 +113,16 @@ class RecordingService : Service() {
         imu = WatchImu.capture(this, imuThread, ::now)
         feedback = WorkoutFeedback(this)
         engine = RecordingEngine(
-            sessionFactory = {
-                RecordingSession.create(
-                    WatchStorage.journals(this).toPath(),
-                    SystemClock::elapsedRealtimeNanos
-                )
-            },
+            sessionFactory = { createSession() },
             onProcessed = ::onProcessed
         )
         notification = RunNotification(this).also { it.createChannel() }
         foreground = ForegroundController(this, notification)
-        exercise = HealthServicesExercise.create(this, ::now).also { it.start(EngineFeed()) }
-        ticker.scheduleWithFixedDelay(::tick, 1, 1, TimeUnit.SECONDS)
+        exercise = createExercise().also { it.start(EngineFeed()) }
+        battery = WatchBattery(this) { percent ->
+            engine.submit(EngineInput.Resources(now(), batteryPercent = percent))
+        }.also { it.start() }
+        ticker.scheduleWithFixedDelay(::tick, 0, 1, TimeUnit.SECONDS)
     }
 
     override fun onBind(intent: Intent?): IBinder = LocalBinder()
@@ -129,6 +148,7 @@ class RecordingService : Service() {
     override fun onDestroy() {
         // The exercise is not ended here: after a restart its owner adopts it (ExerciseController).
         exercise.stop()
+        battery.close()
         ticker.shutdownNow()
         engine.close()
         imu.close()
@@ -155,6 +175,7 @@ class RecordingService : Service() {
         imuMode = ImuPreferences.load(this)
         if (engine.state.value.phase == RunPhase.STOPPED) engine.submit(EngineInput.Reset)
         val now = now()
+        engine.submit(EngineInput.Resources(now, batteryPercent = battery.percent))
         engine.submit(EngineInput.ConfigureWorkout(WorkoutPreferences.load(this)))
         engine.submit(EngineInput.Prepare(now))
         if (!warmUp) engine.submit(EngineInput.Start(now))
@@ -170,6 +191,7 @@ class RecordingService : Service() {
         val now = now()
         val input = when (command) {
             ServiceCommand.START -> {
+                engine.submit(EngineInput.Resources(now, batteryPercent = battery.percent))
                 engine.submit(EngineInput.ConfigureWorkout(WorkoutPreferences.load(this)))
                 EngineInput.Start(now)
             }
@@ -196,6 +218,7 @@ class RecordingService : Service() {
             return
         }
         if (recovery.recover(engine, now())) {
+            engine.submit(EngineInput.Resources(now(), batteryPercent = battery.percent))
             requestedRun = true
             Log.i(TAG, "run restored after a restart")
         } else {
@@ -211,7 +234,11 @@ class RecordingService : Service() {
     }
 
     private fun tick() {
-        if (ServiceStartPolicy.needsForeground(lastPhase)) engine.submit(EngineInput.Tick(now()))
+        if (ServiceStartPolicy.needsForeground(lastPhase)) {
+            val time = now()
+            engine.submit(EngineInput.Resources(time, battery.percent, readAvailableBytes()))
+            engine.submit(EngineInput.Tick(time))
+        }
     }
 
     /** Engine thread: must not block (R6), so the notification work goes to the main thread. */

@@ -26,6 +26,7 @@ Watch setup step by step (in Italian, for the owner): `docs/it/CONFIGURAZIONE_OR
 | F9 | Auto-lap and time/distance intervals | Correct lap summaries, countdowns and haptics with screen on/off; pauses freeze targets (see below) |
 | F8 | Phone sync: phone app installed, several runs with the phone out of range for some of them, then in range | Every run in the phone's `files/runs` once, journals gone from the watch (see below) |
 | F10 | IMU capture and battery cost (see below) | 50 Hz without gaps, battery %/h with IMU off, accelerometer, accelerometer + gyroscope |
+| F11 | Low-resource warnings and automatic saving (see below) | Initial battery, running/paused warnings, saved automatic stop and exercise shutdown |
 | F9 | Start a workout in Gear Tracker (or another Health Services app), then a RunPro run; during it start a workout in the other app again | RunPro takes over at its start; when the other app takes over, the run keeps recording (timer, strap) without wrist HR and GPS, and the log shows it |
 
 ## Auto-lap and interval check (F9)
@@ -63,6 +64,43 @@ the setting it started with. Streams stay on the watch in `files/imu` (phone syn
    source that does not start a second workout on the watch. Keep, per run: the `.imu` file(s) (named by
    run id), the FIT from the phone and the reference export. Report them on the field-test issue; nothing
    about accuracy is claimed until #34 compares them.
+
+## Low-resource check (F11)
+
+Use a short test run with the phone out of range, so its journal stays on the watch for inspection.
+Battery levels can be simulated through adb without draining the watch:
+
+```bash
+adb shell dumpsys battery unplug
+adb shell dumpsys battery set level 15
+```
+
+1. Open RunPro and choose **Get ready**. The initial 15% reading must show the low-battery warning.
+   Start a run: it must continue recording at 15%. Set the level to 16: the warning must clear.
+2. Set the level to 3 during the run. The summary must explain the automatic battery stop and show
+   **Saved**; the Ongoing Activity disappears and RunPro's Health Services exercise ends. Check the
+   `.journal` remains in `files/journals` and its `.reserve` is gone. Copy the journal for the report.
+3. Set 16, start another run and pause it. Repeat 15 then 3: the warning and automatic save must also
+   work while paused. Repeat with the screen off, then reopen RunPro and inspect the summary.
+4. While still at 3, choose **Get ready**, then **Start**: it must stay in warm-up and explain the
+   rejected start. Set 16 and retry **Start**: a new run must begin normally.
+5. Always restore real battery reporting after the check:
+
+   ```bash
+   adb shell dumpsys battery reset
+   ```
+
+Storage checks belong on a disposable Wear OS emulator with no valuable data: consume space on the
+journal's `/data` filesystem with a removable test file. Below 50,000,000 bytes the warning must appear
+within the next one-second refresh, including while paused. At zero ordinary free bytes the engine
+must attempt a clean automatic stop using its reserve. Check **Saved**, a retained stopped journal,
+removed reserve, and exercise/foreground shutdown. A start at zero must remain in warm-up with a
+storage explanation (or the storage error if reserve allocation fails). Remove the test file and
+retry. Do not fill the owner's watch for this check. ENOSPC retry and exhausted-reserve failures also
+have deterministic real-file JVM coverage in `LowResourceReplayTest` and `ReservedStorageTest`.
+
+Report the build, simulated levels, screen/paused state, summary and journal observations as a field
+report. These are procedures awaiting physical results, not a claim that F11 has passed.
 
 ## FIT file acceptance (no watch needed)
 

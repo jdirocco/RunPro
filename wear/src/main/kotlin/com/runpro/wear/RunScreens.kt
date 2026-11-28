@@ -11,6 +11,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.wear.compose.foundation.lazy.ScalingLazyListScope
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
+import com.runpro.core.model.RunEvent
+import com.runpro.core.model.StopReason
+import com.runpro.core.recording.ResourceState
 import com.runpro.core.recording.RunPhase
 import com.runpro.core.recording.RunState
 import com.runpro.core.recording.exercise.ExercisePhase
@@ -21,14 +24,15 @@ import com.runpro.core.recording.service.ServiceCommand
 /** GPS and heart rate acquire; the runner starts when ready, or earlier, or goes back. */
 internal fun ScalingLazyListScope.warmUpItems(
     status: ExerciseStatus,
-    journalFailed: Boolean,
+    state: RunState,
     actions: SetupActions
 ) {
     item { Paragraph(stringResource(R.string.warmup_title)) }
+    resourceItems(state, beforeStart = true)
     item { SensorLine(stringResource(R.string.warmup_gps), status.gps) }
     item { SensorLine(stringResource(R.string.warmup_heart_rate), status.heartRate) }
     warmUpNote(status)?.let { note -> item { Paragraph(stringResource(note)) } }
-    if (journalFailed) {
+    if (state.journalFailed) {
         item { Paragraph(stringResource(R.string.summary_not_saved)) }
     }
     item {
@@ -73,6 +77,7 @@ internal fun ScalingLazyListScope.runItems(
     askToStop: () -> Unit
 ) {
     val paused = state.phase == RunPhase.PAUSED
+    resourceItems(state, beforeStart = false)
     if (paused) item { Paragraph(stringResource(R.string.run_paused)) }
     item {
         Text(clock(state.totals.timer), style = MaterialTheme.typography.displayLarge)
@@ -116,6 +121,17 @@ internal fun ScalingLazyListScope.confirmStopItems(stop: () -> Unit, keepRunning
 internal fun ScalingLazyListScope.summaryItems(state: RunState, done: () -> Unit) {
     val totals = state.totals
     item { Paragraph(stringResource(R.string.summary_title)) }
+    when ((state.run?.events?.lastOrNull() as? RunEvent.Stopped)?.reason) {
+        StopReason.LOW_BATTERY -> item {
+            Paragraph(stringResource(R.string.resource_stopped_battery))
+        }
+
+        StopReason.STORAGE_FULL -> item {
+            Paragraph(stringResource(R.string.resource_stopped_storage))
+        }
+
+        else -> Unit
+    }
     item { Text(clock(totals.timer), style = MaterialTheme.typography.displayMedium) }
     item { Metric(kilometers(totals.distance), stringResource(R.string.unit_km)) }
     item { Metric(pace(totals.averagePace), stringResource(R.string.summary_average_pace)) }
@@ -139,6 +155,29 @@ internal fun ScalingLazyListScope.summaryItems(state: RunState, done: () -> Unit
         )
     }
     item { WideButton(stringResource(R.string.summary_done), done) }
+}
+
+/** Resource policy belongs to the engine; these messages only explain its published state. */
+internal fun ScalingLazyListScope.resourceItems(state: RunState, beforeStart: Boolean) {
+    val resources = state.resources
+    if (resources.lowBattery) {
+        val text = if (beforeStart &&
+            (resources.batteryPercent ?: Int.MAX_VALUE) <= ResourceState.BATTERY_STOP_PERCENT
+        ) {
+            R.string.resource_start_battery
+        } else {
+            R.string.resource_low_battery
+        }
+        item { Paragraph(stringResource(text)) }
+    }
+    if (resources.lowStorage) {
+        val text = if (beforeStart && resources.availableBytes == 0L) {
+            R.string.resource_start_storage
+        } else {
+            R.string.resource_low_storage
+        }
+        item { Paragraph(stringResource(text)) }
+    }
 }
 
 @Composable

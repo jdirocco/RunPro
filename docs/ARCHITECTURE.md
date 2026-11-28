@@ -212,7 +212,15 @@ and the stop is synced before publication. Journal sessions query space before e
 rolls back a partial write and retries once; the session immediately saves with `STORAGE_FULL`. Other
 I/O failures and exhausted reserves remain observable unsaved states with a recoverable prefix; the
 engine continues processing inputs without writing to the failed journal. ADR 0008
-explains the limits. Watch resource monitoring and warning UI integration are tracked in #71.
+explains the limits. The watch service registers for sticky and changing `ACTION_BATTERY_CHANGED`
+readings and submits the latest battery before each Start, including after session reset. Its
+`runpro-tick` worker refreshes journal-filesystem usable space every second while preparing, running
+or paused, alongside the existing journal ticks. Disk queries never run on the main thread.
+The UI observes the resource warnings and rejected-start reasons; summaries explain automatic stops.
+Platform exercise/IMU shutdown follows the engine's published state, after persistence was handled;
+foreground shutdown and phone sync follow on the main thread, with sync gated on `journalSaved`.
+The existing failure flow and `journalFailed` state expose allocation/write failures without claiming
+a save. Watch verification is scenario F11 in `FIELD_TESTING.md`.
 
 ## Phone sync (`:core:sync`)
 

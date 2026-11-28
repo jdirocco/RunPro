@@ -109,4 +109,10 @@
     <string name="history_delete_confirm_unsynced">Questa corsa non è ancora sincronizzata col telefono. Eliminandola andrà persa per sempre.</string>
     <string name="history_delete_confirm_synced">Eliminare questa corsa dall\'orologio? Il telefono ha già una copia.</string>
     <string name="history_delete_confirm_action">Conferma eliminazione</string>
+    <string name="resource_low_battery">Batteria in riserva: 15% o meno.</string>
+    <string name="resource_low_storage">Spazio in esaurimento: meno di 50 MB liberi.</string>
+    <string name="resource_start_battery">Impossibile avviare: carica l’orologio oltre il 3%.</string>
+    <string name="resource_start_storage">Impossibile avviare: libera spazio sull’orologio.</string>
+    <string name="resource_stopped_battery">Corsa fermata automaticamente: batteria al 3% o meno.</string>
+    <string name="resource_stopped_storage">Corsa fermata automaticamente: memoria dell’orologio piena.</string>
 </resources>
