@@ -4,14 +4,18 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.wear.compose.foundation.lazy.AutoCenteringParams
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.ScalingLazyListScope
+import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
+import androidx.wear.compose.foundation.rotary.RotaryScrollableDefaults
 import androidx.wear.compose.material3.Button
 import androidx.wear.compose.material3.FilledTonalButton
 import androidx.wear.compose.material3.MaterialTheme
@@ -39,7 +43,8 @@ fun RunProScreen(
     runState: StateFlow<RunState>,
     exercise: StateFlow<ExerciseStatus>,
     actions: SetupActions,
-    location: StateFlow<LocationStatus> = MutableStateFlow(LocationStatus())
+    location: StateFlow<LocationStatus> = MutableStateFlow(LocationStatus()),
+    screens: DataScreens = DataScreens.DEFAULT
 ) {
     val state by runState.collectAsState()
     val exerciseStatus by exercise.collectAsState()
@@ -50,9 +55,24 @@ fun RunProScreen(
     val runKey = state.run?.id?.value.orEmpty()
     var summaryDismissed by rememberSaveable(runKey) { mutableStateOf(false) }
     var confirmingStop by rememberSaveable(runKey) { mutableStateOf(false) }
+    val screenKey = runScreenKey(state.phase, confirmingStop, summaryDismissed)
+    val listState = key(runKey, screenKey) {
+        rememberScalingLazyListState(initialCenterItemIndex = 0)
+    }
     MaterialTheme {
         ScreenScaffold {
-            ScalingLazyColumn(modifier = Modifier.fillMaxWidth()) {
+            ScalingLazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxWidth(),
+                autoCentering = AutoCenteringParams(itemIndex = 0),
+                rotaryScrollableBehavior = if (screenKey ==
+                    "run"
+                ) {
+                    null
+                } else {
+                    RotaryScrollableDefaults.behavior(listState)
+                }
+            ) {
                 when (state.phase) {
                     RunPhase.IDLE -> startItems(setup, actions)
 
@@ -73,7 +93,7 @@ fun RunProScreen(
                             keepRunning = { confirmingStop = false }
                         )
                     } else {
-                        runItems(state, actions, askToStop = { confirmingStop = true })
+                        runItems(state, actions, screens, askToStop = { confirmingStop = true })
                     }
 
                     RunPhase.STOPPED -> if (summaryDismissed) {
@@ -90,6 +110,17 @@ fun RunProScreen(
     }
 }
 
+private fun runScreenKey(
+    phase: RunPhase,
+    confirmingStop: Boolean,
+    summaryDismissed: Boolean
+): String = when {
+    confirmingStop -> "confirm"
+    summaryDismissed -> "setup"
+    phase == RunPhase.RUNNING || phase == RunPhase.PAUSED -> "run"
+    else -> phase.name
+}
+
 private fun ScalingLazyListScope.startItems(setup: SetupState, actions: SetupActions) {
     item { Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleMedium) }
     permissionItems(setup, actions)
@@ -103,6 +134,7 @@ private fun ScalingLazyListScope.startItems(setup: SetupState, actions: SetupAct
             }
         }
     }
+    item { QuietButton(stringResource(R.string.data_screens_title), actions.openDataScreens) }
     item { QuietButton(stringResource(R.string.settings_title), actions.openSettings) }
     item { QuietButton(stringResource(R.string.sensors_open), actions.openSensors) }
     item { QuietButton(stringResource(R.string.history_title), actions.openHistory) }

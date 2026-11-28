@@ -44,6 +44,7 @@ class RunProScreenTest {
 
     private val commands = mutableListOf<ServiceCommand>()
     private var historyOpened = 0
+    private var dataScreensOpened = 0
     private val runState = MutableStateFlow(RunState())
     private val exercise = MutableStateFlow(ExerciseStatus())
     private val location = MutableStateFlow(LocationStatus())
@@ -54,13 +55,30 @@ class RunProScreenTest {
             advice = emptyList(),
             backgroundLocationSkipped = false
         )
-        val actions = SetupActions({}, {}, {}, {}, commands::add, openHistory = { historyOpened++ })
+        val actions = SetupActions(
+            {},
+            {},
+            {},
+            {},
+            commands::add,
+            openHistory = { historyOpened++ },
+            openDataScreens = { dataScreensOpened++ }
+        )
         compose.setContent { RunProScreen(setup, runState, exercise, actions, location) }
     }
 
     private fun click(text: String) = compose.onNodeWithText(text).performClick()
 
     private fun shows(text: String) = compose.onNodeWithText(text).assertIsDisplayed()
+
+    @Test
+    fun `data screen configuration is available before a run and absent while recording`() {
+        show()
+        click("Data screens")
+        assertEquals(1, dataScreensOpened)
+        runState.value = running()
+        compose.onNodeWithText("Data screens").assertDoesNotExist()
+    }
 
     @Test
     fun `get ready starts the warm-up, not the run`() {
