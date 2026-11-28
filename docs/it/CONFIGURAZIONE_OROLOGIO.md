@@ -164,7 +164,9 @@ può leggere dall'app: RunPro te la ricorda finché non tocchi **Fatto, controll
 
 **Come si registra una corsa.** Tocca **Preparati**: RunPro cerca il GPS e il battito e mostra se sono
 pronti. Aspetta **GPS: pronto** e tocca **Avvia** (puoi avviare anche prima: la distanza parte quando arriva il
-GPS) oppure **Indietro** per rinunciare. Durante la corsa vedi tempo, distanza, passo e battito, con **Giro**,
+GPS) oppure **Indietro** per rinunciare. Se dopo **Preparati** non tocchi **Avvia** entro 10 minuti, RunPro
+rinuncia da solo: spegne GPS e notifica per non scaricare la batteria (una corsa avviata non viene mai
+interrotta). Durante la corsa vedi tempo, distanza, passo e battito, con **Giro**,
 **Pausa**/**Riprendi** e **Stop**. Stop chiede conferma: **Continua a correre** è la prima scelta, la corsa
 si ferma solo con **Ferma e salva**. Alla fine il riepilogo mostra i totali e **Salvata**; se mostra
 **Non salvata**, apri una issue **Field report**.
