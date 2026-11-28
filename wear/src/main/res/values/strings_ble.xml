@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- BLE sensors screen (#17). Kept apart from strings.xml so settings work (#27) does not collide. -->
+<resources>
+    <string name="sensors_title">Sensors</string>
+    <string name="sensors_open">Sensors</string>
+    <string name="sensors_pair_strap">Pair HR strap</string>
+    <string name="sensors_pair_footpod">Pair footpod</string>
+    <string name="sensors_strap">Strap: %1$s</string>
+    <string name="sensors_footpod">Footpod: %1$s</string>
+    <string name="sensors_forget">Forget</string>
+    <string name="sensors_searching">Searching. Wake the sensor (wear the strap).</string>
+    <string name="sensors_stop_search">Stop searching</string>
+    <string name="sensors_paired">Paired</string>
+    <string name="sensors_not_paired">Not paired</string>
+    <string name="sensors_bluetooth_off">Turn Bluetooth on to search</string>
+    <string name="sensors_next_run">Used from the next warm-up</string>
+    <string name="sensors_close">Done</string>
+</resources>

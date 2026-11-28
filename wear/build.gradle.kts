@@ -88,6 +88,7 @@ dependencies {
     implementation(libs.androidx.core)
     implementation(libs.androidx.wear.ongoing)
     implementation(project(":core:recording"))
+    implementation(project(":core:ble"))
     implementation(project(":core:sync"))
     implementation(libs.play.services.wearable)
     implementation(libs.androidx.health.services)

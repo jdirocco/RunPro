@@ -172,9 +172,25 @@ Gaps, real rate and battery cost on the Galaxy Watch 5 Pro are field results (F1
 - R8 timing tests cover dropout recovery, failed/silent resubscription and 20 seeded return-to-range
   offsets during capped backoff with 1.2 s discovery. Restored data arrives in < 10 s with the fake's
   responsive setup. A platform/radio that cannot complete setup or close is outside this JVM guarantee.
-  Policy and budgets: ADR 0012. Watch adapter integration is #17; physical validation remains #22,
-  scenarios F1/F2. The controller never issues recording commands; R4 recording evidence remains
+  Policy and budgets: ADR 0012. Physical validation remains #22, scenarios F1/F2. The controller never issues recording commands; R4 recording evidence remains
   `SensorDropoutReplayTest` and `ChaosRecordingReplayTest`.
+
+## BLE adapter evidence (#17, ADR 0017)
+
+- R8: `BleSensorLinkTest` reconnects a strap after GATT 133 with `autoConnect=true` and streams again in
+  < 10 s through the link (events, parsing and the bond/cache checks in the path). A cache refresh after
+  repeated setup failures and discovery held while bonding stay within the controller's deadlines, so
+  neither can stall recovery; a rejected held discovery recovers instead of hanging.
+- R4: the link and `WatchBle` only produce samples and `Connected` / `Disconnected(status)` events.
+  `RecordingServiceBleTest` streams strap HR into a real service run (it becomes the active HR source),
+  drops it with GATT 133 and checks the run keeps recording; missing permission, adapter or pairing
+  leaves the run on watch sensors (`WatchBleTest`).
+- R6: all GATT work runs on the `runpro-ble` thread; `follow` from the engine thread only posts.
+  `AndroidGattPortTest` (Robolectric, API 30 and 34) checks every callback is posted, never inline, and
+  that a closed session's callbacks are dropped.
+- Not covered off the watch: real Bluetooth callback timing, the hidden cache refresh, companion
+  association on the Galaxy Watch 5 Pro. The 30 min strap acceptance of #17 and F1/F2 (#22) are owner
+  field tests; no field result is claimed.
 
 ## Source arbitration evidence
 
@@ -189,8 +205,8 @@ Gaps, real rate and battery cost on the Galaxy Watch 5 Pro are field results (F1
   strap/wrist and footpod/GPS switches, exports and decodes a verified FIT, and checks every source
   decision exactly (R5/R3). Replay honors recorded decisions rather than generating new ones.
 - `HeartRateSourceTest` observes the strap/wrist icon through fallback, return and loss of all sources.
-  These are JVM/Robolectric guarantees. BLE adapter ingestion remains #17; physical field results are
-  #22 (F1/F2). Policy and limits: ADR 0013.
+  These are JVM/Robolectric guarantees. BLE adapter ingestion is in the section above; physical field
+  results are #22 (F1/F2). Policy and limits: ADR 0013.
 
 ## Failure catalogue
 

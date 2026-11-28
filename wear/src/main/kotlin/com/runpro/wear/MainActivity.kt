@@ -29,6 +29,7 @@ import com.runpro.core.recording.service.PermissionReadiness
 import com.runpro.core.recording.service.RunPermission
 import com.runpro.core.recording.service.ServiceCommand
 import com.runpro.core.recording.service.ServicePermissions
+import com.runpro.wear.ble.SensorActivity
 import com.runpro.wear.history.RunHistoryHost
 import com.runpro.wear.history.WatchHistory
 import com.runpro.wear.imu.ImuPreferences
@@ -105,29 +106,34 @@ class MainActivity : ComponentActivity() {
                     ),
                     runState,
                     exercise,
-                    SetupActions(
-                        askForeground = { ask(readiness.missingForeground) },
-                        askBackgroundLocation = { ask(listOf(RunPermission.BACKGROUND_LOCATION)) },
-                        skipBackgroundLocation = { backgroundLocationSkipped = true },
-                        confirmSleepingApps = ::confirmSleepingApps,
-                        command = ::send,
-                        configureWorkout = {
-                            workoutSettings = it
-                            WorkoutPreferences.save(this, it)
-                        },
-                        configureImu = {
-                            imuMode = it
-                            ImuPreferences.save(this, it)
-                        },
-                        openHistory = {
-                            showingHistory = true
-                            history.refresh()
-                        }
-                    )
+                    setupActions()
                 )
             }
         }
     }
+
+    private fun setupActions() = SetupActions(
+        askForeground = { ask(readiness.missingForeground) },
+        askBackgroundLocation = { ask(listOf(RunPermission.BACKGROUND_LOCATION)) },
+        skipBackgroundLocation = { backgroundLocationSkipped = true },
+        confirmSleepingApps = ::confirmSleepingApps,
+        command = ::send,
+        configureWorkout = {
+            workoutSettings = it
+            WorkoutPreferences.save(this, it)
+        },
+        configureImu = {
+            imuMode = it
+            ImuPreferences.save(this, it)
+        },
+        openHistory = {
+            showingHistory = true
+            history.refresh()
+        },
+        openSensors = {
+            startActivity(Intent(this, SensorActivity::class.java))
+        }
+    )
 
     override fun onDestroy() {
         history.close()
@@ -205,5 +211,6 @@ class SetupActions(
     val command: (ServiceCommand) -> Unit,
     val configureWorkout: (WorkoutSettings) -> Unit = {},
     val configureImu: (ImuMode) -> Unit = {},
-    val openHistory: () -> Unit = {}
+    val openHistory: () -> Unit = {},
+    val openSensors: () -> Unit = {}
 )

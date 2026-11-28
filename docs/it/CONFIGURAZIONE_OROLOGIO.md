@@ -212,8 +212,16 @@ controllata degli avvisi e dello stop automatico è F11 in `docs/FIELD_TESTING.m
 
 1. La fascia **non** deve essere collegata al telefono, a Samsung Health o a Gear Tracker mentre corri
    con RunPro. In Samsung Health (orologio e telefono) scollega la fascia dagli **Accessori**.
-2. Non abbinarla da **Impostazioni → Connessioni → Bluetooth** dell'orologio: la aggiungi da RunPro
-   (Sensori → Aggiungi), che gestisce la connessione da sé. Se l'avevi abbinata lì, scegli **Dimentica**.
+2. Non abbinarla da **Impostazioni → Connessioni → Bluetooth** dell'orologio: la aggiungi da RunPro,
+   che gestisce la connessione da sé. Se l'avevi abbinata lì, scegli **Dimentica**.
+   In RunPro, dalla schermata iniziale tocca **Sensori → Associa fascia cardio** (o **Associa footpod**),
+   indossa la fascia (si sveglia col contatto) e sceglila nell'elenco. Se l'orologio ha la finestra di
+   sistema per i dispositivi associati la vedi lì, e l'associazione dà a RunPro anche il permesso di
+   restare attiva in background; altrimenti RunPro cerca per 15 secondi e mostra i sensori trovati. Serve
+   il permesso **Dispositivi nelle vicinanze**. Si tiene una fascia e un footpod; **Dimentica** li toglie.
+   RunPro si collega alla fascia da **Preparati** fino allo stop: una nuova associazione vale dal
+   riscaldamento successivo. Il registro del collegamento è in logcat con il tag `RunProBle`
+   (`adb logcat -s RunProBle`).
 3. Chiudi Gear Tracker prima di correre: solo un'app alla volta può usare l'allenamento di Health Services.
    Se un'altra app ne sta registrando uno, RunPro lo segnala mentre si prepara; quando avvii la corsa,
    RunPro prende Health Services e l'allenamento dell'altra app si chiude. Se invece un'altra app avvia un
@@ -230,8 +238,9 @@ il polso se i suoi dati sono ancora recenti. Torna alla fascia al primo dato val
 mette in pausa la corsa e viene salvato nel giornale e nel FIT. Se non resta nessuna fonte, appare
 «Nessuna fonte cardio»; al cambio il valore attende la prossima misura.
 
-L’icona segue i dati ricevuti: il collegamento dei sensori BLE all’app è ancora nell’issue #17.
-La verifica fisica di questi passaggi resta la prova F1/F2 dell’issue #22.
+L’icona segue i dati ricevuti dalla fascia associata (issue #17). Se la fascia si disconnette RunPro
+riprova da solo (entro 10 secondi quando torna a portata). La verifica fisica di questi passaggi resta
+la prova F1/F2 dell’issue #22.
 
 ### Giri automatici e ripetute
 
@@ -283,6 +292,7 @@ Segui `docs/FIELD_TESTING.md`. In breve:
 | `unauthorized` in `adb devices` | Accetta la richiesta sull'orologio; se non compare, disattiva e riattiva **Debug ADB** |
 | `more than one device` durante l'installazione | Usa `ANDROID_SERIAL` (punto 6) |
 | La fascia non viene trovata | È collegata a un altro dispositivo o app (punto 7); toglila e rimettila per riattivarla |
+| La fascia è associata ma il battito resta del polso | Permesso **Dispositivi nelle vicinanze** mancante o Bluetooth spento; guarda `adb logcat -s RunProBle` |
 | La registrazione si interrompe a schermo spento | RunPro è tra le app in sospensione (punto 7, Batteria) |
 
 ## 10. A fine sessione di sviluppo
