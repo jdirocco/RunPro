@@ -191,6 +191,11 @@ Gaps, real rate and battery cost on the Galaxy Watch 5 Pro are field results (F1
 - `HeartRateSourceTest` observes the strap/wrist icon through fallback, return and loss of all sources.
   These are JVM/Robolectric guarantees. BLE adapter ingestion remains #17; physical field results are
   #22 (F1/F2). Policy and limits: ADR 0013.
+- `ScreenOffBatchReplayTest` replays the committed screen-off trace (#108): Health Services samples held
+  back while the screen is off arrive late in one batch while the service keeps ticking. Every batched
+  sample is admitted and journaled, distance and moving time match the trace, and recovery rebuilds the
+  same run (R4/R2). A source with no eligible replacement keeps its metric while silent, so loss of all
+  sources is no longer a recorded switch; real switches are still FIT events (R5). Policy: ADR 0016.
 
 ## Failure catalogue
 
@@ -198,6 +203,7 @@ Every real failure seen in the field gets a row here, a recorded trace in `testd
 
 | Date | Issue | What happened | Trace | Test |
 |---|---|---|---|---|
+| 2026-11-28 | #108 | Walk with watch GPS and wrist HR: no location, distance, HR or cadence while the screen was off (123–302 s of 302 s). The only source went stale, a `to = null` switch was recorded, and the late Health Services batch was rejected | `screen-off-batching.jsonl.gz` (synthetic, field screen timeline; no field trace was recorded) | `ScreenOffBatchReplayTest`, `SourceArbitrationTest` |
 | 2026-11-26 | #10 | Setup screen: "Open settings" for battery did nothing on the Galaxy Watch 5 Pro. On Wear OS `ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS` resolves to a placeholder activity that closes at once, so the fallback never ran. Now opens the app details page. | none (UI, no sensor data) | `BatterySettingsTest` |
 | 2026-11-26 | #10 | The app details page has no Battery entry on the watch either, and `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` is also a placeholder: no screen can exempt RunPro. The setup screen now shows the adb command instead of a button. | none (UI, no sensor data) | `BatterySettingsTest` |
 | 2026-11-27 | #12 | Warm-up screen: tapping "Start" ("Avvia") did nothing on the Galaxy Watch 5 Pro while "Back" returned to the start screen, leaving a 0-byte `.journal` file in `files/journals`. `FileJournalOutput.availableBytes` called `Files.getFileStore(path)`, which scans `/proc/mounts` and throws `IOException` ("Mount point not found") on Android `/data/user/0/...` before `RunStarted` is written; `RecordingSession` caught it, set `journalFailed` and stayed in `PREPARING` with no error shown on the warm-up screen. `FileJournalOutput` now queries `File.usableSpace` (`statvfs`), the warm-up screen shows storage errors, and `Reset` replaces a failed warm-up session. | none (pre-start storage check, no sensor data) | `ReservedStorageTest`, `JournalFailureTest`, `RunProScreenTest` |
