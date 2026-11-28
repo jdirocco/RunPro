@@ -287,6 +287,25 @@ tar -xf traces.tar
 
 La prova fisica è la sezione *Settings check (#27)* in `docs/FIELD_TESTING.md`.
 
+### Schermate dati
+
+Prima di **Preparati**, apri **Schermate dati**. Scegli una pagina, poi un campo numerato per cambiarlo.
+**Aggiungi campo** e **Rimuovi ultimo campo** scelgono il numero di campi (da 1 a 5); puoi aggiungere
+fino a 10 pagine, rimuoverle e spostarle prima o dopo. Le modifiche si salvano subito e restano dopo
+la riapertura dell'app. Puoi ricreare la disposizione di Gear Tracker scegliendo lo stesso ordine.
+
+Durante la corsa, la ghiera, uno scorrimento orizzontale o le frecce cambiano pagina, anche in pausa.
+Dopo l'ultima pagina si torna alla prima. Scorri verticalmente per raggiungere giro, pausa e stop.
+Il tempo e il tempo giro escludono le pause; passo medio e passo giro usano tempo e distanza relativi.
+La quota è l'altitudine in m o ft, la cadenza è in passi/min, la potenza in W, l'ora locale in formato
+24 ore e la batteria è quella dell'orologio. Le unità seguono le impostazioni della corsa.
+
+La zona FC richiede la frequenza massima nel profilo: zona 0 sotto il 50%, zone da 1 a 5 a partire dal
+50/60/70/80/90% della massima. Non sono ancora zone personalizzabili. Senza massima o battito attuale
+compare `--`. Anche gli altri valori mancanti, per esempio la potenza senza sensore compatibile,
+restano `--`. La prova fisica, inclusa la leggibilità della disposizione di Gear Tracker, è
+*Data screens check (#23)* in `docs/FIELD_TESTING.md`.
+
 ### Registrazione IMU (accelerometro e giroscopio)
 
 Prima di **Avvia**, il pulsante **IMU** alterna **accelerometro** (predefinito), **accel. + giroscopio** e

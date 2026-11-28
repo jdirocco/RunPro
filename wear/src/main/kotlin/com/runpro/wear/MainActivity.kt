@@ -11,6 +11,7 @@ import android.os.PowerManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -50,6 +51,8 @@ class MainActivity : ComponentActivity() {
     private var backgroundLocationSkipped by mutableStateOf(false)
     private var showingSettings by mutableStateOf(false)
     private var showingHistory by mutableStateOf(false)
+    private var showingDataScreens by mutableStateOf(false)
+    private var dataScreens by mutableStateOf(DataScreens.DEFAULT)
     private lateinit var history: WatchHistory
 
     private val askPermissions = registerForActivityResult(
@@ -73,55 +76,70 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         workoutSettings = WorkoutPreferences.load(this)
+        dataScreens = DataScreenPreferences.load(this)
         imuMode = ImuPreferences.load(this)
         history = WatchHistory.forContext(this)
         // Runs waiting for the phone are sent again whenever the app opens (#30).
         PhoneSync.request(this)
-        setContent {
-            val currentRun by runState.collectAsState()
-            val syncRevision by PhoneSync.revision.collectAsState()
-            val canShowHistory =
-                currentRun.phase == RunPhase.IDLE || currentRun.phase == RunPhase.STOPPED
-            LaunchedEffect(canShowHistory) {
-                if (!canShowHistory) {
-                    showingHistory = false
-                    showingSettings = false
-                }
+        setContent { RunProContent() }
+    }
+
+    @Composable
+    private fun RunProContent() {
+        val currentRun by runState.collectAsState()
+        val syncRevision by PhoneSync.revision.collectAsState()
+        val canShowHistory =
+            currentRun.phase == RunPhase.IDLE || currentRun.phase == RunPhase.STOPPED
+        LaunchedEffect(canShowHistory) {
+            if (!canShowHistory) {
+                showingHistory = false
+                showingSettings = false
+                showingDataScreens = false
             }
-            LaunchedEffect(showingHistory, canShowHistory, syncRevision) {
-                if (showingHistory && canShowHistory) history.refresh()
-            }
-            if (showingSettings && canShowHistory) {
-                SettingsScreen(
-                    workoutSettings.runSettings,
-                    update = {
-                        workoutSettings = workoutSettings.copy(runSettings = it)
-                        WorkoutPreferences.save(this, workoutSettings)
-                    },
-                    close = { showingSettings = false }
-                )
-            } else if (showingHistory && canShowHistory) {
-                RunHistoryHost(
-                    historyState = history.state,
-                    onRetryExport = history::retryExport,
-                    onDelete = history::delete,
-                    onClearFeedback = history::clearFeedback,
-                    onClose = { showingHistory = false }
-                )
-            } else {
-                RunProScreen(
-                    SetupState(
-                        readiness,
-                        advice,
-                        backgroundLocationSkipped,
-                        workoutSettings,
-                        imuMode
-                    ),
-                    runState,
-                    exercise,
-                    setupActions()
-                )
-            }
+        }
+        LaunchedEffect(showingHistory, canShowHistory, syncRevision) {
+            if (showingHistory && canShowHistory) history.refresh()
+        }
+        if (showingDataScreens && canShowHistory) {
+            DataScreenEditor(
+                dataScreens,
+                update = {
+                    dataScreens = it
+                    DataScreenPreferences.save(this, it)
+                },
+                close = { showingDataScreens = false }
+            )
+        } else if (showingSettings && canShowHistory) {
+            SettingsScreen(
+                workoutSettings.runSettings,
+                update = {
+                    workoutSettings = workoutSettings.copy(runSettings = it)
+                    WorkoutPreferences.save(this, workoutSettings)
+                },
+                close = { showingSettings = false }
+            )
+        } else if (showingHistory && canShowHistory) {
+            RunHistoryHost(
+                historyState = history.state,
+                onRetryExport = history::retryExport,
+                onDelete = history::delete,
+                onClearFeedback = history::clearFeedback,
+                onClose = { showingHistory = false }
+            )
+        } else {
+            RunProScreen(
+                SetupState(
+                    readiness,
+                    advice,
+                    backgroundLocationSkipped,
+                    workoutSettings,
+                    imuMode
+                ),
+                runState,
+                exercise,
+                setupActions(),
+                dataScreens
+            )
         }
     }
 
@@ -129,7 +147,10 @@ class MainActivity : ComponentActivity() {
         askForeground = { ask(readiness.missingForeground) },
         askBackgroundLocation = { ask(listOf(RunPermission.BACKGROUND_LOCATION)) },
         skipBackgroundLocation = { backgroundLocationSkipped = true },
-        confirmSleepingApps = ::confirmSleepingApps,
+        confirmSleepingApps = {
+            prefs().edit { putBoolean(KEY_SLEEPING_APPS_CHECKED, true) }
+            refresh()
+        },
         command = ::send,
         configureWorkout = {
             workoutSettings = it
@@ -140,6 +161,7 @@ class MainActivity : ComponentActivity() {
             ImuPreferences.save(this, it)
         },
         openSettings = { showingSettings = true },
+        openDataScreens = { showingDataScreens = true },
         openHistory = {
             showingHistory = true
             history.refresh()
@@ -195,11 +217,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun confirmSleepingApps() {
-        prefs().edit { putBoolean(KEY_SLEEPING_APPS_CHECKED, true) }
-        refresh()
-    }
-
     private fun prefs() = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     private companion object {
@@ -227,5 +244,6 @@ class SetupActions(
     val configureImu: (ImuMode) -> Unit = {},
     val openHistory: () -> Unit = {},
     val openSettings: () -> Unit = {},
-    val openSensors: () -> Unit = {}
+    val openSensors: () -> Unit = {},
+    val openDataScreens: () -> Unit = {}
 )
