@@ -11,6 +11,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.wear.compose.foundation.lazy.ScalingLazyListScope
 import androidx.wear.compose.material3.MaterialTheme
 import androidx.wear.compose.material3.Text
+import com.runpro.core.model.DisplayUnits
 import com.runpro.core.model.RunEvent
 import com.runpro.core.model.StopReason
 import com.runpro.core.recording.ResourceState
@@ -25,7 +26,8 @@ import com.runpro.core.recording.service.ServiceCommand
 internal fun ScalingLazyListScope.warmUpItems(
     status: ExerciseStatus,
     state: RunState,
-    actions: SetupActions
+    actions: SetupActions,
+    countdownSeconds: Int = 0
 ) {
     item { Paragraph(stringResource(R.string.warmup_title)) }
     resourceItems(state, beforeStart = true)
@@ -36,7 +38,7 @@ internal fun ScalingLazyListScope.warmUpItems(
         item { Paragraph(stringResource(R.string.summary_not_saved)) }
     }
     item {
-        WideButton(stringResource(R.string.run_start)) { actions.command(ServiceCommand.START) }
+        StartCountdown(countdownSeconds) { actions.command(ServiceCommand.START) }
     }
     item {
         QuietButton(stringResource(R.string.warmup_cancel)) {
@@ -77,6 +79,8 @@ internal fun ScalingLazyListScope.runItems(
     askToStop: () -> Unit
 ) {
     val paused = state.phase == RunPhase.PAUSED
+    val units = state.workoutSettings.runSettings.units
+    val imperial = units == DisplayUnits.IMPERIAL
     resourceItems(state, beforeStart = false)
     if (paused) item { Paragraph(stringResource(R.string.run_paused)) }
     item {
@@ -85,8 +89,18 @@ internal fun ScalingLazyListScope.runItems(
     if (state.workout != null) {
         item { WorkoutCountdown(state) }
     }
-    item { Metric(kilometers(state.totals.distance), stringResource(R.string.unit_km)) }
-    item { Metric(pace(state.current.pace), stringResource(R.string.unit_pace)) }
+    item {
+        Metric(
+            displayDistance(state.totals.distance, units.distance),
+            stringResource(if (imperial) R.string.unit_mi else R.string.unit_km)
+        )
+    }
+    item {
+        Metric(
+            pace(state.current.pace, units.distance),
+            stringResource(if (imperial) R.string.unit_pace_mi else R.string.unit_pace)
+        )
+    }
     item { Metric(heartRate(state.current.heartRate), stringResource(R.string.unit_bpm)) }
     item { HeartRateSource(state) }
     state.laps.lastOrNull()?.let { lap ->
@@ -120,6 +134,8 @@ internal fun ScalingLazyListScope.confirmStopItems(stop: () -> Unit, keepRunning
 
 internal fun ScalingLazyListScope.summaryItems(state: RunState, done: () -> Unit) {
     val totals = state.totals
+    val units = state.workoutSettings.runSettings.units
+    val imperial = units == DisplayUnits.IMPERIAL
     item { Paragraph(stringResource(R.string.summary_title)) }
     when ((state.run?.events?.lastOrNull() as? RunEvent.Stopped)?.reason) {
         StopReason.LOW_BATTERY -> item {
@@ -133,8 +149,20 @@ internal fun ScalingLazyListScope.summaryItems(state: RunState, done: () -> Unit
         else -> Unit
     }
     item { Text(clock(totals.timer), style = MaterialTheme.typography.displayMedium) }
-    item { Metric(kilometers(totals.distance), stringResource(R.string.unit_km)) }
-    item { Metric(pace(totals.averagePace), stringResource(R.string.summary_average_pace)) }
+    item {
+        Metric(
+            displayDistance(totals.distance, units.distance),
+            stringResource(if (imperial) R.string.unit_mi else R.string.unit_km)
+        )
+    }
+    item {
+        Metric(
+            pace(totals.averagePace, units.distance),
+            stringResource(
+                if (imperial) R.string.summary_average_pace_mi else R.string.summary_average_pace
+            )
+        )
+    }
     item { Metric(heartRate(totals.averageHeartRate), stringResource(R.string.summary_average_hr)) }
     if (state.laps.size > 1) {
         item {

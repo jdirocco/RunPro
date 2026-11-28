@@ -276,3 +276,13 @@ manual laps do not advance the workout. `RunState.workout` exposes stage and rem
 Settings are retained in the journal start, and recovery/export replay existing marks without
 regenerating them. The service handles countdown/transition haptics independently of the activity;
 Compose observes countdown and lap summaries. Semantics and durability: ADR 0011.
+
+## Settings and user profile (`:core:model` / `:wear`)
+
+`WorkoutSettings.runSettings` contains optional HR/weight profile values, display units, auto-pause,
+start countdown and debug tracing. The existing pre-start configuration path copies preferences into
+the journal start; active runs and recovery use that immutable snapshot. Only fresh admitted speed
+readings can auto-pause/resume; sensor silence cannot pause recording. Health Services continues to
+collect speed during automatic pauses. The countdown remains in warm-up until START is sent.
+`DebugTrace` writes optional raw replay JSONL on a bounded, separate worker to `files/traces` and fails
+independently of recording. Units change presentation; measurements/export remain SI. ADR 0017.

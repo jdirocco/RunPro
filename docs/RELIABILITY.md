@@ -209,3 +209,17 @@ Every real failure seen in the field gets a row here, a recorded trace in `testd
 | 2026-11-27 | #12 | Warm-up screen: tapping "Start" ("Avvia") did nothing on the Galaxy Watch 5 Pro while "Back" returned to the start screen, leaving a 0-byte `.journal` file in `files/journals`. `FileJournalOutput.availableBytes` called `Files.getFileStore(path)`, which scans `/proc/mounts` and throws `IOException` ("Mount point not found") on Android `/data/user/0/...` before `RunStarted` is written; `RecordingSession` caught it, set `journalFailed` and stayed in `PREPARING` with no error shown on the warm-up screen. `FileJournalOutput` now queries `File.usableSpace` (`statvfs`), the warm-up screen shows storage errors, and `Reset` replaces a failed warm-up session. | none (pre-start storage check, no sensor data) | `ReservedStorageTest`, `JournalFailureTest`, `RunProScreenTest` |
 | 2026-11-28 | #12 | Warm-up logged `W/ExerciseUpdateListener: Availability received without any requested DataTypes` on the Galaxy Watch 5 Pro and dropped initial availability events. `ExerciseController` called `setUpdateCallback` right after `inspect`, before `prepareExerciseAsync` / `startExerciseAsync` populated `ServiceBackedExerciseClient.requestedDataTypes`. The controller now registers the listener once `prepare` or `start` completes (or immediately when adopting an already-active exercise). | none (Health Services warm-up handshake, no sensor data) | `ExerciseControllerTest` |
 | 2026-11-28 | #105 | IMU capture never started on the Galaxy Watch 5 Pro: at run start `ImuCapture` logged `state=OFF, problem=SENSOR_FAILED, error=SecurityException: getFileStore` and `files/imu` stayed empty, while the run itself was recorded and synced. The default `freeBytes` of `ImuCapture` called `Files.getFileStore(path).usableSpace`, the call already fixed for the journal in #12. It now queries `File.usableSpace` (`statvfs`); the Android-like file system used by both tests moved to `:tools:replay` (`noFileStorePath`) so new storage code can be checked against it. | none (pre-capture storage check, no sensor data) | `ImuCaptureTest`, `ReservedStorageTest` |
+
+## Settings evidence
+
+- `RunSettingsTest` in recording and `RecordingServiceTest` verify that saved settings reach the next
+  run, configuration cannot change an active snapshot, and settings survive real journal recovery (R2).
+- `AutoPauseReplayTest` writes real journals with automatic pause/resume events, verifies exact rebuilt
+  totals/events, and injects a silent speed sensor without causing a pause (R2/R4). Recording
+  `RunSettingsTest` also covers manual pauses, hysteresis and late batches. Stored events remain the
+  authority for recovery/export; automatic decisions are never regenerated while rebuilding.
+- `DebugTraceTest` verifies opt-in raw capture and failure isolation. Trace I/O runs on its own bounded
+  worker, cannot block sensor/engine submission, and never changes journal retention (R3/R6).
+- `SettingsScreenTest` checks the countdown sends START once at expiry and sends nothing after cancel.
+  Until then the service stays in warm-up; existing durable-start latency and worker tests cover START
+  (R1/R6). Existing low-resource, source-switch and BLE suites continue to cover R5/R7/R8. ADR 0017.

@@ -1,6 +1,7 @@
 package com.runpro.wear
 
 import com.runpro.core.model.Distance
+import com.runpro.core.model.DistanceUnit
 import com.runpro.core.model.HeartRate
 import com.runpro.core.model.Pace
 import java.util.Locale
@@ -31,6 +32,13 @@ class RunFormatTest {
         assertEquals(NO_VALUE, pace(null))
         // Slower than 30 min/km is walking or standing: not a pace worth showing.
         assertEquals(NO_VALUE, pace(Pace(31.minutes.inWholeSeconds.toDouble())))
+    }
+
+    @Test
+    fun `imperial pace converts seconds per kilometer to seconds per mile`() {
+        assertEquals("8:03", pace(Pace(300.0), DistanceUnit.MILE))
+        assertEquals(NO_VALUE, pace(null, DistanceUnit.MILE))
+        assertEquals(NO_VALUE, pace(Pace(1860.0), DistanceUnit.MILE))
     }
 
     @Test
