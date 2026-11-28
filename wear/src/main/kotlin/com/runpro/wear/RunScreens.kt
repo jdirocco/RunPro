@@ -83,6 +83,7 @@ internal fun ScalingLazyListScope.runItems(
     item { Metric(kilometers(state.totals.distance), stringResource(R.string.unit_km)) }
     item { Metric(pace(state.current.pace), stringResource(R.string.unit_pace)) }
     item { Metric(heartRate(state.current.heartRate), stringResource(R.string.unit_bpm)) }
+    item { HeartRateSource(state) }
     state.laps.lastOrNull()?.let { lap ->
         item {
             Paragraph(

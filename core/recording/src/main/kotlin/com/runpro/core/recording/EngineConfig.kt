@@ -17,7 +17,8 @@ import kotlin.time.Duration.Companion.seconds
 data class EngineConfig(
     val minMovingSpeed: Speed = Speed(DEFAULT_MIN_MOVING_SPEED),
     val maxSampleHold: Duration = DEFAULT_MAX_SAMPLE_HOLD_SECONDS.seconds,
-    val elevationThreshold: Distance = Distance(DEFAULT_ELEVATION_THRESHOLD)
+    val elevationThreshold: Distance = Distance(DEFAULT_ELEVATION_THRESHOLD),
+    val sourcePolicy: SourcePolicy = SourcePolicy()
 ) {
     init {
         require(maxSampleHold.isPositive()) { "maxSampleHold must be positive: $maxSampleHold" }

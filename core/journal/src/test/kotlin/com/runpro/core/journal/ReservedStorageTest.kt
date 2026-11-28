@@ -113,6 +113,29 @@ class ReservedStorageTest {
         assertTrue(JournalReader.read(dir.resolve("watch.journal")).isStopped)
     }
 
+    @Test
+    fun `abort keeps the journal file if RunStarted failed during sync`(@TempDir dir: Path) {
+        val file = dir.resolve("failed-sync.journal")
+        val reserve = StorageReserve.create(file)
+        val channel = FileChannel.open(
+            file,
+            StandardOpenOption.CREATE_NEW,
+            StandardOpenOption.WRITE
+        )
+        val output = FileJournalOutput(
+            channel,
+            reserve,
+            file = file,
+            syncChannel = { throw IOException("sync failed") }
+        )
+        val writer = JournalWriter(output)
+        kotlin.test.assertFailsWith<IOException> { writer.append(started()) }
+        writer.abort()
+        assertTrue(Files.exists(file))
+        assertFalse(Files.exists(reserve.file))
+        assertEquals(listOf(started()), JournalReader.read(file).records)
+    }
+
     private fun noFileStorePath(real: Path): Path {
         val baseFs = real.fileSystem
         val baseProvider = baseFs.provider()

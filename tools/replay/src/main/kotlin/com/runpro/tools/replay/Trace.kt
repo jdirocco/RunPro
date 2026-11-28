@@ -1,5 +1,6 @@
 package com.runpro.tools.replay
 
+import com.runpro.core.model.ImuBatch
 import com.runpro.core.model.Sample
 import com.runpro.core.model.SensorEvent
 import com.runpro.core.model.SourceId
@@ -34,7 +35,7 @@ data class TraceHeader(
     }
 }
 
-/** One line of a trace after the header: a reading or a sensor event, as delivered by its source. */
+/** One line of a trace after the header: a reading, a sensor event or an IMU batch, as delivered. */
 sealed interface TraceRecord {
     val time: Timestamp
     val source: SourceId
@@ -47,6 +48,12 @@ sealed interface TraceRecord {
     data class EventRecord(val event: SensorEvent) : TraceRecord {
         override val time: Timestamp get() = event.time
         override val source: SourceId get() = event.source
+    }
+
+    /** IMU readings (ADR 0012); [time] is the first reading. */
+    data class ImuRecord(val batch: ImuBatch) : TraceRecord {
+        override val time: Timestamp get() = batch.time
+        override val source: SourceId get() = batch.source
     }
 }
 
@@ -72,6 +79,9 @@ data class Trace(
 
     val events: List<SensorEvent>
         get() = records.filterIsInstance<TraceRecord.EventRecord>().map { it.event }
+
+    val imuBatches: List<ImuBatch>
+        get() = records.filterIsInstance<TraceRecord.ImuRecord>().map { it.batch }
 
     /** Monotonic time from the earliest to the latest record. */
     val duration: Duration

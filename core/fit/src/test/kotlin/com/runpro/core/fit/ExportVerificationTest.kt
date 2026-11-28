@@ -58,8 +58,8 @@ class ExportVerificationTest {
         assertEquals(1770.0, session.timerSeconds!!, 0.01)
         assertEquals(1769.0, session.movingSeconds!!, 0.01)
         assertEquals(4913.89, session.distanceMeters!!, 0.05)
-        assertEquals(139, session.averageHeartRateBpm)
-        assertEquals(147, session.maxHeartRateBpm)
+        assertEquals(140, session.averageHeartRateBpm)
+        assertEquals(145, session.maxHeartRateBpm)
         assertEquals(172.23, session.averageCadenceStepsPerMinute!!, 0.05)
         assertEquals(
             listOf(LapTrigger.MANUAL, LapTrigger.MANUAL, LapTrigger.STOP),
@@ -82,7 +82,7 @@ class ExportVerificationTest {
                 "LAP/MARKER",
                 "TIMER/STOP_ALL"
             ),
-            fit.events.map { it.type }
+            fit.events.filter { it.runEvent !is RunEvent.SourceSwitched }.map { it.type }
         )
     }
 

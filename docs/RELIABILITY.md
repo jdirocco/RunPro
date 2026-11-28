@@ -43,7 +43,10 @@ persistence and recovery evidence follows below; R7 evidence is in the low-resou
   thread without blocking submission (R1/R6); persistence failures are exposed to callers.
 - `RecordingJournalTest` checks real threaded start-input-to-file latency (< 1 s), one-second sample
   flushing and five-second sync during sensor silence, exact synthetic run read-back, closure before
-  stop publication and distinct files for successive runs. `EngineJournalReplayTest` compares the
+  stop publication, distinct files for successive runs, and no leftover journal/reserve files after a
+  rejected start (while `JournalWriterTest` and `ReservedStorageTest` confirm `abort()` removes only
+  newly created files that never received `RunStarted`, preserving started/resumed journals under R3).
+  `EngineJournalReplayTest` compares the
   committed dropout trace's accepted samples, adapter events, run events, laps and totals after reading
   the actual engine-written journal. `RecordingServiceTest` checks the watch service writes these files
   to the phone outbox and releases reserves on stop (R1/R2/R3/R6; ADR 0011).
@@ -82,7 +85,7 @@ and platform exercise shutdown on the watch are tracked in #71 after #10/#12; no
   the Garmin FIT SDK and compares run id, devices, every run/sensor event, every record, laps and
   session with the journal. Only a match yields a `VerifiedExport`; a mismatch or damaged file is
   removed, and the journal bytes never change (R3). Source switches are FIT events carrying the exact
-  RunPro event (R5 in the file; the switching itself is #19).
+  RunPro event (R5; engine-generated switches are also covered by `SourceSwitchEventTest`).
 - Journal deletion is in the phone sync below: only after the phone acknowledges a file whose
   `VerifiedExport` hash still matches. Strava/Garmin validator acceptance is an owner check
   (`FIELD_TESTING.md`). Format and mapping: ADR 0009.
@@ -129,6 +132,58 @@ Watch behaviour (real GPS and wrist HR, another app taking over) is a field resu
   Automatic marks use the existing synced event path; `JournaledEngineTest`, `RecordingThreadingTest`
   and `LowResourceReplayTest` continue to cover start-before-publication, worker isolation and emergency
   saves (R1/R6/R7). No sensor arbitration or BLE reconnect policy is changed (R5/R8).
+
+## IMU capture evidence
+
+The IMU capture (ADR 0012) is kept out of the recording path, so it cannot weaken R1–R8:
+
+- R1/R2/R3: IMU batches never enter the engine or the run journal. They go to separate stream files
+  with their own magic (`RPIM`), which the journal reader, recovery and phone sync refuse or never list.
+  `ImuStreamTest` checks the separation, that a restarted capture opens a new segment without rewriting
+  the old one, that process death keeps everything flushed (1 s) and that a cut tail keeps every complete
+  batch. `RecordingServiceImuTest` records a run with a shadow accelerometer and checks the journal is
+  where it was and stopped, and that a watch without motion sensors or with IMU off saves the run as usual.
+- R6: `ImuCapture.follow` only queues work for the IMU thread, and only when the target state changed
+  (`ImuCaptureTest`: `follow only queues work...`). Sensor callbacks and stream writes run on that thread.
+- R4/R7: no sensor, a platform refusal, a storage failure, free space under 100 MB and the battery warning
+  each end the capture for that run, keep what was written and never throw (`ImuCaptureTest`); the
+  100 MB floor leaves the journal its space. Old streams are pruned to 300 MB, never the current run's.
+- `ImuCodecTest` bounds the encoding (at most 12 bytes a reading, several times smaller than samples) and
+  the quantisation (1 µs, 0.001 m/s²); `ImuTraceTest` and `ImuReportTest` cover traces and the report tool.
+
+Gaps, real rate and battery cost on the Galaxy Watch 5 Pro are field results (F10), not claimed here.
+
+## BLE connection evidence
+
+- `BleReconnectStateMachineTest` injects normal disconnects, GATT 133, silent stalls, slow discovery,
+  missing callbacks, platform request rejection and failed close through a fake `GattPort`. It rejects
+  overlapping requests and connect-before-close, checks serial subscription writes and their
+  cancellation, stale/duplicate callbacks, independent devices, stop/restart and transition logging.
+- Five-second silence is checked per required measurement characteristic; battery readings and other
+  live streams cannot conceal a stall. Successful resubscription needs actual notifications, including
+  a deadline check between ticks. Retry grows 1/2/4/8 s and resets on data, not CCCD success.
+- R8 timing tests cover dropout recovery, failed/silent resubscription and 20 seeded return-to-range
+  offsets during capped backoff with 1.2 s discovery. Restored data arrives in < 10 s with the fake's
+  responsive setup. A platform/radio that cannot complete setup or close is outside this JVM guarantee.
+  Policy and budgets: ADR 0012. Watch adapter integration is #17; physical validation remains #22,
+  scenarios F1/F2. The controller never issues recording commands; R4 recording evidence remains
+  `SensorDropoutReplayTest` and `ChaosRecordingReplayTest`.
+
+## Source arbitration evidence
+
+- `SensorDropoutReplayTest` records the committed strap-dropout trace and chaos GATT 133, silent stalls
+  and GPS loss into real journals. It checks uninterrupted Running/timer state, exact HR fallback/return
+  counts, and recovery with identical run events, laps and totals (R4/R2).
+- `SourceArbitrationTest` checks per-metric priority lists and stale deadlines (including the exact
+  boundary), paused loss, zero-HR contact loss, old samples/callbacks and independent cumulative
+  distance/elevation offsets. Losing a source never creates distance, ascent or a lap.
+- `SourceSwitchEventTest` in recording checks initial/fallback/return decisions are persisted before
+  admitted measurements and remain identical after recovery. Its FIT counterpart records real engine
+  strap/wrist and footpod/GPS switches, exports and decodes a verified FIT, and checks every source
+  decision exactly (R5/R3). Replay honors recorded decisions rather than generating new ones.
+- `HeartRateSourceTest` observes the strap/wrist icon through fallback, return and loss of all sources.
+  These are JVM/Robolectric guarantees. BLE adapter ingestion remains #17; physical field results are
+  #22 (F1/F2). Policy and limits: ADR 0013.
 
 ## Failure catalogue
 

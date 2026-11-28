@@ -12,6 +12,8 @@ junit4 = "4.13.2"
 kotlinx-serialization = "1.13.0"
 kotlinx-coroutines = "1.11.0"
 robolectric = "4.16.1"
+robolectric-android-all-api30 = "11-robolectric-6757853-i7"
+robolectric-android-all-api34 = "14-robolectric-10818077-i7"
 androidx-core = "1.18.0"
 wear-ongoing = "1.1.0"
 garmin-fit = "21.176.0"
@@ -43,6 +45,8 @@ kotlinx-serialization-protobuf = { module = "org.jetbrains.kotlinx:kotlinx-seria
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
 junit4 = { module = "junit:junit", version.ref = "junit4" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+robolectric-android-all-api30 = { module = "org.robolectric:android-all-instrumented", version.ref = "robolectric-android-all-api30" }
+robolectric-android-all-api34 = { module = "org.robolectric:android-all-instrumented", version.ref = "robolectric-android-all-api34" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

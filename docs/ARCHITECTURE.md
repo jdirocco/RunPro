@@ -31,15 +31,19 @@ Android code in `:wear` and `:mobile` is a thin adapter layer.
   GATT status, GPS lost / acquired). Inputs to the engine, unlike `RunEvent`s, which are its decisions.
 - `SensorSource` / `SensorListener`: the callback contract every producer of samples implements (Health
   Services, GATT, accelerometer, replayed trace). `start(listener)` until `stop()`; listeners never block (R6).
+- `ImuBatch`: about one second of one IMU sensor (`ImuSensor`: accelerometer, gyroscope) at 50 Hz, as
+  offsets and floats. Not a `Sample`: IMU data bypasses the engine (ADR 0012); `SensorListener.onImu`.
 
 ## Recording data flow
 
 ```
 Health Services ExerciseClient ─┐
-Android GATT (strap, footpod) ──┼─► SensorSource flows ─► RecordingEngine ─► Journal (disk)
-SensorManager accelerometer ────┘                           │                    │
+Android GATT (strap, footpod) ──┴─► SensorSource flows ─► RecordingEngine ─► Journal (disk)
+                                                           │                    │
                                                            ▼                    ▼
                                                      UI state (StateFlow)   FIT export ─► phone
+                                                           │ follow
+SensorManager accel/gyro 50 Hz ─► ImuCapture (runpro-imu) ◄┘ ─► IMU stream files/imu/<run>.imu
 ```
 
 - `RecordingService` is a foreground service (`health|location|connectedDevice`) with an Ongoing Activity.
@@ -59,12 +63,30 @@ SensorManager accelerometer ────┘                           │       
   time, distance, pace, heart rate, lap, pause/resume; **Stop** asks for a confirmation whose first choice
   keeps running. Stopped: a summary that says whether the journal was saved.
 - Source arbitration: per metric a priority list (e.g. HR: strap → wrist). A source is *stale* after a
-  timeout; the engine switches to the next one and writes a source-switch event (R5).
+  timeout; the engine switches to the next one and writes a source-switch event (R5). `SourcePolicy`
+  configures priorities/timeouts independently; fresh BLE measurements win by default. Loss of all
+  sources clears the value, and fresh preferred data restores it without recording commands. The
+  journal stores decisions before admitted samples; recovery/export replay them exactly. Cumulative
+  distance/elevation baselines restart across switches. `RunState.activeSources` drives the HR
+  strap/wrist icon. Defaults, late data and recovery semantics: ADR 0013.
+
+## IMU capture (`:core:recording` imu / `:core:journal` / `:wear` imu)
+
+`ImuCapture` follows the published `RunState` on its own executor (the `runpro-imu` thread): sensors on
+while running, off while paused, stream closed on stop. `ImuPort` is the platform seam (`AndroidImuPort`:
+`SensorManager`, 20 ms period, 1 s report latency, wake-up sensors preferred). `ImuBatcher` makes one
+batch per sensor and second; `ImuStream` writes them as compact `JournalRecord.Imu` records (delta encoded,
+packed, about 10 bytes a reading) into per-run segment files with the `RPIM` magic, apart from the run
+journal: recovery and phone sync never touch them. No sensor, a storage error, free space under 100 MB or
+the battery warning end the capture for that run only (`ImuStatus.problem`); the run never depends on it.
+Old streams are pruned to 300 MB. The runner picks accelerometer, accelerometer + gyroscope or off on the
+setup screen. `./gradlew :tools:replay:imuReport` summarises and exports streams copied from the watch.
+Decisions: ADR 0012.
 
 ## Replay traces (`:tools:replay`)
 
-A trace is gzip-compressed JSON Lines: a `trace_header` line, then one `Sample` or `SensorEvent` per line in
-delivery order (ADR 0004). `TraceRecorder` is a `SensorListener` that writes one (thread safe, gzip sync
+A trace is gzip-compressed JSON Lines: a `trace_header` line, then one `Sample`, `SensorEvent` or
+`imu_batch` per line in delivery order (ADR 0004, ADR 0012). `TraceRecorder` is a `SensorListener` that writes one (thread safe, gzip sync
 flush); `TraceReader` reads it back and keeps every complete record of a trace whose recorder was killed.
 `Replayer` exposes one fake `SensorSource` per source in the trace and delivers the records in file order,
 paced by a `ReplayClock` at real time, N× or without waiting. Traces live in `testdata/traces/`.
@@ -94,12 +116,21 @@ sample.
 ```
 Idle → Connecting → DiscoveringServices → Subscribing → Streaming
 Streaming --(no data 5 s)--> Resubscribing --(fail)--> Reconnecting
-any --(disconnect / GATT 133)--> Closing → Backoff(1,2,4,8 s, max 10 s) → Connecting (autoConnect=true)
+any --(disconnect / GATT 133)--> Closing → Backoff(1,2,4,8 s, repeat 8 s) → Connecting (autoConnect=true)
 ```
 
 All GATT operations go through one serial queue per device with timeouts. `BluetoothGatt.close()` is always
 called before a new `connectGatt`. Every transition is written to the sensor log (exportable from the
 diagnostics screen and attached to field reports).
+
+`BleConnectionStateMachine` in `:core:ble` implements this policy behind `GattPort`, with a
+`GattOperationQueue` (one in flight), per-request deadlines, session/request ids that reject stale
+callbacks, and a required `BleTransition` log sink. The adapter serializes calls and ticks at least
+every 100 ms using monotonic milliseconds. Each required measurement characteristic has its own
+five-second watchdog; resubscription must restore real notifications within one second after its last
+CCCD write. Backoff resets only after every required stream sends data. Failed close stays in Closing;
+stop cancels pending work and retries. Defaults, port contract and R8 timing limits: ADR 0012.
+The Android adapter and sensor-log persistence/export follow in #17 and #20.
 
 ## Journal format (`:core:journal`)
 

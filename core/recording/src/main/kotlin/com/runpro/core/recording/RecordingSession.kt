@@ -55,10 +55,14 @@ class RecordingSession internal constructor(
     private fun handlePersisted(input: EngineInput): Boolean {
         var accepted = false
         try {
-            checkStartStorage(input)
+            val createdJournal = checkStartStorage(input)
             val previousEvents = state.run?.events?.size ?: 0
             accepted = machine.handle(input)
-            if (accepted) persist(input, previousEvents)
+            if (!accepted && createdJournal) {
+                discardCreatedJournal()
+            } else {
+                persist(input, previousEvents, accepted)
+            }
             finishPersistence()
         } catch (e: IOException) {
             failure = e
@@ -71,18 +75,33 @@ class RecordingSession internal constructor(
         return accepted
     }
 
-    private fun checkStartStorage(input: EngineInput) {
-        if (input is EngineInput.Start && journaled && state.phase == RunPhase.PREPARING) {
-            val writer = journal ?: requireNotNull(journalFactory).invoke().also { journal = it }
-            machine.handle(
-                EngineInput.Resources(input.time, availableBytes = writer.availableBytes)
-            )
+    private fun canCreateOrQueryJournal(): Boolean =
+        journal != null || (journalFactory != null && !state.resources.batteryCritical)
+
+    private fun checkStartStorage(input: EngineInput): Boolean {
+        if (input !is EngineInput.Start ||
+            state.phase != RunPhase.PREPARING ||
+            !canCreateOrQueryJournal()
+        ) {
+            return false
         }
+        val created = journal == null
+        val writer = journal ?: requireNotNull(journalFactory).invoke().also { journal = it }
+        machine.handle(
+            EngineInput.Resources(input.time, availableBytes = writer.availableBytes)
+        )
+        return created
+    }
+
+    private fun discardCreatedJournal() {
+        val created = journal ?: return
+        journal = null
+        created.abort()
     }
 
     private fun finishPersistence() {
         if (closed) return
-        journal?.tick()
+        if (state.run != null) journal?.tick()
         if (journal?.storageFull == true) {
             val beforeStop = state.run?.events?.size ?: 0
             if (machine.stopForStorageFull()) persistEvents(beforeStop)
@@ -90,25 +109,37 @@ class RecordingSession internal constructor(
         if (state.phase == RunPhase.STOPPED) close()
     }
 
-    private fun persist(input: EngineInput, previousEvents: Int) {
-        if (state.run == null) return // Preparing samples are not part of the run.
-        // The input goes first: automatic laps it triggers must follow it on recovery.
-        when (input) {
-            is EngineInput.SampleReceived -> journal?.append(
-                JournalRecord.Samples(listOf(input.sample))
-            )
-
-            is EngineInput.SensorReceived -> journal?.append(JournalRecord.Sensor(input.event))
-
-            else -> Unit
+    private fun persist(input: EngineInput, previousEvents: Int, accepted: Boolean) {
+        if (state.run == null) return
+        val events = state.run!!.events.drop(previousEvents)
+        // Source decisions precede their samples so recovery resets cumulative baselines first.
+        events.filterIsInstance<RunEvent.SourceSwitched>().forEach {
+            journal?.append(JournalRecord.Event(it))
         }
-        persistEvents(previousEvents)
-        if (input is EngineInput.Tick) journal?.append(JournalRecord.Checkpoint(input.time))
+        if (accepted) {
+            when (input) {
+                is EngineInput.SampleReceived -> journal?.append(
+                    JournalRecord.Samples(listOf(input.sample))
+                )
+
+                is EngineInput.SensorReceived -> journal?.append(JournalRecord.Sensor(input.event))
+
+                else -> Unit
+            }
+        }
+        // Automatic laps follow the sample that crossed their distance threshold.
+        persistEvents(previousEvents, excludeSwitches = true)
+        if (accepted &&
+            input is EngineInput.Tick
+        ) {
+            journal?.append(JournalRecord.Checkpoint(input.time))
+        }
     }
 
-    private fun persistEvents(previousEvents: Int) {
+    private fun persistEvents(previousEvents: Int, excludeSwitches: Boolean = false) {
         val run = state.run ?: return
         for (event in run.events.drop(previousEvents)) {
+            if (excludeSwitches && event is RunEvent.SourceSwitched) continue
             journal?.append(
                 if (event is RunEvent.Started) {
                     JournalRecord.RunStarted(run.id, event.time, state.workoutSettings)
@@ -122,7 +153,7 @@ class RecordingSession internal constructor(
     /** Orderly shutdown; successful stops close before publication, including resource-triggered stops. */
     override fun close() {
         if (!closed) {
-            journal?.close()
+            if (state.run == null) journal?.abort() else journal?.close()
             closed = true
         }
     }

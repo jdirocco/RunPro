@@ -19,12 +19,14 @@ import androidx.core.content.edit
 import com.runpro.core.model.WorkoutSettings
 import com.runpro.core.recording.RunState
 import com.runpro.core.recording.exercise.ExerciseStatus
+import com.runpro.core.recording.imu.ImuMode
 import com.runpro.core.recording.service.BatteryAdvice
 import com.runpro.core.recording.service.BatteryGuidance
 import com.runpro.core.recording.service.PermissionReadiness
 import com.runpro.core.recording.service.RunPermission
 import com.runpro.core.recording.service.ServiceCommand
 import com.runpro.core.recording.service.ServicePermissions
+import com.runpro.wear.imu.ImuPreferences
 import com.runpro.wear.sync.PhoneSync
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,6 +34,7 @@ import kotlinx.coroutines.flow.StateFlow
 /** Binds to [RecordingService] and shows [RunProScreen]: setup checks, warm-up, run and summary. */
 class MainActivity : ComponentActivity() {
     private var workoutSettings by mutableStateOf(WorkoutSettings())
+    private var imuMode by mutableStateOf(ImuPreferences.DEFAULT)
     private var readiness by mutableStateOf(ServicePermissions.readiness(emptySet()))
     private var advice by mutableStateOf(emptyList<BatteryAdvice>())
     private var runState by mutableStateOf<StateFlow<RunState>>(MutableStateFlow(RunState()))
@@ -61,11 +64,12 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         workoutSettings = WorkoutPreferences.load(this)
+        imuMode = ImuPreferences.load(this)
         // Runs waiting for the phone are sent again whenever the app opens (#30).
         PhoneSync.request(this)
         setContent {
             RunProScreen(
-                SetupState(readiness, advice, backgroundLocationSkipped, workoutSettings),
+                SetupState(readiness, advice, backgroundLocationSkipped, workoutSettings, imuMode),
                 runState,
                 exercise,
                 SetupActions(
@@ -77,6 +81,10 @@ class MainActivity : ComponentActivity() {
                     configureWorkout = {
                         workoutSettings = it
                         WorkoutPreferences.save(this, it)
+                    },
+                    configureImu = {
+                        imuMode = it
+                        ImuPreferences.save(this, it)
                     }
                 )
             )
@@ -142,7 +150,8 @@ data class SetupState(
     val readiness: PermissionReadiness,
     val advice: List<BatteryAdvice>,
     val backgroundLocationSkipped: Boolean,
-    val workoutSettings: WorkoutSettings = WorkoutSettings()
+    val workoutSettings: WorkoutSettings = WorkoutSettings(),
+    val imuMode: ImuMode = ImuPreferences.DEFAULT
 )
 
 class SetupActions(
@@ -151,5 +160,6 @@ class SetupActions(
     val skipBackgroundLocation: () -> Unit,
     val confirmSleepingApps: () -> Unit,
     val command: (ServiceCommand) -> Unit,
-    val configureWorkout: (WorkoutSettings) -> Unit = {}
+    val configureWorkout: (WorkoutSettings) -> Unit = {},
+    val configureImu: (ImuMode) -> Unit = {}
 )

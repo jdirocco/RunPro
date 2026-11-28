@@ -4,22 +4,29 @@ import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.channels.Channels
 import java.nio.channels.FileChannel
+import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
 
-/** A [JournalOutput] on a file: [write] goes to the OS page cache, [sync] is `fsync` (`FileChannel.force`). */
+/**
+ * A [JournalOutput] on a file: [write] goes to the OS page cache, [sync] is `fsync` (`FileChannel.force`).
+ * Without a [reserve] (IMU streams, ADR 0012) a full storage is an ordinary I/O failure.
+ */
 class FileJournalOutput internal constructor(
     private val channel: FileChannel,
-    private val reserve: StorageReserve,
+    private val reserve: StorageReserve?,
+    private val file: Path = requireNotNull(reserve).file,
     private val writeChannel: (ByteBuffer) -> Int = channel::write,
     private val syncChannel: () -> Unit = { channel.force(false) }
 ) : JournalOutput {
+    private var deletableOnDiscard: Boolean = true
+
     override var storageFull: Boolean = false
         private set
 
     // File.usableSpace queries statvfs directly; Files.getFileStore scans /proc/mounts and fails on Android (#12).
     override val availableBytes: Long
-        get() = if (storageFull) 0 else reserve.file.toFile().usableSpace
+        get() = if (storageFull) 0 else file.toFile().usableSpace
 
     override fun write(bytes: ByteArray, offset: Int, length: Int) {
         val position = channel.position()
@@ -39,7 +46,7 @@ class FileJournalOutput internal constructor(
         try {
             action()
         } catch (e: IOException) {
-            if (storageFull || !e.isStorageFull()) throw e
+            if (reserve == null || storageFull || !e.isStorageFull()) throw e
             onFull()
             reserve.release()
             storageFull = true
@@ -48,7 +55,25 @@ class FileJournalOutput internal constructor(
     }
 
     override fun close() {
-        channel.use { reserve.close() }
+        channel.use { reserve?.close() }
+    }
+
+    /** Closes the output and deletes a newly created file that never received RunStarted. */
+    internal fun discard() {
+        var failure: IOException? = null
+        try {
+            close()
+        } catch (e: IOException) {
+            failure = e
+        }
+        if (deletableOnDiscard) {
+            try {
+                Files.deleteIfExists(file)
+            } catch (e: IOException) {
+                if (failure != null) failure.addSuppressed(e) else failure = e
+            }
+        }
+        failure?.let { throw it }
     }
 
     companion object {
@@ -64,7 +89,9 @@ class FileJournalOutput internal constructor(
                 channel.truncate(contents.validLength)
                 channel.position(contents.validLength)
                 channel.force(true)
-                val output = FileJournalOutput(channel, StorageReserve.create(file))
+                val output = FileJournalOutput(channel, StorageReserve.create(file)).apply {
+                    deletableOnDiscard = false
+                }
                 opened = true
                 return output
             } finally {
@@ -73,18 +100,30 @@ class FileJournalOutput internal constructor(
         }
 
         /** Creates [file], which must not exist, and makes its directory entry durable. */
-        fun create(file: Path): FileJournalOutput {
+        fun create(file: Path): FileJournalOutput = create(file, reserved = true)
+
+        /** Creates [file] like [create], without a storage reserve. */
+        internal fun create(file: Path, reserved: Boolean): FileJournalOutput {
             val channel = FileChannel.open(
                 file,
                 StandardOpenOption.CREATE_NEW,
                 StandardOpenOption.WRITE
             )
             try {
-                val reserve = StorageReserve.create(file)
+                val reserve = if (reserved) StorageReserve.create(file) else null
                 syncDirectory(file.toAbsolutePath().parent)
-                return FileJournalOutput(channel, reserve)
+                return FileJournalOutput(channel, reserve, file)
             } catch (e: IOException) {
-                channel.close()
+                try {
+                    channel.close()
+                } catch (closing: IOException) {
+                    e.addSuppressed(closing)
+                }
+                try {
+                    Files.deleteIfExists(file)
+                } catch (deleting: IOException) {
+                    e.addSuppressed(deleting)
+                }
                 throw e
             }
         }

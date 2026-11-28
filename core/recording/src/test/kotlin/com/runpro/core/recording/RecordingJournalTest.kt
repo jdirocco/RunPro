@@ -13,6 +13,7 @@ import java.nio.file.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
@@ -210,7 +211,99 @@ class RecordingJournalTest {
         }
     }
 
-    private class Output : JournalOutput {
+    @Test
+    fun `rejected start on low battery creates no journal and allows a later start`(
+        @TempDir dir: Path
+    ) {
+        val directory = dir.resolve("journals")
+        RecordingEngine(
+            dispatcher = Dispatchers.Unconfined,
+            sessionFactory = { RecordingSession.create(directory) }
+        ).use { engine ->
+            engine.submit(prepare(0))
+            engine.submit(EngineInput.Resources(TestTime.at(0), batteryPercent = 3))
+            engine.submit(start(0))
+            assertEquals(RunPhase.PREPARING, engine.state.value.phase)
+            assertNull(engine.failure.value)
+            assertFalse(Files.exists(directory))
+            engine.submit(tick(2))
+            assertFalse(Files.exists(directory))
+        }
+        assertFalse(Files.exists(directory))
+
+        val retryDir = dir.resolve("retry")
+        RecordingEngine(
+            dispatcher = Dispatchers.Unconfined,
+            sessionFactory = { RecordingSession.create(retryDir) }
+        ).use { engine ->
+            engine.submit(prepare(0))
+            engine.submit(EngineInput.Resources(TestTime.at(0), batteryPercent = 3))
+            engine.submit(start(0))
+            assertEquals(RunPhase.PREPARING, engine.state.value.phase)
+            assertFalse(Files.exists(retryDir))
+
+            engine.submit(EngineInput.Resources(TestTime.at(1), batteryPercent = 16))
+            engine.submit(start(1))
+            assertEquals(RunPhase.RUNNING, engine.state.value.phase)
+            val id = engine.state.value.run!!.id
+            engine.submit(stop(2))
+            assertTrue(engine.state.value.journalSaved)
+            assertTrue(JournalReader.read(retryDir.resolve("$id.journal")).isStopped)
+        }
+    }
+
+    @Test
+    fun `rejected start with zero output space discards the created writer and retries`() {
+        var available = 0L
+        val outputs = mutableListOf<Output>()
+        val session = RecordingSession(
+            RecordingStateMachine(requireStorageCheck = true),
+            journalFactory = {
+                val output = Output(available)
+                outputs += output
+                JournalWriter(output)
+            }
+        )
+        session.use {
+            assertTrue(it.handle(prepare(0)))
+            assertFalse(it.handle(start(0)))
+            assertEquals(RunPhase.PREPARING, it.state.phase)
+            assertTrue(it.state.resources.lowStorage)
+            assertEquals(1, outputs.size)
+            assertTrue(outputs.single().closed)
+
+            available = 50_000_000L
+            assertTrue(it.handle(start(1)))
+            assertEquals(RunPhase.RUNNING, it.state.phase)
+            assertEquals(2, outputs.size)
+            assertFalse(outputs.last().closed)
+            assertTrue(it.handle(stop(2)))
+            assertTrue(it.state.journalSaved)
+            assertTrue(outputs.last().read().isStopped)
+        }
+    }
+
+    @Test
+    fun `aborting or closing a pre-created session after a rejected start removes its file`(
+        @TempDir dir: Path
+    ) {
+        for (closeOrderly in listOf(false, true)) {
+            val file = dir.resolve("rejected-$closeOrderly.journal")
+            val reserve = file.resolveSibling("${file.fileName}.reserve")
+            var now = 0L
+            val session = RecordingSession(journal = JournalWriter.create(file, { now }))
+            session.handle(prepare(0))
+            session.handle(EngineInput.Resources(TestTime.at(0), batteryPercent = 3))
+            assertFalse(session.handle(start(0)))
+            now = 2.seconds.inWholeNanoseconds
+            session.handle(tick(2))
+            if (closeOrderly) session.close() else session.abort()
+            assertFalse(Files.exists(file))
+            assertFalse(Files.exists(reserve))
+        }
+    }
+
+    private class Output(override val availableBytes: Long = Long.MAX_VALUE) : JournalOutput {
         private val bytes = ByteArrayOutputStream()
         private var synced = byteArrayOf()
         var closed = false

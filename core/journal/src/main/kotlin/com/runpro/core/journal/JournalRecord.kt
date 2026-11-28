@@ -1,5 +1,6 @@
 package com.runpro.core.journal
 
+import com.runpro.core.model.ImuBatch
 import com.runpro.core.model.RunEvent
 import com.runpro.core.model.RunId
 import com.runpro.core.model.Sample
@@ -43,4 +44,10 @@ sealed interface JournalRecord {
 
     /** Latest recording clock during sensor silence. Buffered with the sample durability policy. */
     data class Checkpoint(val time: Timestamp) : JournalRecord
+
+    /**
+     * IMU readings, compactly encoded (offsets to 1 µs, values to the resolution in ADR 0012). Written to
+     * the run's IMU stream ([ImuStream]), not to its journal; buffered with the sample policy.
+     */
+    data class Imu(val batch: ImuBatch) : JournalRecord
 }

@@ -78,13 +78,13 @@ class JournalWriter private constructor(
     private val output: JournalOutput,
     private val clock: MonotonicClock,
     private val policy: JournalPolicy,
-    writeHeader: Boolean
+    header: ByteArray?
 ) : Closeable {
     constructor(
         output: JournalOutput,
         clock: MonotonicClock = MonotonicClock.SYSTEM,
         policy: JournalPolicy = JournalPolicy()
-    ) : this(output, clock, policy, true)
+    ) : this(output, clock, policy, JournalFormat.header())
 
     val storageFull: Boolean get() = output.storageFull
     val availableBytes: Long get() = output.availableBytes
@@ -94,11 +94,12 @@ class JournalWriter private constructor(
     private var lastFlush = clock.nanos()
     private var lastSync = lastFlush
     private var unsynced = false
+    private var hasRunStarted = header == null
     private var closed = false
     private var failed: IOException? = null
 
     init {
-        if (writeHeader) buffer.write(JournalFormat.header())
+        if (header != null) buffer.write(header)
     }
 
     /**
@@ -111,6 +112,7 @@ class JournalWriter private constructor(
         val framed = JournalFormat.frame(JournalCodec.encode(record))
         synchronized(lock) {
             checkUsable()
+            if (record is JournalRecord.RunStarted) hasRunStarted = true
             buffer.write(framed)
             if (record is JournalRecord.RunStarted || record is JournalRecord.Event) {
                 guarded {
@@ -155,12 +157,19 @@ class JournalWriter private constructor(
         }
     }
 
-    /** Discards memory buffers and closes the output, as when the recording process dies. */
+    /**
+     * Discards memory buffers and closes the output, as when the recording process dies.
+     * Removes a newly created file only if [JournalRecord.RunStarted] was never appended (R3).
+     */
     fun abort() = synchronized(lock) {
         if (!closed) {
             closed = true
             buffer.reset()
-            output.close()
+            if (!hasRunStarted && output is FileJournalOutput) {
+                output.discard()
+            } else {
+                output.close()
+            }
         }
     }
 
@@ -232,6 +241,10 @@ class JournalWriter private constructor(
             file: Path,
             clock: MonotonicClock = MonotonicClock.SYSTEM,
             policy: JournalPolicy = JournalPolicy()
-        ): JournalWriter = JournalWriter(FileJournalOutput.resume(file), clock, policy, false)
+        ): JournalWriter = JournalWriter(FileJournalOutput.resume(file), clock, policy, null)
+
+        /** A writer of an IMU stream ([ImuStream]): same records and policy, IMU magic. */
+        internal fun imu(output: JournalOutput, clock: MonotonicClock, policy: JournalPolicy) =
+            JournalWriter(output, clock, policy, JournalFormat.header(JournalFormat.IMU_MAGIC))
     }
 }
