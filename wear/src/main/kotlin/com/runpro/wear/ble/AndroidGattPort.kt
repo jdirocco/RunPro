@@ -75,6 +75,12 @@ internal class AndroidGattPort(
         }.getOrDefault(false)
     }
 
+    // BluetoothDevice.removeBond() is hidden too; a stale bond is otherwise only removable by hand (#117).
+    @SuppressLint("DiscouragedPrivateApi")
+    override fun removeBond(): Boolean = runCatching {
+        BluetoothDevice::class.java.getMethod("removeBond").invoke(device) as? Boolean ?: false
+    }.getOrDefault(false)
+
     override fun bondState(): BondState = when (device.bondState) {
         BluetoothDevice.BOND_BONDING -> BondState.BONDING
         BluetoothDevice.BOND_BONDED -> BondState.BONDED

@@ -347,6 +347,7 @@ Segui `docs/FIELD_TESTING.md`. In breve:
 | `more than one device` durante l'installazione | Usa `ANDROID_SERIAL` (punto 6) |
 | La fascia non viene trovata | È collegata a un altro dispositivo o app (punto 7); toglila e rimettila per riattivarla |
 | La fascia è associata ma il battito resta del polso | Permesso **Dispositivi nelle vicinanze** mancante o Bluetooth spento; guarda `adb logcat -s RunProBle` |
+| Nel log `disconnect status=5` subito dopo `bond=BONDED` | La fascia era abbinata nelle impostazioni Bluetooth dell'orologio e ha perso le chiavi: RunPro toglie da sé il vecchio abbinamento al primo errore (`removed the stale bond`). Se il log dice `cannot remove the stale bond`, dimentica la fascia in **Impostazioni → Connessioni → Bluetooth** |
 | La registrazione si interrompe a schermo spento | RunPro è tra le app in sospensione (punto 7, Batteria) |
 
 ## 10. A fine sessione di sviluppo

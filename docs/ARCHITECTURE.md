@@ -156,7 +156,8 @@ RecordingService ─► WatchBle (runpro-ble thread, 100 ms tick) ──┘
 
 `BleSensorLink` (pure) adds to the controller what is policy: samples only while streaming and from the
 current session, connect/disconnect `SensorEvent`s, a GATT cache refresh before discovery after two
-consecutive sessions that never streamed, and discovery held while the device is bonding. The Android
+consecutive sessions that never streamed, discovery held while the device is bonding, and a stale bond
+removed once when a bonded device drops on encryption before streaming (#117). The Android
 `AndroidGattPort` posts every `BluetoothGattCallback` (one per session) to the BLE thread, so nothing
 completes inline and closed sessions stay silent; the first connect uses `autoConnect=false`, reconnects
 `true`. `WatchBle` follows the run phases: links from the warm-up to the stop. Pairing (**Sensors** on
