@@ -58,6 +58,12 @@ class InstallTest(unittest.TestCase):
 
     adb_available = True
 
+    def test_serial_with_spaces_is_recognised(self):
+        serial = "adb-RFAW60DL36L-mdIM3P (2)._adb-tls-connect._tcp"
+        self.devices = f"List of devices attached\n{serial}\tdevice product:watch model:Galaxy_Watch5_Pro\n"
+        self.assertEqual(0, self.install(serial))
+        self.assertIn(["adb", "-s", serial, "install", "-r", str(self.apk)], self.calls)
+
     def install(self, *args):
         with contextlib.redirect_stdout(self.output):
             with self.assertRaises(SystemExit) as result:

@@ -1129,9 +1129,12 @@ def cmd_install(args):
     print(listing, flush=True)
     devices = {}
     for line in listing.splitlines():
-        fields = line.split()
-        if len(fields) >= 2 and not line.startswith(("List of devices", "*")):
-            devices[fields[0]] = fields[1]
+        if line.startswith(("List of devices", "*")):
+            continue
+        # Serials may contain spaces (duplicate mDNS entries), so split on the state column.
+        match = re.match(r"^(.+?)\s+(device|offline|unauthorized|authorizing|recovery|sideload|bootloader|host|no permissions)(?:\s|$)", line)
+        if match:
+            devices[match.group(1)] = match.group(2)
     serial = args[0] if args else os.environ.get("ANDROID_SERIAL")
     if not serial:
         if not devices:
