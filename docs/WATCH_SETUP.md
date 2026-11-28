@@ -60,7 +60,9 @@ adb devices -l
 ```
 
 The pairing port and connection port differ. Pairing alone does not establish the install connection.
-Use the exact serial shown by `adb devices -l`; it may also be an mDNS name. Reconnect with the current
+Use the exact serial shown by `adb devices -l`; it may also be an mDNS name.
+Wireless ADB can register a duplicate mDNS entry whose serial contains a space, for example
+`adb-RFAW60DL36L-mdIM3P (2)._adb-tls-connect._tcp`; quote it: `./rp install "adb-RFAW60DL36L-mdIM3P (2)._adb-tls-connect._tcp"`. Reconnect with the current
 address/port after restarting wireless debugging, rebooting, or changing networks. Pair again if the
 watch has forgotten the computer. See [Android's Wear OS Wi-Fi debugging guide](https://developer.android.com/training/wearables/get-started/debug-wifi).
 
