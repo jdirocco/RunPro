@@ -146,9 +146,19 @@ agy     installed (/Users/juridirocco/.local/bin/agy) — (agy default) on googl
 Inside a command sandbox (for example Antigravity's default sandbox), `command -v claude` silently misses
 `~/.local/bin/claude` when its symlink target in `~/.local/share/claude/versions/...` is outside the sandbox.
 `./rp runners` inspects the `PATH` symlink with `lstat` before `stat`, so it still reports `claude` as
-installed (`sandbox-blocked — run ./rp unsandboxed`) without requiring any change to Claude's installation or
-settings, and `./rp agent` refuses to mark an issue In Progress if invoked inside a sandbox that blocks the
-selected runner.
+installed, marked `sandbox-blocked`, without requiring any change to Claude's installation or settings:
+
+```
+$ ./rp runners        # run inside a sandbox that cannot read ~/.local/share/claude
+claude  installed (/Users/juridirocco/.local/bin/claude -> /Users/juridirocco/.local/share/claude/versions/2.1.332; sandbox-blocked: run ./rp agent outside the sandbox) — (claude default) on anthropic (cloud)
+codex   installed (/Users/juridirocco/.local/bin/codex) — (codex default) on openai (cloud)
+agy     missing
+```
+
+Statuses: `installed (path)` = ready; `sandbox-blocked` = installed but the sandbox you run in cannot execute it,
+so run `./rp agent` outside the sandbox (for Antigravity: `BypassSandbox`); `missing` = not on `PATH`.
+`./rp agent` runs the same check before it touches the issue: a `missing` or `sandbox-blocked` runner stops it
+with a message, so the issue is never left In Progress without an agent (`--dry-run` skips the check).
 
 ### `./rp agent`: launch Claude Code, Codex or Antigravity on an issue
 
@@ -170,7 +180,7 @@ tells it which issue and branch it is on and to follow `AGENTS.md`. All three CL
 | `--headless` | off (interactive) | `claude -p` / `codex exec` / `agy -p`: no chat, the agent runs to the end and exits. Without `--auto` it commits but does not push and ends with `./rp handoff` |
 | `--worktree` | off | Work in `../RunPro-worktrees/<branch>` |
 | `--prompt TEXT` | none | Extra instructions appended to the prompt |
-| `--dry-run` | off | Print the command without starting the issue or the agent |
+| `--dry-run` | off | Print the command without starting the issue or the agent (also skips the runner check of `./rp runners`) |
 | `-- ARGS` | none | Passed unchanged to the agent CLI |
 
 Examples:

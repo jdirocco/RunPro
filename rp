@@ -986,7 +986,7 @@ def format_runner_probe(info, acfg=None, cwd=ROOT, env=None, home=None):
     where = _where(model, provider, location)
     if info["status"] == "sandbox-blocked":
         via = f"{info['path']} -> {info['target']}" if info.get("target") else info["path"]
-        return f"{name}  installed ({via}; sandbox-blocked — run ./rp unsandboxed) — {where}"
+        return f"{name}  installed ({via}; sandbox-blocked: run ./rp agent outside the sandbox) — {where}"
     return f"{name}  installed ({info['path']}) — {where}"
 
 
