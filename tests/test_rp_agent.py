@@ -128,7 +128,7 @@ class SharedSkillsContractTest(unittest.TestCase):
         agents_skills = repo_root / ".agents" / "skills"
         claude_skills = repo_root / ".claude" / "skills"
         canonical = sorted(p.name for p in agents_skills.iterdir() if p.is_dir())
-        self.assertEqual(["runpro-review", "runpro-task", "runpro-triage"], canonical)
+        self.assertEqual(["runpro-orchestrate", "runpro-review", "runpro-task", "runpro-triage"], canonical)
         for name in canonical:
             skill_md = agents_skills / name / "SKILL.md"
             self.assertTrue(skill_md.is_file(), f"missing {skill_md}")
