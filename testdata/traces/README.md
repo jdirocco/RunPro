@@ -24,6 +24,7 @@ speed and cadence from `watch:health-services`, and chest strap heart rate from
 | `easy-run-30min.jsonl.gz` | 30 min | Easy run at about 6:00/km, no dropouts | 10 800 |
 | `intervals-6x3min.jsonl.gz` | 45 min | 10 min warm-up, 6 × (3 min at 4:00/km + 2 min jog at 6:30/km), 5 min cool-down | 16 200 |
 | `strap-dropout.jsonl.gz` | 20 min | Strap silent 8:00–8:30 (connected, no data), disconnected 12:00–12:45 (GATT status 8), 0 bpm 16:40–16:45; wrist HR throughout | 7 125 |
+| `screen-off-batching.jsonl.gz` | 5 min | Walk at 1.4 m/s, watch only (no strap). Screen off 0:03–0:20, 0:23–0:38, 1:11–1:40, 2:04–4:56 as in #108: the watch samples of each window are delivered in one batch when the screen turns on, grouped by data type, with their measurement times. `SyntheticTraces.screenOffDelivery` gives the delivery time of a record | 1 510 |
 
 ## Golden totals
 

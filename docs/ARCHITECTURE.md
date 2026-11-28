@@ -67,9 +67,10 @@ SensorManager accel/gyro 50 Hz ─► ImuCapture (runpro-imu) ◄┘ ─► IMU 
   keeps running. Stopped: a summary that says whether the journal was saved.
 - Source arbitration: per metric a priority list (e.g. HR: strap → wrist). A source is *stale* after a
   timeout; the engine switches to the next one and writes a source-switch event (R5). `SourcePolicy`
-  configures priorities/timeouts independently; fresh BLE measurements win by default. Loss of all
-  sources clears the value, and fresh preferred data restores it without recording commands. The
-  journal stores decisions before admitted samples; recovery/export replay them exactly. Cumulative
+  configures priorities/timeouts independently; fresh BLE measurements win by default. With no
+  other eligible source a stale source keeps its metric while *silent*: the value and icon clear, no
+  switch is recorded, and its late batches (Health Services with the screen off) still count (ADR 0016).
+  The journal stores decisions before admitted samples; recovery/export replay them exactly. Cumulative
   distance/elevation baselines restart across switches. `RunState.activeSources` drives the HR
   strap/wrist icon. Defaults, late data and recovery semantics: ADR 0013.
 

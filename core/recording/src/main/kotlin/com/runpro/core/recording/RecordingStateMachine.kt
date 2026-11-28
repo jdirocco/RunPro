@@ -255,12 +255,13 @@ class RecordingStateMachine(
         val time = maxOf(sample.time, now ?: sample.time)
         arbitrate(time, listOf(sample.metric))
         val accepted = gate.admit(sample)
-        if (accepted) applySample(sample)
+        // A late sample of a still silent source counts but is too old to show.
+        if (accepted) applySample(sample, display = gate.isLive(sample.metric))
         return accepted
     }
 
-    private fun applySample(sample: Sample) {
-        current = current.updatedWith(sample)
+    private fun applySample(sample: Sample, display: Boolean = true) {
+        if (display) current = current.updatedWith(sample)
         metrics?.onSample(sample)
         advanceClock(sample.time)
     }
@@ -277,7 +278,9 @@ class RecordingStateMachine(
     }
 
     private fun arbitrate(time: Timestamp, metrics: Iterable<Metric> = Metric.entries) {
-        gate.switches(time, metrics).forEach { event ->
+        val decisions = gate.switches(time, metrics)
+        decisions.silenced.forEach { current = current.cleared(it) }
+        decisions.switches.forEach { event ->
             if (run == null) {
                 current = current.cleared(event.metric)
             } else {

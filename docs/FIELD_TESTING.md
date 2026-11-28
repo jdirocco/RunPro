@@ -27,6 +27,7 @@ Watch setup step by step (in Italian, for the owner): `docs/it/CONFIGURAZIONE_OR
 | F8 | Phone sync: phone app installed, several runs with the phone out of range for some of them, then in range | Every run in the phone's `files/runs` once, journals gone from the watch (see below) |
 | F10 | IMU capture and battery cost (see below) | 50 Hz without gaps, battery %/h with IMU off, accelerometer, accelerometer + gyroscope |
 | F11 | Low-resource warnings and automatic saving (see below) | Initial battery, running/paused warnings, saved automatic stop and exercise shutdown |
+| F12 | Screen off (#108): 10 min walk or run with watch GPS and wrist HR only, wrist down so the screen stays off for at least 3 min at a time | Continuous track, distance, HR and cadence in the FIT and on Strava, including the screen-off stretches |
 | F9 | Start a workout in Gear Tracker (or another Health Services app), then a RunPro run; during it start a workout in the other app again | RunPro takes over at its start; when the other app takes over, the run keeps recording (timer, strap) without wrist HR and GPS, and the log shows it |
 
 ## Auto-lap and interval check (F9)
