@@ -23,6 +23,7 @@ import com.runpro.core.recording.RunPhase
 import com.runpro.core.recording.RunState
 import com.runpro.core.recording.exercise.ExerciseStatus
 import com.runpro.core.recording.imu.ImuMode
+import com.runpro.core.recording.location.LocationStatus
 import com.runpro.core.recording.service.BatteryAdvice
 import com.runpro.core.recording.service.BatteryGuidance
 import com.runpro.core.recording.service.PermissionReadiness
@@ -47,6 +48,9 @@ class MainActivity : ComponentActivity() {
     private var exercise by mutableStateOf<StateFlow<ExerciseStatus>>(
         MutableStateFlow(ExerciseStatus())
     )
+    private var location by mutableStateOf<StateFlow<LocationStatus>>(
+        MutableStateFlow(LocationStatus())
+    )
     private var backgroundLocationSkipped by mutableStateOf(false)
     private var showingSettings by mutableStateOf(false)
     private var showingHistory by mutableStateOf(false)
@@ -61,12 +65,14 @@ class MainActivity : ComponentActivity() {
             (binder as? RecordingService.LocalBinder)?.let {
                 runState = it.state
                 exercise = it.exercise
+                location = it.location
             }
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
             runState = MutableStateFlow(RunState())
             exercise = MutableStateFlow(ExerciseStatus())
+            location = MutableStateFlow(LocationStatus())
         }
     }
 
@@ -119,7 +125,8 @@ class MainActivity : ComponentActivity() {
                     ),
                     runState,
                     exercise,
-                    setupActions()
+                    setupActions(),
+                    location
                 )
             }
         }

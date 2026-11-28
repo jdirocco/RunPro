@@ -56,4 +56,21 @@ data class ExerciseStatus(
 ) {
     /** No warm-up sensor is still acquiring: the run can start with every fix it will get. */
     val warmedUp: Boolean get() = gps != Readiness.WAITING && heartRate != Readiness.WAITING
+
+    /**
+     * This status with the GPS readiness of the fused location source ([location], ADR 0019) folded in:
+     * the run has a fix when either source has one, so the warm-up shows the better of the two.
+     */
+    fun withLocation(location: Readiness): ExerciseStatus =
+        copy(gps = maxOf(gps, location, compareBy(GPS_ORDER::indexOf)))
+
+    private companion object {
+        /** From worst to best for the runner waiting to start. */
+        val GPS_ORDER = listOf(
+            Readiness.NOT_REQUESTED,
+            Readiness.UNAVAILABLE,
+            Readiness.WAITING,
+            Readiness.READY
+        )
+    }
 }

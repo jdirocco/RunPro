@@ -34,3 +34,7 @@ Done: #13 core resource policy, pre-start filesystem space checks and reserved j
 ## 2026-11-26 14:58 · issue-30-phone-companion-and-data-layer-sync
 
 Issue #30 blocked by open prerequisite #28. Read harness/architecture/reliability docs and inspected phone/watch/FIT modules; no production changes. core/fit has no implementation or verified-export API, so end-to-end sync would require widening scope into #28. Commented on #30 and added status:blocked. Next: merge #28, then implement durable ChannelClient outbox/receiver/ack and 20-run interruption/dedup tests; align phone/watch application IDs and signing (currently different IDs), document in ADR. No tests/check/commit/PR or field validation claimed.
+
+## 2026-11-28 15:30 · issue-96-fusedlocationprovider-gps-source-and-adr
+
+done: worker (claude) hit the usage limit early; only draft tests exist, uncommitted (SourceIdTest.kt modified, FusedLocationArbitrationTest.kt and core/recording/src/test/.../location/ new). next: resume #96 in this worktree after the limit resets (ADR, core gating/arbitration, wear FusedLocationProvider adapter). open: draft tests not yet verified against ./rp check.

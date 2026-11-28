@@ -30,6 +30,7 @@ Watch setup step by step (in Italian, for the owner): `docs/it/CONFIGURAZIONE_OR
 | F10 | IMU capture and battery cost (see below) | 50 Hz without gaps, battery %/h with IMU off, accelerometer, accelerometer + gyroscope |
 | F11 | Low-resource warnings and automatic saving (see below) | Initial battery, running/paused warnings, saved automatic stop and exercise shutdown |
 | F12 | Screen off (#108): 10 min walk or run with watch GPS and wrist HR only, wrist down so the screen stays off for at least 3 min at a time | Continuous track, distance, HR and cadence in the FIT and on Strava, including the screen-off stretches |
+| F13 | Fused location near buildings (#96, see below) | GPS ready during warm-up where Health Services stays acquiring; no distance while standing; switch events; battery %/h |
 | F9 | Start a workout in Gear Tracker (or another Health Services app), then a RunPro run; during it start a workout in the other app again | RunPro takes over at its start; when the other app takes over, the run keeps recording (timer, strap) without wrist HR and GPS, and the log shows it |
 
 ## Auto-lap and interval check (F9)
@@ -67,6 +68,23 @@ the setting it started with. Streams stay on the watch in `files/imu` (phone syn
    source that does not start a second workout on the watch. Keep, per run: the `.imu` file(s) (named by
    run id), the FIT from the phone and the reference export. Report them on the field-test issue; nothing
    about accuracy is claimed until #34 compares them.
+
+## Fused location check (F13)
+
+Phone paired over Bluetooth with location on. Keep `adb logcat -s RunProLocation RecordingService` and the
+debug trace on.
+
+1. Stand next to a tall building (where Health Services stayed acquiring in #12) and choose **Get ready**.
+   **GPS: ready** should appear within about 10 s. Note the time.
+2. Start, stand still for 2 min, then run 10 min, partly in the open, and stand still for 2 min at the end.
+   The distance must not grow while standing; the pace must look plausible while running.
+3. After the run, check in the FIT file (or the debug trace) the source switches for location, distance
+   and speed between `watch:fused-location` and `watch:health-services`, and that the track has no jumps
+   of 50 m or more.
+4. Repeat a 30 min run in the open with and without the phone (F7): compare battery %/h with an F1 run.
+
+Report the build, the times, the distance against a known route, the switches and the battery numbers.
+These are procedures awaiting physical results; no field result is claimed by #96.
 
 ## Low-resource check (F11)
 

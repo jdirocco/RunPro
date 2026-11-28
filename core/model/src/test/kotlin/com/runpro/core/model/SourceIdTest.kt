@@ -20,6 +20,14 @@ class SourceIdTest {
     fun `watch sources are not BLE`() {
         assertFalse(SourceId.HEALTH_SERVICES.isBle)
         assertNull(SourceId.WATCH_IMU.bleAddress)
+        assertFalse(SourceId.FUSED_LOCATION.isBle)
+    }
+
+    @Test
+    fun `the fused location provider is its own stable watch source`() {
+        // Stable across runs: switch events and FIT exports refer to it by this id (R5, ADR 0019).
+        assertEquals("watch:fused-location", SourceId.FUSED_LOCATION.value)
+        assertTrue(SourceId.FUSED_LOCATION != SourceId.HEALTH_SERVICES)
     }
 
     @Test

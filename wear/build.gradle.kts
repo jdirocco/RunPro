@@ -91,6 +91,8 @@ dependencies {
     implementation(project(":core:ble"))
     implementation(project(":core:sync"))
     implementation(libs.play.services.wearable)
+    // Fused location backs up the Health Services GPS near buildings (#96, ADR 0019).
+    implementation(libs.play.services.location)
     implementation(libs.androidx.health.services)
     constraints {
         // Play services brings Fragment 1.0; registerForActivityResult needs 1.3+ (lint, ADR 0010).
