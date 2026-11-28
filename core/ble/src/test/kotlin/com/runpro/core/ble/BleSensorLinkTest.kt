@@ -1,8 +1,11 @@
 package com.runpro.core.ble
 
 import com.runpro.core.model.CadenceSample
+import com.runpro.core.model.DistanceSample
 import com.runpro.core.model.HeartRate
 import com.runpro.core.model.HeartRateSample
+import com.runpro.core.model.Power
+import com.runpro.core.model.PowerSample
 import com.runpro.core.model.Sample
 import com.runpro.core.model.SensorEvent
 import com.runpro.core.model.SensorListener
@@ -302,6 +305,61 @@ class BleSensorLinkTest {
         assertEquals(170.0, assertIs<CadenceSample>(rig.samples[1]).cadence.stepsPerMinute)
     }
 
+    @Test
+    fun `a Stryd subscribes to RSC and power and streams speed, cadence, distance and power`() {
+        val rig = Rig(STRYD)
+        rig.link.start(rig.listener, rig.time())
+        rig.ready()
+        assertEquals(
+            listOf(GattUuids.RSC_MEASUREMENT, GattUuids.CYCLING_POWER_MEASUREMENT),
+            rig.port.requests.mapNotNull { it.characteristic }
+        )
+        // Running, total distance present: 3.0 m/s, 172 spm, 1234.5 m since the pod was reset.
+        rig.notify(
+            bytes(0x06, 0x00, 0x03, 0xAC, 0x39, 0x30, 0x00, 0x00),
+            characteristic = GattUuids.RSC_MEASUREMENT
+        )
+        // Instantaneous power only: 251 W.
+        rig.notify(
+            bytes(0x00, 0x00, 0xFB, 0x00),
+            characteristic = GattUuids.CYCLING_POWER_MEASUREMENT
+        )
+        assertEquals(3.0, assertIs<SpeedSample>(rig.samples[0]).speed.metersPerSecond)
+        assertEquals(172.0, assertIs<CadenceSample>(rig.samples[1]).cadence.stepsPerMinute)
+        assertEquals(1234.5, assertIs<DistanceSample>(rig.samples[2]).total.meters, 1e-9)
+        assertEquals(Power(251), assertIs<PowerSample>(rig.samples[3]).power)
+        assertTrue(rig.samples.all { it.source == STRYD.source })
+        assertEquals(
+            listOf<SensorEvent>(SensorEvent.Connected(rig.time(), STRYD.source)),
+            rig.events
+        )
+    }
+
+    @Test
+    fun `a Stryd whose power goes silent resubscribes even while RSC still streams`() {
+        val rig = Rig(STRYD)
+        rig.link.start(rig.listener, rig.time())
+        rig.ready()
+        val subscribed = rig.port.requests.size
+        repeat(5) {
+            rig.advance(1_000)
+            rig.notify(bytes(0x04, 0x00, 0x03, 0xAC), characteristic = GattUuids.RSC_MEASUREMENT)
+        }
+        assertEquals(BleConnectionState.RESUBSCRIBING, rig.link.state)
+        rig.complete()
+        assertEquals(
+            listOf(GattUuids.RSC_MEASUREMENT, GattUuids.CYCLING_POWER_MEASUREMENT),
+            rig.port.requests.drop(subscribed).map { it.characteristic }
+        )
+        rig.complete()
+        rig.notify(
+            bytes(0x00, 0x00, 0xFB, 0x00),
+            characteristic = GattUuids.CYCLING_POWER_MEASUREMENT
+        )
+        assertEquals(BleConnectionState.STREAMING, rig.link.state)
+        assertTrue(rig.events.none { it is SensorEvent.Disconnected })
+    }
+
     private class Rig(sensor: PairedSensor = STRAP) {
         val port = FakeDevicePort()
         val log = mutableListOf<BleLogLine>()
@@ -424,5 +482,6 @@ class BleSensorLinkTest {
         const val TICK = 100L
         val STRAP = PairedSensor("AA:BB:CC:DD:EE:01", BleSensorKind.HEART_RATE, "Strap")
         val STRAP_SOURCE = SourceId.ble("AA:BB:CC:DD:EE:01")
+        val STRYD = PairedSensor("AA:BB:CC:DD:EE:03", BleSensorKind.STRYD, "Stryd")
     }
 }

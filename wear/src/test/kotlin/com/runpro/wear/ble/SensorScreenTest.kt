@@ -2,6 +2,7 @@ package com.runpro.wear.ble
 
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
@@ -37,7 +38,42 @@ class SensorScreenTest {
         }
         compose.onNodeWithText("Pair HR strap").performScrollTo().performClick()
         compose.onNodeWithText("Pair footpod").performScrollTo().performClick()
-        assertEquals(listOf(BleSensorKind.HEART_RATE, BleSensorKind.FOOTPOD), asked)
+        compose.onNodeWithText("Pair Stryd").performScrollTo().performClick()
+        assertEquals(
+            listOf(BleSensorKind.HEART_RATE, BleSensorKind.FOOTPOD, BleSensorKind.STRYD),
+            asked
+        )
+    }
+
+    @Test
+    fun `a paired Stryd takes the foot slot, so no footpod is offered until it is forgotten`() {
+        val forgotten = mutableListOf<BleSensorKind>()
+        val stryd = PairedSensor("AA:BB:CC:DD:EE:03", BleSensorKind.STRYD, "Stryd 4")
+        compose.setContent {
+            SensorScreen(
+                SensorScreenState(paired = listOf(strap, stryd), bluetoothAllowed = true),
+                SensorActions(forget = { forgotten += it })
+            )
+        }
+        compose.onNodeWithText("Stryd: Stryd 4").performScrollTo()
+        compose.onNodeWithText("Pair footpod").assertDoesNotExist()
+        compose.onNodeWithText("Pair Stryd").assertDoesNotExist()
+        compose.onAllNodesWithText("Forget")[1].performScrollTo().performClick()
+        assertEquals(listOf(BleSensorKind.STRYD), forgotten)
+    }
+
+    @Test
+    fun `a paired footpod hides the Stryd pairing`() {
+        val footpod = PairedSensor("AA:BB:CC:DD:EE:02", BleSensorKind.FOOTPOD, "Pod")
+        compose.setContent {
+            SensorScreen(
+                SensorScreenState(paired = listOf(footpod), bluetoothAllowed = true),
+                SensorActions()
+            )
+        }
+        compose.onNodeWithText("Footpod: Pod").performScrollTo()
+        compose.onNodeWithText("Pair Stryd").assertDoesNotExist()
+        compose.onNodeWithText("Pair HR strap").performScrollTo()
     }
 
     @Test

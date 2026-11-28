@@ -194,6 +194,22 @@ Gaps, real rate and battery cost on the Galaxy Watch 5 Pro are field results (F1
   association on the Galaxy Watch 5 Pro. The 30 min strap acceptance of #17 and F1/F2 (#22) are owner
   field tests; no field result is claimed.
 
+## Stryd evidence (#21)
+
+- `BleSensorKind.STRYD` reuses the link and controller unchanged, with two required measurements (RSC and
+  Cycling Power). `BleSensorLinkTest` subscribes both and turns them into speed, cadence, distance and
+  power samples of the Stryd's source; a Stryd whose power alone goes silent for 5 s resubscribes
+  without a `Disconnected` event and streams again (R4, R8 budget unchanged).
+- `StrydRunTest` drives a running engine with a Stryd over `BleSensorLink` and a watch distance that
+  reads 4 % short: the Stryd is the active distance and power source, the run distance is the pod's
+  increase within 1 % (its counter not starting at zero), power is current, the run keeps running.
+  Source switches to and from the Stryd are the generic BLE ones of `SourceSwitchEventTest` (R5).
+- `PairedSensorsTest` / `SensorScreenTest`: one foot sensor (footpod or Stryd) at a time, so two BLE
+  distance sources never compete.
+- Not covered: no real Stryd has been used (the owner has none). Whether the pod advertises 0x1818
+  (the chooser and scan filter on it), its cadence unit and its notification rate while standing are
+  unverified; F14 in `FIELD_TESTING.md`. Proprietary metrics are #125.
+
 ## Source arbitration evidence
 
 - `SensorDropoutReplayTest` records the committed strap-dropout trace and chaos GATT 133, silent stalls

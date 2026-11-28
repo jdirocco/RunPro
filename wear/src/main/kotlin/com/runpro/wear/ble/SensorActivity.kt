@@ -122,7 +122,7 @@ class SensorActivity : ComponentActivity() {
         scan.stop()
         // The replaced sensor loses its association, unless it is the very association just made.
         state.paired
-            .filter { it.kind == sensor.kind || it.address == sensor.address }
+            .filter { it.kind.slot == sensor.kind.slot || it.address == sensor.address }
             .filterNot { it.address == sensor.address && it.associationId == sensor.associationId }
             .forEach(association::forget)
         update(PairedSensors.pair(state.paired, sensor), R.string.sensors_paired)

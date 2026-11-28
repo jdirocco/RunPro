@@ -76,4 +76,41 @@ class PairedSensorsTest {
         assertEquals(listOf(GattUuids.RSC_MEASUREMENT), BleSensorKind.FOOTPOD.measurements)
         assertEquals(GattUuids.RUNNING_SPEED_AND_CADENCE_SERVICE, BleSensorKind.FOOTPOD.service)
     }
+
+    @Test
+    fun `a Stryd is found by its power service and must stream both RSC and power`() {
+        assertEquals(GattUuids.CYCLING_POWER_SERVICE, BleSensorKind.STRYD.service)
+        assertEquals(
+            listOf(GattUuids.RSC_MEASUREMENT, GattUuids.CYCLING_POWER_MEASUREMENT),
+            BleSensorKind.STRYD.measurements
+        )
+    }
+
+    @Test
+    fun `footpod and Stryd share the foot slot, the strap has its own`() {
+        assertEquals(SensorSlot.FOOT, BleSensorKind.FOOTPOD.slot)
+        assertEquals(SensorSlot.FOOT, BleSensorKind.STRYD.slot)
+        assertEquals(SensorSlot.CHEST, BleSensorKind.HEART_RATE.slot)
+    }
+
+    @Test
+    fun `pairing a Stryd replaces the footpod and keeps the strap, and the reverse`() {
+        val stryd = PairedSensor("AA:BB:CC:DD:EE:03", BleSensorKind.STRYD, "Stryd")
+        val withStryd = PairedSensors.pair(listOf(strap, footpod), stryd)
+        assertEquals(listOf(strap, stryd), withStryd)
+        assertEquals(listOf(strap, footpod), PairedSensors.pair(withStryd, footpod))
+        assertEquals(listOf(strap), PairedSensors.forget(withStryd, BleSensorKind.STRYD))
+    }
+
+    @Test
+    fun `a Stryd survives the preferences and a later foot sensor wins on decode`() {
+        val stryd = PairedSensor("AA:BB:CC:DD:EE:03", BleSensorKind.STRYD, "Stryd", 4)
+        assertEquals(
+            listOf(strap, stryd),
+            PairedSensors.decode(PairedSensors.encode(listOf(strap, stryd)))
+        )
+        val text = PairedSensors.encode(listOf(footpod)) + "\n" +
+            PairedSensors.encode(listOf(stryd))
+        assertEquals(listOf(stryd), PairedSensors.decode(text))
+    }
 }

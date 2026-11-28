@@ -9,4 +9,6 @@ dependencies {
     api(libs.kotlinx.coroutines.core)
     // noFileStorePath reproduces the watch file system in IMU storage tests (#105).
     testImplementation(project(":tools:replay"))
+    // A Stryd's GATT notifications drive a run end to end (#21).
+    testImplementation(project(":core:ble"))
 }
