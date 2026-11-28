@@ -9,10 +9,17 @@ Watch setup step by step (in Italian, for the owner): `docs/it/CONFIGURAZIONE_OR
 
 1. Install the build from the PR (`./rp install` with the watch on Wi-Fi ADB; see [WATCH_SETUP.md](WATCH_SETUP.md)) or from Play internal testing.
 2. Check: RunPro not in "Sleeping apps", background activity allowed, Location on.
-3. Make sure the strap is **not** connected to the phone, Samsung Health or Gear Tracker at the same time.
-   Pair it once in RunPro (**Sensors → Pair HR strap**, #17); keep `adb logcat -s RunProBle` for the
-   connection log until the diagnostics export (#20) exists.
-4. Enable "Record debug trace" in RunPro settings.
+3. Make sure the strap is **not** connected to the phone, Samsung Health or Gear Tracker at the same time,
+   and do not pair it in the watch's Bluetooth settings (forget it there if it is listed). Pair it once in
+   RunPro (**Sensors → Pair HR strap**, #17): wear the strap, the screen lists what RunPro's own scan finds
+   (Wear OS refuses the system chooser to third-party apps, #115). If the watch still holds an old bond
+   the strap has forgotten, RunPro removes it on the first failed connection (`removed the stale bond` in
+   the log, #117). Keep `adb logcat -s RunProBle` for the connection log until the diagnostics export
+   (#20) exists.
+4. In warm-up (**Get ready**) wait for the strap icon below "Heart rate" before **Start**: "HR strap:
+   connecting" means the strap is not the heart rate source yet (#123). "Heart rate: ready" alone is the
+   wrist sensor.
+5. Enable "Record debug trace" in RunPro settings.
 
 ## Standard scenarios
 
