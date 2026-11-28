@@ -29,6 +29,7 @@ import com.runpro.core.recording.service.RunRecovery
 import com.runpro.core.recording.service.ServiceCommand
 import com.runpro.core.recording.service.ServiceStartPolicy
 import com.runpro.core.recording.service.ServiceStartPolicy.Decision
+import com.runpro.core.recording.service.WarmUpTimeout
 import com.runpro.wear.health.HealthServicesExercise
 import com.runpro.wear.imu.ImuPreferences
 import com.runpro.wear.imu.WatchImu
@@ -51,6 +52,8 @@ import kotlinx.coroutines.flow.StateFlow
  *   its samples go to the engine. A refused or lost exercise never pauses or stops the run (R4).
  * - The IMU capture ([ImuCapture], #33) follows the run on its own thread into `files/imu`, apart from
  *   the journal; it never affects the run (ADR 0012).
+ * - A warm-up left alone ends after [WarmUpTimeout.DEFAULT_LIMIT] (#82): the service resets the engine and
+ *   leaves the foreground, so GPS and the notification do not stay on. A recording run is never affected (R1).
  * - The UI binds to it and only reads [LocalBinder.state] and [LocalBinder.exercise].
  */
 class RecordingService : Service() {
@@ -86,6 +89,9 @@ class RecordingService : Service() {
         val directory = WatchStorage.journals(this)
         (if (directory.exists()) directory else filesDir).usableSpace
     }
+
+    /** Read and used only on the ticker thread; tests shorten the limit. */
+    @Volatile internal var warmUpTimeout = WarmUpTimeout()
 
     /** The IMU setting of the current run, read when it starts (or is restored). */
     @Volatile private var imuMode = ImuMode.OFF
@@ -234,8 +240,15 @@ class RecordingService : Service() {
     }
 
     private fun tick() {
-        if (ServiceStartPolicy.needsForeground(lastPhase)) {
-            val time = now()
+        val phase = lastPhase
+        val time = now()
+        // R1: only a warm-up is cancelled; the engine also ignores a reset once the run records.
+        if (warmUpTimeout.shouldCancel(phase, time)) {
+            Log.i(TAG, "warm-up left alone for ${warmUpTimeout.limit}: cancelled")
+            engine.submit(EngineInput.Reset)
+            return
+        }
+        if (ServiceStartPolicy.needsForeground(phase)) {
             engine.submit(EngineInput.Resources(time, battery.percent, readAvailableBytes()))
             engine.submit(EngineInput.Tick(time))
         }

@@ -10,8 +10,11 @@ import com.runpro.core.model.RunEvent
 import com.runpro.core.recording.RunPhase
 import com.runpro.core.recording.service.RunRecovery
 import com.runpro.core.recording.service.ServiceCommand
+import com.runpro.core.recording.service.WarmUpTimeout
 import com.runpro.wear.sync.WatchStorage
+import java.time.Duration
 import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.seconds
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -26,6 +29,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.android.controller.ServiceController
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowLooper
+import org.robolectric.shadows.ShadowSystemClock
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -157,6 +161,46 @@ class RecordingServiceTest {
         assertTrue(shadowOf(service).isStoppedBySelf)
         val binder = service.onBind(null) as RecordingService.LocalBinder
         assertNull(binder.state.value.run)
+    }
+
+    @Test
+    fun `a warm-up left alone ends on its own and leaves the foreground`() {
+        grantAll()
+        val service = service().get()
+        service.warmUpTimeout = WarmUpTimeout(limit = 1.seconds)
+        service.onStartCommand(RecordingService.intent(app, ServiceCommand.PREPARE), 0, 1)
+        service.awaitPhase(RunPhase.PREPARING)
+
+        // Robolectric's boot clock stands still: move it on while the real ticker runs once a second.
+        val binder = service.onBind(null) as RecordingService.LocalBinder
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+        while (binder.state.value.phase == RunPhase.PREPARING && System.nanoTime() < deadline) {
+            ShadowSystemClock.advanceBy(Duration.ofMillis(100))
+            Thread.sleep(50)
+        }
+        service.awaitPhase(RunPhase.IDLE)
+
+        assertTrue(shadowOf(service).isForegroundStopped)
+        assertTrue(shadowOf(service).isStoppedBySelf)
+        assertNull(binder.state.value.run)
+        assertFalse(WatchStorage.journals(app).exists())
+    }
+
+    @Test
+    fun `the warm-up timeout never ends a recording run`() {
+        grantAll()
+        val service = service().get()
+        service.warmUpTimeout = WarmUpTimeout(limit = 1.seconds)
+        service.onStartCommand(RecordingService.intent(app, ServiceCommand.START), 0, 1)
+        service.awaitPhase(RunPhase.RUNNING)
+
+        repeat(25) {
+            ShadowSystemClock.advanceBy(Duration.ofMillis(200))
+            Thread.sleep(100)
+        }
+
+        service.awaitPhase(RunPhase.RUNNING)
+        assertFalse(shadowOf(service).isStoppedBySelf)
     }
 
     @Test
