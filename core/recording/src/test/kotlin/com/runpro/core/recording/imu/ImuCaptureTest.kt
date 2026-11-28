@@ -15,6 +15,7 @@ import com.runpro.core.model.Timestamp
 import com.runpro.core.recording.ResourceState
 import com.runpro.core.recording.RunPhase
 import com.runpro.core.recording.RunState
+import com.runpro.tools.replay.noFileStorePath
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.Executor
@@ -193,6 +194,19 @@ class ImuCaptureTest {
         port.failure = null
         follow(capture, state(RunPhase.RUNNING, RunId("run-2")))
         assertEquals(ImuCaptureState.CAPTURING, capture.status.value.state)
+    }
+
+    @Test
+    fun `the default free space check works where getFileStore is denied as on the watch`() {
+        // Field report #105: Files.getFileStore threw SecurityException on the Galaxy Watch 5 Pro.
+        val watchDir = noFileStorePath(dir) { SecurityException("getFileStore") }
+        val capture = ImuCapture(port, watchDir, executor, clock)
+        follow(capture, state(RunPhase.RUNNING))
+        assertEquals(ImuCaptureState.CAPTURING, capture.status.value.state)
+        assertNull(capture.status.value.problem)
+        deliver(2)
+        follow(capture, state(RunPhase.STOPPED))
+        assertEquals(100, ImuStream.readRun(dir, runId).single().readingCount)
     }
 
     @Test

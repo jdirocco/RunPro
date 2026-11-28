@@ -7,4 +7,6 @@ dependencies {
     api(project(":core:model"))
     api(project(":core:journal"))
     api(libs.kotlinx.coroutines.core)
+    // noFileStorePath reproduces the watch file system in IMU storage tests (#105).
+    testImplementation(project(":tools:replay"))
 }
