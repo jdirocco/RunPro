@@ -240,6 +240,18 @@ directly from disk without a separate index. Open journals are excluded and cann
 from history. Retry export re-verifies or writes the FIT file without removing the journal (R3) and triggers
 `PhoneSync`; delete requires explicit confirmation (with a warning when unsynced).
 
+## Health Connect export (`:core:sync` healthconnect / `:mobile` healthconnect)
+
+`FitToHealthConnectMapper` (`:core:sync`) maps a decoded `FitActivity` to a validated `HealthConnectRun`
+(running session bounds, de-overlapped laps, active/pause segments, GPS route in `[startTime, endTime)`,
+3,600-sample HR chunks, distance, and active-only cadence-derived steps). `HealthConnectExporter` scans
+`files/runs/*.fit`, writes through `HealthConnectPort` with deterministic `clientRecordId`s, and tracks
+exported SHA-256 hashes and versions in `files/health-connect/exported.tsv` without modifying or deleting
+the FIT files. `:mobile` provides `HealthConnectRecordMapper`, `AndroidHealthConnectPort` (write-only
+permissions via `HealthConnectClient`), `PermissionsRationaleActivity` (API 30–33 rationale and API 34+
+`ViewPermissionUsageActivity` alias), and schedules background export from `FitReceiverService` after
+`FitInbox` has stored and acknowledged the FIT file. Decisions: ADR 0014.
+
 ## Auto-lap and intervals (`:core:recording`)
 
 `ConfigureWorkout` selects a free run (default 1 km auto-lap) or warm-up, repeated work/recovery,

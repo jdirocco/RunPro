@@ -1,3 +1,20 @@
 <resources>
     <string name="app_name">RunPro</string>
+    <string name="health_connect_rationale_title">RunPro and Health Connect</string>
+    <string name="health_connect_rationale_body">RunPro exports finished runs synced from your watch into Health Connect so apps such as Samsung Health can display them.\n\nRunPro requests write-only access for:\n• Running exercise sessions and laps\n• GPS exercise routes\n• Heart rate series\n• Distance\n• Steps\n\nRunPro does not read health data written by other apps.</string>
+    <string name="health_connect_grant_permissions">Grant Health Connect permissions</string>
+    <string name="health_connect_export_pending">Export pending runs</string>
+    <string name="health_connect_status_ready">Health Connect is available. Grant permissions to export received runs.</string>
+    <string name="health_connect_status_update_required">Health Connect needs an update before RunPro can export runs.</string>
+    <string name="health_connect_status_unavailable">Health Connect is unavailable on this device.</string>
+    <string name="health_connect_status_exporting">Exporting pending runs…</string>
+    <string name="health_connect_status_missing_permissions">Health Connect permissions are missing. Tap Grant Health Connect permissions first.</string>
+    <plurals name="health_connect_status_done">
+        <item quantity="one">Exported %1$d run, %2$d already exported.</item>
+        <item quantity="other">Exported %1$d runs, %2$d already exported.</item>
+    </plurals>
+    <plurals name="health_connect_status_partial">
+        <item quantity="one">Exported %1$d run, %2$d already exported, %3$d failed.</item>
+        <item quantity="other">Exported %1$d runs, %2$d already exported, %3$d failed.</item>
+    </plurals>
 </resources>
