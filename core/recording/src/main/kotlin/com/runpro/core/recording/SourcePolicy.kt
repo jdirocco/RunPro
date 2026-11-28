@@ -5,7 +5,10 @@ import com.runpro.core.model.SourceId
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
-/** Explicit ids are preferred in list order; unlisted BLE, watch and derived sources follow. */
+/**
+ * Explicit ids are preferred in list order; unlisted sources follow: BLE, Health Services, fused location
+ * (ADR 0019), the IMU, then derived and others.
+ */
 data class MetricSourcePolicy(
     val priorities: List<SourceId> = emptyList(),
     val staleAfter: Duration = 5.seconds
@@ -21,8 +24,9 @@ data class MetricSourcePolicy(
         val fallback = when {
             source.isBle -> 0
             source == SourceId.HEALTH_SERVICES -> 1
-            source == SourceId.WATCH_IMU -> 2
-            else -> 3
+            source == SourceId.FUSED_LOCATION -> 2
+            source == SourceId.WATCH_IMU -> 3
+            else -> 4
         }
         return priorities.size + fallback
     }
