@@ -18,6 +18,9 @@ interface GattDevicePort : GattPort {
     fun refreshServiceCache(sessionId: Long): Boolean
 
     fun bondState(): BondState
+
+    /** Drops the platform bond with the device; false when it cannot (unsupported or refused). */
+    fun removeBond(): Boolean
 }
 
 /** One line of the sensor log (#20 persists and exports it). */
@@ -40,7 +43,10 @@ data class BleLogLine(
  *   a disconnect) when a streaming link closes. Neither is a recording command (R4);
  * - [CACHE_REFRESH_AFTER] consecutive sessions that fail before streaming refresh the platform GATT
  *   cache before the next discovery;
- * - discovery waits while the device is bonding, within its normal deadline.
+ * - discovery waits while the device is bonding, within its normal deadline;
+ * - a session of a bonded device that drops before streaming with an authentication or encryption
+ *   status ([STALE_BOND_STATUSES]) removes the bond once per link: the sensor has forgotten the keys
+ *   the platform still holds, and every encrypted reconnect would fail the same way (#117).
  *
  * Not thread safe: the owner calls everything on one serial dispatcher, off the recording/UI thread,
  * ticks at least every 100 ms, and passes times of one boot. [log] must be prompt and never throw.
@@ -60,6 +66,7 @@ class BleSensorLink(
     private var setupFailures = 0
     private var held: GattRequest? = null
     private var malformed = 0
+    private var bondRemoved = false
 
     val state: BleConnectionState get() = machine.state
 
@@ -149,7 +156,34 @@ class BleSensorLink(
                 target?.onEvent(SensorEvent.Disconnected(now, sensor.source, disconnectStatus))
             }
 
-            target != null -> setupFailures++
+            target != null -> {
+                setupFailures++
+                disconnectStatus?.takeIf { it in STALE_BOND_STATUSES }
+                    ?.let { dropStaleBond(change.sessionId, it) }
+            }
+        }
+    }
+
+    // A platform throw is a refused removal; the link keeps retrying as before.
+    @Suppress("TooGenericExceptionCaught")
+    private fun dropStaleBond(sessionId: Long, status: Int) {
+        if (bondRemoved) return
+        val removed = try {
+            if (port.bondState() != BondState.BONDED) return
+            bondRemoved = true
+            port.removeBond()
+        } catch (error: Exception) {
+            note(sessionId, "bond check failed: ${error.message}")
+            false
+        }
+        if (removed) {
+            note(sessionId, "removed the stale bond (status=$status)")
+        } else {
+            note(
+                sessionId,
+                "cannot remove the stale bond (status=$status): forget the sensor in the " +
+                    "watch Bluetooth settings"
+            )
         }
     }
 
@@ -192,6 +226,13 @@ class BleSensorLink(
 
         /** Consecutive sessions failing before streaming that trigger a GATT cache refresh. */
         const val CACHE_REFRESH_AFTER = 2
+
+        /**
+         * Disconnect statuses of a failed encryption: 5 authentication failure / insufficient
+         * authentication (seen with a forgotten key, #117), 6 key missing, 61 MIC failure, 137
+         * GATT_AUTH_FAIL.
+         */
+        val STALE_BOND_STATUSES = setOf(5, 6, 61, 137)
 
         private const val MALFORMED_LOG_LIMIT = 5
         private const val NANOS_PER_MILLI = 1_000_000L

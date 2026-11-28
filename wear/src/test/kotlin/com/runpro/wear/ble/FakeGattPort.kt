@@ -25,6 +25,8 @@ internal class FakeGattPort(private val events: GattEvents, private val post: (R
 
     override fun bondState() = BondState.NONE
 
+    override fun removeBond() = false
+
     fun notify(value: ByteArray) {
         val session = requests.last().sessionId
         post { events.notified(session, GattUuids.HEART_RATE_MEASUREMENT, value) }
