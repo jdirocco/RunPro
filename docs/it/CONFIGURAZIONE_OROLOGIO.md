@@ -257,6 +257,34 @@ L’orologio vibra negli ultimi tre secondi e al cambio fase, anche con l’app 
 rimanenti. Al termine dell’allenamento la registrazione continua: premi **Stop** per salvarla.
 La prova sul campo è F9 in `docs/FIELD_TESTING.md`; i risultati fisici devono ancora essere verificati.
 
+### Impostazioni e profilo
+
+Prima di **Preparati**, apri **Impostazioni**: scegli unità metriche (km, min/km, kg) o imperiali
+(mi, min/mi, lb), frequenza cardiaca massima e a riposo, peso, pausa automatica, conto alla rovescia e
+traccia di debug. Per i valori del profilo usa **Aumenta/Diminuisci**, poi **Salva**; **Annulla** scarta la
+modifica e **Rimuovi valore** lo lascia sconosciuto. Il profilo serve alle funzioni che lo richiedono;
+RunPro non inventa valori mancanti. Le scelte restano salvate e valgono per la prossima corsa.
+
+La **pausa automatica** è disattivata all'inizio. Se attiva, richiede velocità sotto 0,5 m/s per almeno
+5 secondi di misure recenti e consecutive; riparte a 1 m/s. Una pausa manuale richiede **Riprendi**.
+L'assenza di GPS o dati del sensore non mette in pausa la corsa.
+
+Il **conto alla rovescia** può essere disattivato o durare 3, 5 o 10 secondi. Parte dal pulsante di avvio
+nella preparazione; la corsa viene avviata solo alla fine. Tocca il conto per annullarlo. Uscire dall'app
+lo annulla: non parte una corsa nascosta.
+
+**Traccia di debug** è disattivata all'inizio. Se attiva salva i dati grezzi dei sensori, inclusa la
+posizione, in `files/traces`, separati dal giornale della corsa. Ogni segmento arriva al massimo a 10 MB;
+all'apertura di uno nuovo i vecchi vengono ridotti a 20 MB. Errori o poco spazio fermano solo la traccia.
+Per copiarli sul Mac:
+
+```sh
+adb exec-out run-as com.runpro.wear tar -c files/traces > traces.tar
+tar -xf traces.tar
+```
+
+La prova fisica è la sezione *Settings check (#27)* in `docs/FIELD_TESTING.md`.
+
 ### Registrazione IMU (accelerometro e giroscopio)
 
 Prima di **Avvia**, il pulsante **IMU** alterna **accelerometro** (predefinito), **accel. + giroscopio** e
@@ -281,7 +309,7 @@ Segui `docs/FIELD_TESTING.md`. In breve:
 1. Installa la build da provare (punto 6).
 2. Controlla permessi, batteria e fascia (punto 7).
 3. In RunPro: **Impostazioni → Registra traccia di debug** attivo.
-4. Dopo la corsa: **Diagnostica → Esporta log**, poi apri una issue **Field report** su GitHub con i file.
+4. Dopo la corsa copia `files/traces` con il comando sopra, poi apri una issue **Field report** su GitHub con i file. La schermata di esportazione diagnostica è un’attività separata ancora da implementare.
 
 ## 9. Problemi frequenti
 

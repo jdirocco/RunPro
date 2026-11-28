@@ -36,11 +36,15 @@ internal fun kilometers(distance: Distance, locale: Locale = Locale.getDefault()
     "%.2f".format(locale, floor(distance.kilometers * HUNDREDTHS) / HUNDREDTHS)
 
 /** `m:ss` per kilometre; [NO_VALUE] when there is no pace or it is slower than a walk. */
-internal fun pace(pace: Pace?): String {
-    val perKilometer = pace?.per(DistanceUnit.KILOMETER)?.takeIf { it <= SLOWEST_PACE }
+internal fun pace(pace: Pace?, unit: DistanceUnit = DistanceUnit.KILOMETER): String {
+    pace?.per(DistanceUnit.KILOMETER)?.takeIf { it <= SLOWEST_PACE }
         ?: return NO_VALUE
-    val total = (perKilometer.inWholeMilliseconds / MILLIS_PER_SECOND).roundToLong()
+    val perUnit = requireNotNull(pace).per(unit)
+    val total = (perUnit.inWholeMilliseconds / MILLIS_PER_SECOND).roundToLong()
     return "%d:%02d".format(total / SECONDS_PER_MINUTE, total % SECONDS_PER_MINUTE)
 }
 
 internal fun heartRate(heartRate: HeartRate?): String = heartRate?.bpm?.toString() ?: NO_VALUE
+
+internal fun displayDistance(distance: Distance, unit: DistanceUnit): String =
+    "%.2f".format(Locale.getDefault(), floor(distance.inUnit(unit) * HUNDREDTHS) / HUNDREDTHS)

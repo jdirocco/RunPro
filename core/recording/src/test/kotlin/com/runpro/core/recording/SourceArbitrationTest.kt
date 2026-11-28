@@ -40,9 +40,12 @@ class SourceArbitrationTest {
         assertEquals(RunPhase.PAUSED, machine.state.phase)
         assertNull(machine.state.activeSources[Metric.HEART_RATE])
         assertNull(machine.state.current.heartRate)
-        assertEquals(2, machine.switches().size)
+        // The silent strap keeps the metric (#108): only the initial selection is a recorded switch.
+        assertEquals(1, machine.switches().size)
         machine.feed(resume(7), hr(8, 140))
         assertEquals(WATCH, machine.state.activeSources[Metric.HEART_RATE])
+        assertEquals(STRAP to WATCH, machine.switches().last().let { it.from to it.to })
+        assertEquals(SwitchReason.STALE, machine.switches().last().reason)
         assertEquals(2.seconds, machine.state.totals.timer)
     }
 
@@ -116,6 +119,56 @@ class SourceArbitrationTest {
         machine.feed(hr(1, 100), hr(2, 150, STRAP))
         machine.handle(EngineInput.SensorReceived(SensorEvent.Disconnected(at(1), STRAP)))
         assertEquals(STRAP, machine.state.activeSources[Metric.HEART_RATE])
+    }
+
+    @Test
+    fun `a late batch from the only source fills the screen-off gap (#108)`() {
+        val machine = runningMachine()
+        machine.feed(hr(0, 100), dist(0, 0.0), dist(1, 1.5))
+        // Screen off: the service keeps ticking, Health Services holds its updates back.
+        (2..60).forEach { machine.handle(tick(it)) }
+        assertNull(machine.state.activeSources[Metric.HEART_RATE])
+        assertNull(machine.state.activeSources[Metric.DISTANCE])
+        assertNull(machine.state.current.heartRate)
+        // Screen on: the batch arrives with its original measurement times.
+        (2..60).forEach { second ->
+            assertTrue(machine.handle(hr(second, 100 + second)), "hr at $second")
+        }
+        (2..60).forEach { second ->
+            assertTrue(machine.handle(dist(second, 1.5 * second)), "distance at $second")
+        }
+        assertEquals(WATCH, machine.state.activeSources[Metric.HEART_RATE])
+        assertEquals(HeartRate(160), machine.state.current.heartRate)
+        assertEquals(90.0, machine.state.totals.distance.meters, 1e-9)
+        assertEquals(60.seconds, machine.state.totals.moving)
+        assertEquals(HeartRate(160), machine.state.totals.maxHeartRate)
+        // Each value held until the next one: 100 for 2 s, then 102..159 for 1 s each.
+        assertEquals(129.5, machine.state.totals.averageHeartRate!!.bpm.toDouble(), 1.0)
+        // Silence of the only source is not a source switch: no decision blocks the batch (R5).
+        assertEquals(
+            listOf(null to WATCH),
+            machine.switches().filter { it.metric == Metric.HEART_RATE }.map { it.from to it.to }
+        )
+        assertEquals(RunPhase.RUNNING, machine.state.phase)
+    }
+
+    @Test
+    fun `distance covered while the only source was silent counts when it reports again`() {
+        val machine = runningMachine()
+        machine.feed(dist(0, 0.0), dist(1, 1.5))
+        (2..40).forEach { machine.handle(tick(it)) }
+        assertTrue(machine.handle(dist(40, 60.0)))
+        assertEquals(60.0, machine.state.totals.distance.meters, 1e-9)
+    }
+
+    @Test
+    fun `a late batch from a source that a backup replaced stays out`() {
+        val machine = runningMachine()
+        machine.feed(hr(0, 150, STRAP), hr(0, 100))
+        (1..10).forEach { second -> machine.feed(tick(second), hr(second, 100)) }
+        assertEquals(WATCH, machine.state.activeSources[Metric.HEART_RATE])
+        assertFalse(machine.handle(hr(6, 155, STRAP)))
+        assertEquals(HeartRate(100), machine.state.current.heartRate)
     }
 
     private fun RecordingStateMachine.switches() =

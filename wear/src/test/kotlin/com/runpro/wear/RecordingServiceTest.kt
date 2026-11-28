@@ -7,6 +7,9 @@ import android.content.pm.ServiceInfo
 import androidx.test.core.app.ApplicationProvider
 import com.runpro.core.journal.JournalReader
 import com.runpro.core.model.RunEvent
+import com.runpro.core.model.RunSettings
+import com.runpro.core.model.UserProfile
+import com.runpro.core.model.WorkoutSettings
 import com.runpro.core.recording.RunPhase
 import com.runpro.core.recording.service.RunRecovery
 import com.runpro.core.recording.service.ServiceCommand
@@ -68,6 +71,30 @@ class RecordingServiceTest {
         assertEquals(phase, binder.state.value.phase)
         Thread.sleep(50)
         ShadowLooper.idleMainLooper()
+    }
+
+    @Test
+    fun `saved settings apply to the next run and never mutate the active snapshot`() {
+        grantAll()
+        val selected =
+            WorkoutSettings(runSettings = RunSettings(profile = UserProfile(190, 50, 72.5)))
+        WorkoutPreferences.save(app, selected)
+        val service = service().get()
+        service.onStartCommand(RecordingService.intent(app, ServiceCommand.START), 0, 1)
+        service.awaitPhase(RunPhase.RUNNING)
+        val binder = service.onBind(null) as RecordingService.LocalBinder
+        assertEquals(selected, binder.state.value.workoutSettings)
+        WorkoutPreferences.save(app, WorkoutSettings())
+        assertEquals(selected, binder.state.value.workoutSettings)
+        service.onStartCommand(RecordingService.intent(app, ServiceCommand.STOP), 0, 2)
+        service.awaitPhase(RunPhase.STOPPED)
+        val file = WatchStorage.journals(app).resolve("${binder.state.value.run!!.id}.journal")
+        val start = JournalReader.read(file.toPath()).records.first() as
+            com.runpro.core.journal.JournalRecord.RunStarted
+        assertEquals(selected, start.workout)
+        service.onStartCommand(RecordingService.intent(app, ServiceCommand.START), 0, 3)
+        service.awaitPhase(RunPhase.RUNNING)
+        assertEquals(WorkoutSettings(), binder.state.value.workoutSettings)
     }
 
     @Test

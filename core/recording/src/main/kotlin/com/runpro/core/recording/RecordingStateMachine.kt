@@ -7,6 +7,7 @@ import com.runpro.core.model.RunEvent
 import com.runpro.core.model.RunId
 import com.runpro.core.model.Sample
 import com.runpro.core.model.SensorEvent
+import com.runpro.core.model.SpeedSample
 import com.runpro.core.model.StopReason
 import com.runpro.core.model.Timestamp
 import com.runpro.core.model.WorkoutSettings
@@ -29,6 +30,7 @@ class RecordingStateMachine(
 ) {
     private var settings = WorkoutSettings()
     private var workout = WorkoutController(settings)
+    private val autoPause = AutoPause()
     private var phase = RunPhase.IDLE
     private var run: Run? = null
     private var metrics: RunMetrics? = null
@@ -70,7 +72,10 @@ class RecordingStateMachine(
     /** Applies [input]; false means a command was rejected or a measurement was not admitted. */
     fun handle(input: EngineInput): Boolean {
         // Laps due before a runner command belong before it, so pause/lap/stop never swallow them.
-        if (input is EngineInput.Command) markAutomaticLaps(input.time)
+        if (input is EngineInput.Command) {
+            autoPause.reset()
+            markAutomaticLaps(input.time)
+        }
         val accepted = when (input) {
             // Workout settings can change only before the run starts.
             is EngineInput.ConfigureWorkout ->
@@ -152,6 +157,7 @@ class RecordingStateMachine(
             run = Run(runIds(), listOf(RunEvent.Started(time)))
             metrics = RunMetrics(config, time)
             workout = WorkoutController(settings)
+            autoPause.reset()
             now = time
         }
         return started
@@ -252,15 +258,25 @@ class RecordingStateMachine(
         ) {
             return false
         }
+        val fresh = sample.time >= (now ?: sample.time)
         val time = maxOf(sample.time, now ?: sample.time)
         arbitrate(time, listOf(sample.metric))
         val accepted = gate.admit(sample)
-        if (accepted) applySample(sample)
+        // A late sample of a still silent source counts but is too old to show.
+        if (accepted) {
+            applySample(sample, display = gate.isLive(sample.metric))
+            if (settings.runSettings.autoPause && sample is SpeedSample) {
+                autoPause.command(sample, state, fresh)?.let { command ->
+                    markAutomaticLaps(command.time)
+                    record(command)
+                }
+            }
+        }
         return accepted
     }
 
-    private fun applySample(sample: Sample) {
-        current = current.updatedWith(sample)
+    private fun applySample(sample: Sample, display: Boolean = true) {
+        if (display) current = current.updatedWith(sample)
         metrics?.onSample(sample)
         advanceClock(sample.time)
     }
@@ -277,7 +293,9 @@ class RecordingStateMachine(
     }
 
     private fun arbitrate(time: Timestamp, metrics: Iterable<Metric> = Metric.entries) {
-        gate.switches(time, metrics).forEach { event ->
+        val decisions = gate.switches(time, metrics)
+        decisions.silenced.forEach { current = current.cleared(it) }
+        decisions.switches.forEach { event ->
             if (run == null) {
                 current = current.cleared(event.metric)
             } else {

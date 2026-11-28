@@ -29,6 +29,18 @@ object SyntheticTraces {
     const val EASY_RUN = "easy-run-30min.jsonl.gz"
     const val INTERVALS = "intervals-6x3min.jsonl.gz"
     const val STRAP_DROPOUT = "strap-dropout.jsonl.gz"
+    const val SCREEN_OFF = "screen-off-batching.jsonl.gz"
+
+    /**
+     * Seconds from the start of [SCREEN_OFF] during which the screen is off, as on the watch in #108
+     * (`PowerManagerService` timeline of run `946d6346`, rounded to whole seconds).
+     */
+    val SCREEN_OFF_WINDOWS: List<IntRange> = listOf(
+        3 until 20,
+        23 until 38,
+        71 until 100,
+        124 until 296
+    )
 
     /** The simulated chest strap. */
     val STRAP: SourceId = SourceId.ble("C0:FF:EE:00:00:01")
@@ -42,8 +54,19 @@ object SyntheticTraces {
     val all: Map<String, () -> Trace> = linkedMapOf(
         EASY_RUN to ::easyRun,
         INTERVALS to ::intervals,
-        STRAP_DROPOUT to ::strapDropout
+        STRAP_DROPOUT to ::strapDropout,
+        SCREEN_OFF to ::screenOff
     )
+
+    /**
+     * When the platform delivered a [SCREEN_OFF] record measured at [time]: Health Services holds its
+     * updates back while the screen is off and delivers them as one batch when it turns on again.
+     */
+    fun screenOffDelivery(time: Timestamp): Timestamp {
+        val second = (time.elapsedSince(START).inWholeSeconds).toInt()
+        val window = SCREEN_OFF_WINDOWS.firstOrNull { second in it } ?: return time
+        return START + (window.last + 1).seconds
+    }
 
     private const val EASY = 1000.0 / 360 // 6:00/km
     private const val FAST = 1000.0 / 240 // 4:00/km
@@ -103,6 +126,43 @@ object SyntheticTraces {
             }
         }
     )
+
+    /**
+     * A 5 min walk at about 12:00/km with watch GPS and wrist HR only (no strap), as in #108. While the
+     * screen is off ([SCREEN_OFF_WINDOWS]) the watch samples are held back and delivered in one batch when
+     * the screen turns on, with their measurement times, grouped by data type like an `ExerciseUpdate`.
+     */
+    fun screenOff(): Trace {
+        val runner = Runner(WALK)
+        val records = mutableListOf<TraceRecord>(
+            TraceRecord.EventRecord(SensorEvent.GpsAcquired(START, WATCH))
+        )
+        val batch = mutableListOf<List<TraceRecord>>()
+        for (second in 0 until 302) {
+            val time = START + second.seconds
+            runner.step(second, WALK)
+            val samples = runner.watchSamples(second, time).map(TraceRecord::SampleRecord)
+            if (SCREEN_OFF_WINDOWS.any { second in it }) {
+                batch += samples
+                continue
+            }
+            // One batched update: every heart rate point, then every location point, and so on.
+            records += batch.flatMap { it.withIndex() }.sortedBy { it.index }.map { it.value }
+            batch.clear()
+            records += samples
+        }
+        return Trace(
+            TraceHeader(
+                name = "screen-off-batching",
+                description = "5 min walk, watch GPS and wrist HR; screen off 0:03-0:20, " +
+                    "0:23-0:38, 1:11-1:40, 2:04-4:56 with Health Services batching",
+                device = "synthetic"
+            ),
+            records
+        )
+    }
+
+    private const val WALK = 1.4
 
     private enum class StrapState { STREAMING, SILENT, NO_CONTACT, DISCONNECTED }
 

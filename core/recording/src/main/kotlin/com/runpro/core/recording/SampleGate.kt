@@ -9,17 +9,33 @@ import com.runpro.core.model.SourceId
 import com.runpro.core.model.SwitchReason
 import com.runpro.core.model.Timestamp
 
-/** Per-metric arbitration. Only measurement timestamps establish liveness, never connection reports. */
+/** The decisions of one arbitration: switches to record, and metrics whose only source fell silent. */
+internal data class Arbitration(
+    val switches: List<RunEvent.SourceSwitched>,
+    val silenced: List<Metric>
+)
+
+/**
+ * Per-metric arbitration. Only measurement timestamps establish liveness, never connection reports.
+ *
+ * When the active source goes stale and no other source can take over, the source keeps the metric but is
+ * marked silent: it is not shown as active and no switch is recorded. A platform source that batches its
+ * data (Health Services with the screen off, #108) then delivers the gap late and every sample still counts.
+ */
 internal class SampleGate(private val policy: SourcePolicy) {
     private val sources = mutableMapOf<Metric, SourceId?>()
     private val readings = mutableMapOf<Pair<Metric, SourceId>, Sample>()
     private val lastTimes = mutableMapOf<Pair<Metric, SourceId>, Timestamp>()
     private val admittedTimes = mutableMapOf<Metric, Timestamp>()
     private val switchedAt = mutableMapOf<Metric, Timestamp>()
+    private val silent = mutableSetOf<Metric>()
 
     val activeSources: Map<Metric, SourceId> get() = sources.mapNotNull { (metric, source) ->
-        source?.let { metric to it }
+        source?.takeIf { metric !in silent }?.let { metric to it }
     }.toMap()
+
+    /** True when [metric] has an active source that is not silent. */
+    fun isLive(metric: Metric): Boolean = sources[metric] != null && metric !in silent
 
     fun observe(sample: Sample): Boolean {
         val key = sample.metric to sample.source
@@ -60,28 +76,39 @@ internal class SampleGate(private val policy: SourcePolicy) {
         }
     }
 
-    fun switches(
-        time: Timestamp,
-        metrics: Iterable<Metric> = Metric.entries
-    ): List<RunEvent.SourceSwitched> = metrics.mapNotNull { metric ->
-        val rule = policy.forMetric(metric)
-        val from = sources[metric]
-        val candidates = readings.values.filter {
-            it.metric == metric && it.time <= time &&
-                time.elapsedSince(it.time) < rule.staleAfter
+    fun switches(time: Timestamp, metrics: Iterable<Metric> = Metric.entries): Arbitration {
+        val switches = mutableListOf<RunEvent.SourceSwitched>()
+        val silenced = mutableListOf<Metric>()
+        for (metric in metrics) {
+            val rule = policy.forMetric(metric)
+            val from = sources[metric]
+            val candidates = readings.values.filter {
+                it.metric == metric && it.time <= time &&
+                    time.elapsedSince(it.time) < rule.staleAfter
+            }
+            // Keep the current source on a priority tie, avoiding oscillation between equal devices.
+            val to = candidates.minWithOrNull(
+                compareBy<Sample> { rule.rank(it.source) }.thenBy { it.source != from }
+                    .thenBy { it.source.value }
+            )?.source
+            when {
+                // Nothing can take over: the silent source keeps the metric, so its late data counts.
+                to == null && from != null -> if (silent.add(metric)) silenced += metric
+
+                from == to -> silent.remove(metric)
+
+                else -> {
+                    val reason = if (from != null && candidates.none { it.source == from }) {
+                        SwitchReason.STALE
+                    } else {
+                        SwitchReason.HIGHER_PRIORITY
+                    }
+                    switches +=
+                        RunEvent.SourceSwitched(time, metric, from, to, reason).also(::restore)
+                }
+            }
         }
-        // Keep the current source on a priority tie, avoiding oscillation between equal devices.
-        val to = candidates.minWithOrNull(
-            compareBy<Sample> { rule.rank(it.source) }.thenBy { it.source != from }
-                .thenBy { it.source.value }
-        )?.source
-        if (from == to) return@mapNotNull null
-        val reason = if (from != null && candidates.none { it.source == from }) {
-            SwitchReason.STALE
-        } else {
-            SwitchReason.HIGHER_PRIORITY
-        }
-        RunEvent.SourceSwitched(time, metric, from, to, reason).also(::restore)
+        return Arbitration(switches, silenced)
     }
 
     fun admit(sample: Sample): Boolean {
@@ -100,6 +127,7 @@ internal class SampleGate(private val policy: SourcePolicy) {
         }
         sources[event.metric] = event.to
         switchedAt[event.metric] = event.time
+        silent.remove(event.metric)
     }
 
     /** Old journals without switch events retain their original first-source semantics. */

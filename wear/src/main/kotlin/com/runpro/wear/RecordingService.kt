@@ -76,6 +76,7 @@ class RecordingService : Service() {
     private lateinit var battery: WatchBattery
     private val bleThread = HandlerThread("runpro-ble").apply { start() }
     private lateinit var ble: WatchBle
+    private lateinit var debugTrace: DebugTrace
 
     internal var createSession: () -> RecordingSession = {
         RecordingSession.create(
@@ -125,6 +126,7 @@ class RecordingService : Service() {
         imuMode = ImuPreferences.load(this)
         imu = WatchImu.capture(this, imuThread, ::now)
         feedback = WorkoutFeedback(this)
+        debugTrace = DebugTrace(filesDir.resolve("traces"))
         engine = RecordingEngine(
             sessionFactory = { createSession() },
             onProcessed = ::onProcessed
@@ -167,6 +169,7 @@ class RecordingService : Service() {
         battery.close()
         ticker.shutdownNow()
         engine.close()
+        debugTrace.close()
         imu.close()
         imuThread.quitSafely()
         main.removeCallbacksAndMessages(null)
@@ -266,13 +269,14 @@ class RecordingService : Service() {
 
     /** Engine thread: must not block (R6), so the notification work goes to the main thread. */
     private fun onProcessed(state: RunState) {
+        debugTrace.follow(state)
         val previous = lastPhase
         val changed = state.phase != previous
         val newlyFailed = state.journalFailed && !lastJournalFailed
         lastPhase = state.phase
         lastJournalFailed = state.journalFailed
         // Non-blocking: the controller only queues requests to Health Services.
-        if (changed) exercise.follow(state.phase)
+        if (changed) exercise.follow(exercisePhase(state))
         // Only posts to the BLE thread: paired sensors connect from the warm-up to the stop.
         if (changed) ble.follow(state.phase)
         // Only queues to the IMU thread, and only when something changed.
@@ -310,10 +314,12 @@ class RecordingService : Service() {
     private inner class EngineFeed : SensorListener {
         override fun onSample(sample: Sample) {
             engine.submit(EngineInput.SampleReceived(sample))
+            debugTrace.onSample(sample)
         }
 
         override fun onEvent(event: SensorEvent) {
             engine.submit(EngineInput.SensorReceived(event))
+            debugTrace.onEvent(event)
         }
     }
 

@@ -1,7 +1,10 @@
 # ADR 0013: Per-metric source arbitration and recorded decisions
 
-- Status: proposed (accepted when issue #19 is merged)
+- Status: proposed (accepted when issue #19 is merged); amended by ADR 0016
 - Date: 2026-11-27
+
+> ADR 0016 (#108): when no other source is eligible, a stale source keeps its metric (silent, not shown)
+> and no `to = null` switch is recorded, so late Health Services batches still count.
 
 ## Context
 

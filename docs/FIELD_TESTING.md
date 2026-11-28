@@ -29,6 +29,7 @@ Watch setup step by step (in Italian, for the owner): `docs/it/CONFIGURAZIONE_OR
 | F8 | Phone sync: phone app installed, several runs with the phone out of range for some of them, then in range | Every run in the phone's `files/runs` once, journals gone from the watch (see below) |
 | F10 | IMU capture and battery cost (see below) | 50 Hz without gaps, battery %/h with IMU off, accelerometer, accelerometer + gyroscope |
 | F11 | Low-resource warnings and automatic saving (see below) | Initial battery, running/paused warnings, saved automatic stop and exercise shutdown |
+| F12 | Screen off (#108): 10 min walk or run with watch GPS and wrist HR only, wrist down so the screen stays off for at least 3 min at a time | Continuous track, distance, HR and cadence in the FIT and on Strava, including the screen-off stretches |
 | F9 | Start a workout in Gear Tracker (or another Health Services app), then a RunPro run; during it start a workout in the other app again | RunPro takes over at its start; when the other app takes over, the run keeps recording (timer, strap) without wrist HR and GPS, and the log shows it |
 
 ## Auto-lap and interval check (F9)
@@ -176,3 +177,28 @@ strava.callbackHost=localhost
 
 1. Settings → Diagnostics → Export logs (sends trace + sensor log to the phone).
 2. Open a `field-report` issue, attach files, fill in the scenario id and what went wrong.
+
+## Settings check (#27)
+
+1. Before a run, open **Settings**. Set units to Imperial, maximum/resting HR, weight, auto-pause on,
+   countdown 3 s and debug trace on. Close/reopen RunPro; verify every value remains. Switch units and
+   check weight converts between kg/lb without changing the profile. Clear a value and verify it stays
+   unspecified. Restore Metric if desired.
+2. **Get ready**, then **Start**. During the countdown cancel it: no run starts. Try again and verify
+   recording starts at expiry. Leaving the activity during the countdown must cancel it. With countdown
+   off, Start must retain its immediate behavior.
+3. Run with speed data; stand still for at least 5 s and verify automatic pause. Move above 1 m/s and
+   verify resume. Manually pause and move: it must remain paused until Resume. A GPS/speed dropout must
+   never itself cause a pause. Stop/save and confirm distance/pace units in the summary.
+4. Copy the optional raw traces and inspect/replay the JSONL. They contain location when GPS is available:
+
+   ```sh
+   adb exec-out run-as com.runpro.wear tar -c files/traces > traces.tar
+   tar -xf traces.tar
+   ```
+
+   Debug tracing off on the next run must create no new trace. Trace segments are capped at 10 MB;
+   old traces are pruned before a new segment. They are separate from journals and phone sync. Attach
+   relevant traces to a field report; the diagnostics/export screen is a separate backlog task.
+
+Record the watch observations in a field report. No physical result for these steps is claimed by JVM tests.

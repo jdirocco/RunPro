@@ -68,9 +68,10 @@ SensorManager accel/gyro 50 Hz ─► ImuCapture (runpro-imu) ◄┘ ─► IMU 
   keeps running. Stopped: a summary that says whether the journal was saved.
 - Source arbitration: per metric a priority list (e.g. HR: strap → wrist). A source is *stale* after a
   timeout; the engine switches to the next one and writes a source-switch event (R5). `SourcePolicy`
-  configures priorities/timeouts independently; fresh BLE measurements win by default. Loss of all
-  sources clears the value, and fresh preferred data restores it without recording commands. The
-  journal stores decisions before admitted samples; recovery/export replay them exactly. Cumulative
+  configures priorities/timeouts independently; fresh BLE measurements win by default. With no
+  other eligible source a stale source keeps its metric while *silent*: the value and icon clear, no
+  switch is recorded, and its late batches (Health Services with the screen off) still count (ADR 0016).
+  The journal stores decisions before admitted samples; recovery/export replay them exactly. Cumulative
   distance/elevation baselines restart across switches. `RunState.activeSources` drives the HR
   strap/wrist icon. Defaults, late data and recovery semantics: ADR 0013.
 
@@ -299,3 +300,13 @@ manual laps do not advance the workout. `RunState.workout` exposes stage and rem
 Settings are retained in the journal start, and recovery/export replay existing marks without
 regenerating them. The service handles countdown/transition haptics independently of the activity;
 Compose observes countdown and lap summaries. Semantics and durability: ADR 0011.
+
+## Settings and user profile (`:core:model` / `:wear`)
+
+`WorkoutSettings.runSettings` contains optional HR/weight profile values, display units, auto-pause,
+start countdown and debug tracing. The existing pre-start configuration path copies preferences into
+the journal start; active runs and recovery use that immutable snapshot. Only fresh admitted speed
+readings can auto-pause/resume; sensor silence cannot pause recording. Health Services continues to
+collect speed during automatic pauses. The countdown remains in warm-up until START is sent.
+`DebugTrace` writes optional raw replay JSONL on a bounded, separate worker to `files/traces` and fails
+independently of recording. Units change presentation; measurements/export remain SI. ADR 0017.
