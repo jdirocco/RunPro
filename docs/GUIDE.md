@@ -7,7 +7,7 @@ Everything runs from the repository root: `/Users/juridirocco/development/RunPro
 
 | Piece | Where | What it is for |
 |---|---|---|
-| `./rp` | repo root | CLI that wraps git + GitHub: status, next task, start, launch an agent (`claude`, `codex`, `agy`), check, PR, handoff, install |
+| `./rp` | repo root | CLI that wraps git + GitHub: status, next task, start, runners, launch an agent (`claude`, `codex`, `agy`), check, PR, handoff, install |
 | Backlog | GitHub issues (seeded from `plan/backlog.md`) | One issue = one branch = one PR |
 | Milestones | GitHub milestones M0–M7, with due dates | Release phases (see `docs/PLAN.md`) |
 | Board | https://github.com/users/jdirocco/projects/1 | Todo / In Progress / Done |
@@ -134,6 +134,22 @@ With `--worktree` the branch is created in `../RunPro-worktrees/<branch>` and th
 (use it for parallel work). `git worktree add` does not carry ignored files, so `./rp` copies this
 checkout's `local.properties` (the `sdk.dir` line) into the new worktree; an existing one is kept.
 
+### `./rp runners`: inspect installed agent CLIs
+
+```
+$ ./rp runners
+claude  installed (/Users/juridirocco/.local/bin/claude) — opus[1m] on anthropic (cloud)
+codex   installed (/Users/juridirocco/.local/bin/codex) — gpt-6.1-sol on openai (cloud)
+agy     installed (/Users/juridirocco/.local/bin/agy) — (agy default) on google (cloud)
+```
+
+Inside a command sandbox (for example Antigravity's default sandbox), `command -v claude` silently misses
+`~/.local/bin/claude` when its symlink target in `~/.local/share/claude/versions/...` is outside the sandbox.
+`./rp runners` inspects the `PATH` symlink with `lstat` before `stat`, so it still reports `claude` as
+installed (`sandbox-blocked — run ./rp unsandboxed`) without requiring any change to Claude's installation or
+settings, and `./rp agent` refuses to mark an issue In Progress if invoked inside a sandbox that blocks the
+selected runner.
+
 ### `./rp agent`: launch Claude Code, Codex or Antigravity on an issue
 
 ```
@@ -210,7 +226,7 @@ The agent works without asking for any authorisation and without waiting for you
 
 | Runner | What `--auto` does |
 |---|---|
-| Claude Code | `--permission-mode bypassPermissions`: every tool call is allowed, no prompts |
+| Claude Code | `--permission-mode bypassPermissions`: every tool call is allowed, no prompts. In a linked `--worktree`, `--add-dir` grants access to the shared `.git` directory, and nested `CLAUDECODE` env vars are stripped |
 | Codex | `-a never` (interactive) or `codex exec` (headless, never asks): no approval prompts. Commands still run in the Codex sandbox (see below) |
 | Antigravity (`agy`) | `--dangerously-skip-permissions`: every tool call is auto-approved without prompts. In a linked `--worktree`, `--add-dir` automatically grants workspace access to the shared `.git` directory |
 
@@ -426,15 +442,16 @@ merge remove it with `git worktree remove ../RunPro-worktrees/<branch>`.
 
 To let Antigravity (or another coordinating agent) drive a parallel batch automatically, open it in
 `/Users/juridirocco/development/RunPro` and ask it to act as orchestrator (for example,
-"Orchestrate the next ready RunPro batch"). The `runpro-orchestrate` skill surveys `./rp status` and
-`./rp next --all`, picks 2–3 conflict-free issues across disjoint modules, routes each by complexity to an
-installed runner in `--auto --headless --worktree` mode, and audits every opened PR with `runpro-review`
-without merging:
+"Orchestrate the next ready RunPro batch"). The `runpro-orchestrate` skill checks `./rp runners` (so symlinked installs such as `claude` in
+`~/.local/share/claude` are still detected when the orchestrator's own command sandbox blocks `stat`), surveys
+`./rp status` and `./rp next --all`, picks 2–3 conflict-free issues across disjoint modules, routes each by
+complexity to an installed runner in `--auto --headless --worktree` mode (running `./rp agent` unsandboxed when
+a runner is marked `sandbox-blocked`), and audits every opened PR with `runpro-review` without merging:
 
 ```
 $ ./rp agent 82 codex --auto --headless --worktree -- --oss --local-provider ollama   # XS/S on local Ollama (or agy --model flash)
 $ ./rp agent 71 codex --auto --headless --worktree                                    # M on cloud Codex / AGY
-$ ./rp agent 17 agy --auto --headless --worktree -- --effort high                     # M-L/L or reliability on frontier Claude / Codex / AGY
+$ ./rp agent 17 claude --auto --headless --worktree                                   # M-L/L or reliability on frontier Claude / Codex / AGY
 ```
 
 Ensure the orchestrator's project permissions allow network access (`gh`, `git`, Gradle) and file access to

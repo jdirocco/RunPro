@@ -16,6 +16,7 @@ Commands:
                       Runner and model default to plan/config.json "agents" (model null = tool default).
                       --auto: the agent never asks for confirmation and opens the PR itself.
                       ARGS after -- go to the agent CLI unchanged.
+  runners             list agent CLIs (claude, codex, agy), including symlinked installs blocked by a sandbox
   check               run the local quality gate (./gradlew check, or a notice if no Gradle yet)
   pr                  push the branch and open a PR that closes the issue
   handoff "<text>"    append a handoff note to docs/HANDOFF.md
@@ -26,6 +27,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import time
@@ -588,6 +590,70 @@ def codex_sandbox_args(acfg, cwd=ROOT):
     return args
 
 
+CLAUDE_NESTED_ENV_VARS = ("CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT")
+
+
+def claude_command(acfg, model, headless, auto, cwd, extra_cli, prompt):
+    cmd = ["claude"]
+    if model:
+        cmd += ["--model", model]
+    if auto:
+        cmd += acfg["claude"]["auto_args"]
+    elif headless:
+        cmd += acfg["claude"]["headless_args"]
+    if worktree_git_dir(cwd):
+        cmd += ["--add-dir", git_common_dir()]
+    cmd += extra_cli + (["-p", prompt] if headless else [prompt])
+    return cmd
+
+
+def agent_child_env(runner, env=None):
+    base = dict(os.environ if env is None else env)
+    if runner == "claude":
+        for key in CLAUDE_NESTED_ENV_VARS:
+            base.pop(key, None)
+    return base
+
+
+def probe_runner(runner, path_env=None):
+    """Inspect whether `runner` is installed on PATH, even if a sandbox blocks its symlink target."""
+    path_env = os.environ.get("PATH", "") if path_env is None else path_env
+    found = shutil.which(runner, path=path_env)
+    if found:
+        return {"runner": runner, "installed": True, "status": "ready", "path": found, "target": None}
+    for entry in path_env.split(os.pathsep):
+        if not entry:
+            continue
+        candidate = os.path.join(os.path.expanduser(entry), runner)
+        try:
+            lst = os.lstat(candidate)
+        except OSError:
+            continue
+        link_target = None
+        if stat.S_ISLNK(lst.st_mode):
+            try:
+                link_target = os.readlink(candidate)
+            except OSError:
+                link_target = None
+        try:
+            st = os.stat(candidate)
+        except FileNotFoundError:
+            continue
+        except PermissionError:
+            return {"runner": runner, "installed": True, "status": "sandbox-blocked",
+                    "path": candidate, "target": link_target}
+        except OSError:
+            continue
+        if stat.S_ISREG(st.st_mode) and (st.st_mode & 0o111):
+            return {"runner": runner, "installed": True, "status": "sandbox-blocked",
+                    "path": candidate, "target": link_target}
+    return {"runner": runner, "installed": False, "status": "missing", "path": None, "target": None}
+
+
+def probe_runners(path_env=None):
+    return [probe_runner(r, path_env=path_env) for r in RUNNERS]
+
+
 def agy_command(acfg, model, headless, auto, cwd, extra_cli, prompt):
     cmd = ["agy"]
     if model:
@@ -910,6 +976,28 @@ def unknown_status_line(run, now):
     return f"{head}; recorded: {what}, {run['mode']}, pid {run['pid']}{started})"
 
 
+def format_runner_probe(info, acfg=None, cwd=ROOT, env=None, home=None):
+    name = f"{info['runner']:<6}"
+    if not info["installed"]:
+        return f"{name}  missing"
+    acfg = acfg or agent_config()
+    model, provider, location = resolve_agent_target(info["runner"], acfg[info["runner"]].get("model"), [],
+                                                     cwd=cwd, env=env, home=home)
+    where = _where(model, provider, location)
+    if info["status"] == "sandbox-blocked":
+        via = f"{info['path']} -> {info['target']}" if info.get("target") else info["path"]
+        return f"{name}  installed ({via}; sandbox-blocked — run ./rp unsandboxed) — {where}"
+    return f"{name}  installed ({info['path']}) — {where}"
+
+
+def cmd_runners(args=None):
+    if args:
+        sys.exit("usage: ./rp runners")
+    acfg = agent_config()
+    for info in probe_runners():
+        print(format_runner_probe(info, acfg=acfg))
+
+
 def cmd_agent(args):
     opts, flags, target, extra_cli = parse_agent_args(args)
     acfg = agent_config()
@@ -918,6 +1006,15 @@ def cmd_agent(args):
         sys.exit("runner must be claude, codex or agy")
     model = opts["model"] or acfg[runner].get("model")
     headless = "headless" in flags
+
+    if "dry-run" not in flags:
+        probe = probe_runner(runner)
+        if not probe["installed"]:
+            sys.exit(f"{runner} not found on PATH (see ./rp runners).")
+        if probe["status"] == "sandbox-blocked":
+            via = f"{probe['path']} -> {probe['target']}" if probe.get("target") else probe["path"]
+            sys.exit(f"{runner} is installed ({via}) but blocked by the current sandbox; "
+                     f"run ./rp agent outside the sandbox.")
 
     if target in (None, "next"):
         complexities = parse_complexity_filter(opts["complexity"])
@@ -940,16 +1037,7 @@ def cmd_agent(args):
     auto = "auto" in flags
     prompt = agent_prompt(n, title, branch, headless, opts["prompt"], auto=auto)
     if runner == "claude":
-        cmd = ["claude"]
-        if model:
-            cmd += ["--model", model]
-        if auto:
-            cmd += acfg["claude"]["auto_args"]
-        elif headless:
-            cmd += acfg["claude"]["headless_args"]
-        if headless:
-            cmd += ["-p"]
-        cmd += extra_cli + [prompt]
+        cmd = claude_command(acfg, model, headless, auto, cwd, extra_cli, prompt)
     elif runner == "agy":
         cmd = agy_command(acfg, model, headless, auto, cwd, extra_cli, prompt)
     else:
@@ -976,7 +1064,7 @@ def cmd_agent(args):
     write_agent_run(run)
     code = None
     try:
-        code = subprocess.run(cmd, cwd=cwd).returncode
+        code = subprocess.run(cmd, cwd=cwd, env=agent_child_env(runner)).returncode
     finally:
         run.update(ended=time.time(), exit_code=code)
         write_agent_run(run)
@@ -1073,7 +1161,8 @@ def cmd_install(args):
 
 
 COMMANDS = {"status": cmd_status, "next": cmd_next, "start": cmd_start, "check": cmd_check,
-            "pr": cmd_pr, "agent": cmd_agent, "handoff": cmd_handoff, "install": cmd_install, "sync": cmd_sync}
+            "pr": cmd_pr, "agent": cmd_agent, "runners": cmd_runners,
+            "handoff": cmd_handoff, "install": cmd_install, "sync": cmd_sync}
 
 if __name__ == "__main__":
     if len(sys.argv) < 2 or sys.argv[1] not in COMMANDS:

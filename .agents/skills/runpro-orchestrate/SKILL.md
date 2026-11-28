@@ -4,8 +4,8 @@ description: Orchestrate parallel RunPro issues across Claude Code, Codex, and A
 ---
 
 1. **Survey the board and available runners**:
-   - Run `./rp status` and `./rp next --all` to inspect ready issues, in-progress runs, open PRs, `needs-owner` decisions, and runnable `field-test` issues. Use the `gh` CLI for GitHub operations, not an MCP connector.
-   - Check which agent CLIs are installed on `PATH` (`command -v claude codex agy`) and, before choosing a local Ollama worker, verify Ollama is reachable (`ollama list`). Never dispatch to a missing binary or offline local provider.
+   - Run `./rp runners` to check which agent CLIs (`claude`, `codex`, `agy`) are installed, instead of `command -v` or `which` (which silently hide symlinked installs such as `~/.local/bin/claude -> ~/.local/share/claude/...` when a command sandbox blocks `stat` on `~/.local/share/claude`). Treat every runner reported as `installed` — including `sandbox-blocked` — as available, and verify Ollama is reachable (`ollama list`) before choosing a local Ollama worker. Never dispatch to a `missing` binary or offline local provider.
+   - Run `./rp status` and `./rp next --all` (outside the command sandbox, e.g. `BypassSandbox: true` in Antigravity, whenever `gh` config or network is blocked by the sandbox) to inspect ready issues, in-progress runs, open PRs, `needs-owner` decisions, and runnable `field-test` issues. Use the `gh` CLI for GitHub operations, not an MCP connector.
    - Flag stale `status:in-progress` issues (`no agent running` with no open PR or `needs-owner` label) to the owner before resetting or reassigning them.
 2. **Audit existing open PRs**:
    - Run the `runpro-review` skill on any unreviewed open PRs so the owner gets merge verdicts alongside new work.
@@ -18,7 +18,7 @@ description: Orchestrate parallel RunPro issues across Claude Code, Codex, and A
    - **`M-L` / `L` (`complexity:ml`, `complexity:l`) or any `reliability` (`R1–R8`) issue**: Route to an available frontier cloud runner (`./rp agent <N> claude --auto --headless --worktree`, `./rp agent <N> codex --auto --headless --worktree`, or `./rp agent <N> agy --auto --headless --worktree -- --effort high`).
    - Use `--dry-run` first when verifying the resolved `model`, `provider`, and `cwd`.
 5. **Dispatch workers in isolated worktrees and wait reactively**:
-   - Start each `./rp agent <N> ... --auto --headless --worktree` process in the background (relying on completion notifications rather than `sleep` polling). Each worker runs inside `../RunPro-worktrees/issue-<N>-<slug>`, passes `./rp check`, commits without trailers, and opens its PR via `./rp pr` (or writes `./rp handoff` / adds `needs-owner` if blocked).
+   - Start each `./rp agent <N> ... --auto --headless --worktree` process in the background (relying on completion notifications rather than `sleep` polling). When `./rp runners` marks a runner `sandbox-blocked` (such as `claude` under `~/.local/share/claude`) or `gh`/network requires unsandboxed execution, run `./rp agent` outside the orchestrator's command sandbox (`BypassSandbox: true` in Antigravity) rather than skipping `claude` or asking the owner to modify Claude's settings. Each worker runs inside `../RunPro-worktrees/issue-<N>-<slug>`, passes `./rp check`, commits without trailers, and opens its PR via `./rp pr` (or writes `./rp handoff` / adds `needs-owner` if blocked).
 6. **Audit outcomes and report to the owner**:
    - Once workers exit, check `./rp status` and inspect `docs/HANDOFF.md` in any worktree that stopped without opening a PR.
    - Run the full `runpro-review` checklist on every newly opened PR (`R1–R8` invariant tests, pure-JVM `:core:*` / `:tools:*` boundary, ADRs, commit hygiene, and GitHub Actions CI). If fixes are needed, either run a follow-up fix in that worktree or report exact findings.
