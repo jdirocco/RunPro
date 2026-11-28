@@ -10,7 +10,6 @@ import com.runpro.core.model.Timestamp
 import com.runpro.core.recording.RunPhase
 import com.runpro.core.recording.RunState
 import java.io.IOException
-import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicReference
@@ -66,7 +65,8 @@ class ImuCapture(
     clock: () -> Timestamp,
     private val config: ImuCaptureConfig = ImuCaptureConfig(),
     observer: SensorListener? = null,
-    freeBytes: (Path) -> Long = { Files.getFileStore(it).usableSpace },
+    // File.usableSpace queries statvfs; Files.getFileStore fails on the watch (#12, #105).
+    freeBytes: (Path) -> Long = { it.toFile().usableSpace },
     source: SourceId = SourceId.WATCH_IMU,
     private val onChange: (ImuStatus) -> Unit = {}
 ) : AutoCloseable {
