@@ -3,12 +3,19 @@ package com.runpro.wear
 import android.app.Application
 import android.os.Vibrator
 import androidx.test.core.app.ApplicationProvider
+import com.runpro.core.model.AlertSettings
+import com.runpro.core.model.HeartRate
+import com.runpro.core.model.HeartRateSample
 import com.runpro.core.model.IntervalTarget
 import com.runpro.core.model.IntervalWorkout
+import com.runpro.core.model.RunSettings
+import com.runpro.core.model.SourceId
 import com.runpro.core.model.Timestamp
 import com.runpro.core.model.WorkoutSettings
+import com.runpro.core.recording.AlertKind
 import com.runpro.core.recording.EngineInput
 import com.runpro.core.recording.RecordingStateMachine
+import com.runpro.core.recording.RunAlert
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -70,6 +77,56 @@ class WorkoutFeedbackTest {
         app.getSharedPreferences("workout", 0).edit()
             .putString("settings", "{\"autoLapMeters\":-1}").commit()
         assertEquals(WorkoutSettings(), WorkoutPreferences.load(app))
+    }
+
+    @Test
+    fun `every alert kind has a distinct vibration pattern and vibrates once when running`() {
+        val waveforms = AlertKind.entries.map { AlertFeedback.waveform(it).toList() }
+        assertEquals(AlertKind.entries.size, waveforms.toSet().size)
+        assertFalse(waveforms.contains(listOf(0L, 200L, 100L, 200L)))
+
+        val machine = RecordingStateMachine().apply {
+            handle(
+                EngineInput.ConfigureWorkout(
+                    WorkoutSettings(
+                        runSettings = RunSettings(alerts = AlertSettings(hrHighBpm = 170))
+                    )
+                )
+            )
+            handle(EngineInput.Prepare(at(0)))
+            handle(EngineInput.Start(at(0)))
+        }
+        feedback.update(machine.state)
+        assertFalse(shadowOf(vibrator).isVibrating)
+
+        machine.handle(
+            EngineInput.SampleReceived(
+                HeartRateSample(at(1), SourceId.HEALTH_SERVICES, HeartRate(180))
+            )
+        )
+        feedback.update(machine.state)
+        assertTrue(shadowOf(vibrator).isVibrating)
+        assertTrue(
+            shadowOf(vibrator).pattern.contentEquals(AlertFeedback.waveform(AlertKind.HR_HIGH))
+        )
+
+        // Repeated snapshot with the same alert does not re-vibrate.
+        vibrator.cancel()
+        feedback.update(machine.state)
+        assertFalse(shadowOf(vibrator).isVibrating)
+
+        // A fresh feedback instance binding to an in-progress run does not vibrate for old alerts.
+        val rebound = WorkoutFeedback(app)
+        rebound.update(machine.state)
+        assertFalse(shadowOf(vibrator).isVibrating)
+
+        // Alert while paused does not vibrate.
+        val pausedState = machine.state.copy(
+            phase = com.runpro.core.recording.RunPhase.PAUSED,
+            alerts = machine.state.alerts + RunAlert(99L, at(2), AlertKind.GPS_LOST)
+        )
+        feedback.update(pausedState)
+        assertFalse(shadowOf(vibrator).isVibrating)
     }
 
     private fun running() = RecordingStateMachine().also {

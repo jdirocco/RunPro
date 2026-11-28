@@ -21,12 +21,21 @@ internal fun SettingsScreen(
     close: () -> Unit
 ) {
     var editing by remember { mutableStateOf<ProfileField?>(null) }
+    var showingZonesAlerts by remember { mutableStateOf(false) }
     val field = editing
-    BackHandler { if (field == null) close() else editing = null }
+    BackHandler {
+        when {
+            field != null -> editing = null
+            showingZonesAlerts -> showingZonesAlerts = false
+            else -> close()
+        }
+    }
     MaterialTheme {
         ScreenScaffold {
             if (field != null) {
                 ProfileEditor(settings, field, update) { editing = null }
+            } else if (showingZonesAlerts) {
+                ZonesAndAlertsScreen(settings, update) { showingZonesAlerts = false }
             } else {
                 ScalingLazyColumn {
                     item { Paragraph(stringResource(R.string.settings_title)) }
@@ -36,6 +45,11 @@ internal fun SettingsScreen(
                         item {
                             val value = profileValue(settings, entry)
                             WideButton(stringResource(entry.label, value)) { editing = entry }
+                        }
+                    }
+                    item {
+                        WideButton(stringResource(R.string.zones_alerts_title)) {
+                            showingZonesAlerts = true
                         }
                     }
                     item {
@@ -74,7 +88,15 @@ private fun profileValue(settings: RunSettings, field: ProfileField): String {
     val profile = settings.profile
     return when (field) {
         ProfileField.MAX_HR -> profile.maxHeartRate?.toString()
+
+        ProfileField.LTHR -> profile.lactateThresholdHeartRate?.toString()
+
         ProfileField.RESTING_HR -> profile.restingHeartRate?.toString()
+
+        ProfileField.THRESHOLD_PACE -> profile.thresholdPace?.let {
+            paceWithUnit(it, settings.units)
+        }
+
         ProfileField.WEIGHT -> profile.weightKg?.let { weightLabel(it, settings.units) }
     } ?: stringResource(R.string.settings_not_set)
 }

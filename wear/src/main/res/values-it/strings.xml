@@ -162,6 +162,7 @@
     <string name="field_lap_pace">Passo giro</string>
     <string name="field_heart_rate">FC</string>
     <string name="field_hr_zone">Zona FC</string>
+    <string name="field_pace_zone">Zona passo</string>
     <string name="field_cadence">Cadenza</string>
     <string name="field_power">Potenza</string>
     <string name="field_elevation">Quota</string>
@@ -173,4 +174,37 @@
     <string name="field_meters">m</string>
     <string name="data_previous_page">Pagina precedente</string>
     <string name="data_next_page">Pagina successiva</string>
+
+    <string name="settings_lthr">FC soglia: %1$s</string>
+    <string name="settings_threshold_pace">Passo soglia: %1$s</string>
+    <string name="zones_alerts_title">Zone e avvisi</string>
+    <string name="zones_hr_method">Zone FC: %1$s</string>
+    <string name="zones_method_max_hr">FC max</string>
+    <string name="zones_method_lthr">FC soglia</string>
+    <string name="zones_hr_heading">Zone FC (%1$s)</string>
+    <string name="zones_hr_missing_max">Imposta FC massima nelle Impostazioni per calcolare le zone FC.</string>
+    <string name="zones_hr_missing_lthr">Imposta FC soglia nelle Impostazioni per calcolare le zone FC.</string>
+    <string name="zones_hr_band">Z%1$d · %2$d–%3$d bpm</string>
+    <string name="zones_hr_band_open">Z%1$d · %2$d+ bpm</string>
+    <string name="zones_pace_heading">Zone passo</string>
+    <string name="zones_pace_missing">Imposta il passo soglia nelle Impostazioni per calcolare le zone passo.</string>
+    <string name="zones_pace_band">Z%1$d · %2$s–%3$s</string>
+    <string name="zones_pace_band_slow">Z%1$d · più lento di %2$s</string>
+    <string name="zones_pace_band_fast">Z%1$d · più veloce di %2$s</string>
+    <string name="alert_hr_high_setting">FC alta: %1$s</string>
+    <string name="alert_hr_low_setting">FC bassa: %1$s</string>
+    <string name="alert_pace_fast_setting">Passo veloce: %1$s</string>
+    <string name="alert_pace_slow_setting">Passo lento: %1$s</string>
+    <string name="alert_sensor_setting">Avvisi sensori: %1$s</string>
+    <string name="alert_gps_setting">Avvisi GPS: %1$s</string>
+    <string name="alert_cooldown_setting">Intervallo avvisi: %1$s</string>
+    <string name="alert_hr_high_title">FC alta</string>
+    <string name="alert_hr_low_title">FC bassa</string>
+    <string name="alert_pace_fast_title">Passo troppo veloce</string>
+    <string name="alert_pace_slow_title">Passo troppo lento</string>
+    <string name="alert_sensor_lost_title">Sensore perso</string>
+    <string name="alert_sensor_back_title">Sensore riconnesso</string>
+    <string name="alert_gps_lost_title">GPS perso</string>
+    <string name="alert_gps_back_title">GPS ritrovato</string>
+    <string name="alert_banner_value">%1$s\n%2$s</string>
 </resources>

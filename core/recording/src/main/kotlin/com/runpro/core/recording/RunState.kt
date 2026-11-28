@@ -50,7 +50,8 @@ data class RunState(
     val journalSaved: Boolean = false,
     /** Persistence failed; a stopped phase must not be presented as a successful save. */
     val journalFailed: Boolean = false,
-    val activeSources: Map<Metric, SourceId> = emptyMap()
+    val activeSources: Map<Metric, SourceId> = emptyMap(),
+    val alerts: List<RunAlert> = emptyList()
 )
 
 data class LapTotals(val lap: Lap, val totals: Totals)

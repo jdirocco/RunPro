@@ -12,7 +12,8 @@ import com.runpro.core.model.Timestamp
 /** The decisions of one arbitration: switches to record, and metrics whose only source fell silent. */
 internal data class Arbitration(
     val switches: List<RunEvent.SourceSwitched>,
-    val silenced: List<Metric>
+    val silenced: List<Metric>,
+    val silencedSources: Set<SourceId> = emptySet()
 )
 
 /**
@@ -79,6 +80,7 @@ internal class SampleGate(private val policy: SourcePolicy) {
     fun switches(time: Timestamp, metrics: Iterable<Metric> = Metric.entries): Arbitration {
         val switches = mutableListOf<RunEvent.SourceSwitched>()
         val silenced = mutableListOf<Metric>()
+        val silencedSources = mutableSetOf<SourceId>()
         for (metric in metrics) {
             val rule = policy.forMetric(metric)
             val from = sources[metric]
@@ -93,7 +95,10 @@ internal class SampleGate(private val policy: SourcePolicy) {
             )?.source
             when {
                 // Nothing can take over: the silent source keeps the metric, so its late data counts.
-                to == null && from != null -> if (silent.add(metric)) silenced += metric
+                to == null && from != null -> if (silent.add(metric)) {
+                    silenced += metric
+                    silencedSources += from
+                }
 
                 from == to -> silent.remove(metric)
 
@@ -108,7 +113,7 @@ internal class SampleGate(private val policy: SourcePolicy) {
                 }
             }
         }
-        return Arbitration(switches, silenced)
+        return Arbitration(switches, silenced, silencedSources)
     }
 
     fun admit(sample: Sample): Boolean {

@@ -104,9 +104,7 @@ fun RunProScreen(
                     }
                 }
             }
-            if (!confirmingStop) {
-                LapSummaryPopup(state) // Drawn last so it covers the list.
-            }
+            if (!confirmingStop) RunOverlays(state)
         }
     }
 }
