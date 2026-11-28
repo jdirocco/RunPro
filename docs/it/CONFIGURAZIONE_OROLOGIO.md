@@ -165,6 +165,20 @@ l'orologio ha chiuso RunPro: segnalalo con una issue **Field report**.
 
 **Posizione**: **Impostazioni → Posizione** attiva. RunPro usa solo il GPS dell'orologio.
 
+**Batteria e spazio durante la registrazione.** Anche in pausa, RunPro mostra un avviso quando la
+batteria è al 15% o meno e quando restano meno di 50 MB (50.000.000 byte) liberi nella memoria dei
+giornali. Gli avvisi spariscono se la risorsa torna sopra la soglia. Al 3% o meno, oppure a spazio
+esaurito, la corsa si ferma automaticamente: il motore prova a salvare e chiudere il giornale prima
+di spegnere l’allenamento e uscire dalla registrazione in primo piano. Il riepilogo spiega il motivo
+e mostra **Salvata** solo se il salvataggio è riuscito; in caso contrario mostra **Non salvata** e
+conserva il file per il recupero. La riserva di 1 MiB aiuta a completare il salvataggio a memoria piena,
+ma non può risolvere un guasto della memoria.
+
+Se tocchi **Avvia** con batteria al 3% o meno o senza spazio, resti nella preparazione con il motivo:
+ricarica o libera spazio e riprova. Se appare **Non salvata** durante la preparazione (anche se non
+si riesce ad allocare la riserva), torna **Indietro** e riprova dopo aver risolto il problema. La prova
+controllata degli avvisi e dello stop automatico è F11 in `docs/FIELD_TESTING.md`.
+
 **Fascia cardio e altri sensori Bluetooth.** Un sensore BLE accetta di solito **una sola connessione**:
 
 1. La fascia **non** deve essere collegata al telefono, a Samsung Health o a Gear Tracker mentre corri

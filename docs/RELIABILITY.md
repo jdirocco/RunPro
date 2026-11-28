@@ -75,8 +75,15 @@ Android adapter and field-test issues. Recovery policy and clock assumptions: AD
 - `LowResourceTest` checks exact 15%/3%/50 MB thresholds, start rejection/retry at critical resources,
   paused runs, repeated readings and pre-start checks against actual output capacity.
 
-These are JVM guarantees, with the reserve limits in ADR 0008. Resource input delivery, visible warnings
-and platform exercise shutdown on the watch are tracked in #71 after #10/#12; no field result is claimed.
+- `WatchBatteryTest` checks immediate sticky battery delivery, runtime changes, malformed readings and
+  receiver cleanup. `RecordingServiceResourcesTest` checks start rejection/retry, subsequent sessions,
+  running/paused battery stops, one-second storage polling off the main thread, and storage-full stops
+  into real journals. The fake exercise observes `journalSaved` before END and before the foreground
+  service leaves. Creation/write failures remain observable and never claim a successful save.
+  `RunProScreenTest` checks warning thresholds, paused visibility, clearing and rejected-start messages.
+
+These are JVM/Robolectric guarantees, with the reserve limits in ADR 0008. Physical resource input
+delivery, warning readability and platform shutdown are the owner scenario F11; no field result is claimed.
 
 ## Export verification evidence
 

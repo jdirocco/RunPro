@@ -52,11 +52,12 @@ fun RunProScreen(
 
                     RunPhase.PREPARING -> warmUpItems(
                         status,
-                        journalFailed = state.journalFailed,
+                        state,
                         actions = actions
                     )
 
                     RunPhase.RUNNING, RunPhase.PAUSED -> if (confirmingStop) {
+                        resourceItems(state, beforeStart = false)
                         confirmStopItems(
                             stop = {
                                 confirmingStop = false

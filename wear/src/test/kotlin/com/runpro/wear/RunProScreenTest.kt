@@ -8,10 +8,15 @@ import com.runpro.core.model.Distance
 import com.runpro.core.model.HeartRate
 import com.runpro.core.model.Lap
 import com.runpro.core.model.LapTrigger
+import com.runpro.core.model.Run
+import com.runpro.core.model.RunEvent
+import com.runpro.core.model.RunId
 import com.runpro.core.model.Speed
+import com.runpro.core.model.StopReason
 import com.runpro.core.model.Timestamp
 import com.runpro.core.recording.CurrentValues
 import com.runpro.core.recording.LapTotals
+import com.runpro.core.recording.ResourceState
 import com.runpro.core.recording.RunPhase
 import com.runpro.core.recording.RunState
 import com.runpro.core.recording.Totals
@@ -156,6 +161,48 @@ class RunProScreenTest {
         runState.value = RunState(phase = RunPhase.PREPARING, journalFailed = true)
         show()
         shows("Not saved: the run could not be written to the watch storage.")
+    }
+
+    @Test
+    fun `resource warnings remain visible during a paused run and clear on recovery`() {
+        runState.value = running().copy(resources = ResourceState(15, 49_999_999))
+        show()
+        shows("Low battery: 15% or less.")
+        shows("Low storage: less than 50 MB free.")
+        runState.value = runState.value.copy(phase = RunPhase.PAUSED)
+        shows("Low battery: 15% or less.")
+        shows("Low storage: less than 50 MB free.")
+        runState.value = runState.value.copy(resources = ResourceState(16, 50_000_000))
+        compose.onNodeWithText("Low battery: 15% or less.").assertDoesNotExist()
+        compose.onNodeWithText("Low storage: less than 50 MB free.").assertDoesNotExist()
+    }
+
+    @Test
+    fun `warm-up explains critical resources that reject start`() {
+        runState.value = RunState(
+            phase = RunPhase.PREPARING,
+            resources = ResourceState(3, 0)
+        )
+        show()
+        shows("Cannot start: charge the watch above 3%.")
+        shows("Cannot start: free some watch storage.")
+    }
+
+    @Test
+    fun `an automatic stop explains its reason without claiming a failed save`() {
+        val time = Timestamp(0, 0)
+        runState.value = RunState(
+            phase = RunPhase.STOPPED,
+            run = Run(
+                RunId("resource-stop"),
+                listOf(RunEvent.Started(time), RunEvent.Stopped(time, StopReason.LOW_BATTERY))
+            ),
+            journalFailed = true
+        )
+        show()
+        shows("Run stopped automatically: battery at 3% or less.")
+        shows("Not saved: the run could not be written to the watch storage.")
+        compose.onNodeWithText("Saved").assertDoesNotExist()
     }
 
     private fun running(): RunState {

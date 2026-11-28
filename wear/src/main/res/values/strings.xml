@@ -45,6 +45,12 @@
     <string name="summary_saving">Saving…</string>
     <string name="summary_not_saved">Not saved: the run could not be written to the watch storage.</string>
     <string name="summary_done">Done</string>
+    <string name="resource_low_battery">Low battery: 15% or less.</string>
+    <string name="resource_low_storage">Low storage: less than 50 MB free.</string>
+    <string name="resource_start_battery">Cannot start: charge the watch above 3%.</string>
+    <string name="resource_start_storage">Cannot start: free some watch storage.</string>
+    <string name="resource_stopped_battery">Run stopped automatically: battery at 3% or less.</string>
+    <string name="resource_stopped_storage">Run stopped automatically: watch storage full.</string>
 
     <string name="setup_permissions_intro">RunPro needs:</string>
     <string name="permission_location">Location, for GPS distance and pace</string>
