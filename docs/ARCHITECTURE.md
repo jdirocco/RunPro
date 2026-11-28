@@ -252,6 +252,18 @@ permissions via `HealthConnectClient`), `PermissionsRationaleActivity` (API 30â€
 `ViewPermissionUsageActivity` alias), and schedules background export from `FitReceiverService` after
 `FitInbox` has stored and acknowledged the FIT file. Decisions: ADR 0014.
 
+## Strava upload (`:core:sync` strava / `:mobile` strava)
+
+`StravaAccount` (`:core:sync`) runs Strava OAuth with a durable single-use `state` and stores the tokens in
+`files/strava`; `StravaUploader` uploads `files/runs/*.fit` as Run activities (`POST /uploads`, bounded
+polling of `GET /uploads/{id}`), refreshes and rotates tokens, and keeps an atomic ledger of each file's
+SHA-256, upload id and activity id so retries resume instead of duplicating. HTTP goes through
+`StravaHttpTransport` (`HttpURLConnection` in production, fakes in tests). `:mobile` provides `StravaActivity`
+(launcher: connect, opt-in auto upload, upload/retry pending runs, activity links; also the
+`runpro://<host>/oauth/callback` target) and `StravaUploadRunner`, one background thread that
+`FitReceiverService` calls after `FitInbox` has stored and acknowledged a run. Credentials come from
+git-ignored `local.properties` for a private owner-only build. Decisions: ADR 0015.
+
 ## Auto-lap and intervals (`:core:recording`)
 
 `ConfigureWorkout` selects a free run (default 1 km auto-lap) or warm-up, repeated work/recovery,

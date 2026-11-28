@@ -17,4 +17,37 @@
         <item quantity="one">Exported %1$d run, %2$d already exported, %3$d failed.</item>
         <item quantity="other">Exported %1$d runs, %2$d already exported, %3$d failed.</item>
     </plurals>
+    <string name="strava_title">RunPro and Strava</string>
+    <string name="strava_body">Upload the runs synced from your watch to Strava as Run activities. RunPro asks Strava only for permission to upload activities.</string>
+    <string name="strava_status_not_configured">Strava is not configured in this build. Add strava.clientId, strava.clientSecret and strava.callbackHost to local.properties and rebuild.</string>
+    <string name="strava_status_disconnected">Not connected to Strava.</string>
+    <string name="strava_status_connected">Connected to Strava.</string>
+    <string name="strava_status_connected_as">Connected to Strava as %1$s.</string>
+    <string name="strava_status_connecting">Connecting to Strava…</string>
+    <string name="strava_status_uploading">Uploading to Strava…</string>
+    <string name="strava_status_no_browser">No browser is available to open Strava.</string>
+    <string name="strava_connect">Connect Strava</string>
+    <string name="strava_reconnect">Connect Strava again</string>
+    <string name="strava_disconnect">Disconnect Strava</string>
+    <string name="strava_auto_upload">Upload new runs automatically</string>
+    <string name="strava_upload_pending">Upload pending runs</string>
+    <string name="strava_runs_title">Runs on this phone</string>
+    <string name="strava_runs_empty">No runs received from the watch yet.</string>
+    <string name="strava_open_activity">Open on Strava</string>
+    <string name="strava_open_activity_for">Open %1$s on Strava</string>
+    <string name="strava_run_pending">%1$s: not uploaded</string>
+    <string name="strava_run_processing">%1$s: processing on Strava</string>
+    <string name="strava_run_uploaded">%1$s: on Strava</string>
+    <string name="strava_run_failed">%1$s: upload failed (%2$s)</string>
+    <string name="strava_result_connected">Strava connected.</string>
+    <string name="strava_result_denied">Strava access was not granted.</string>
+    <string name="strava_result_connect_failed">Could not connect to Strava: %1$s</string>
+    <string name="strava_result_not_connected">Connect Strava first.</string>
+    <string name="strava_result_auth_required">%1$s Strava needs you to connect again.</string>
+    <string name="strava_result_rate_limited">%1$s Strava rate limit reached: try again in 15 minutes.</string>
+    <string name="strava_result_error">Strava action failed (%1$s).</string>
+    <plurals name="strava_result_batch">
+        <item quantity="one">Uploaded %1$d run, %2$d already on Strava, %3$d still processing, %4$d failed.</item>
+        <item quantity="other">Uploaded %1$d runs, %2$d already on Strava, %3$d still processing, %4$d failed.</item>
+    </plurals>
 </resources>

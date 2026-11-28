@@ -122,6 +122,22 @@ adb -s <seriale del telefono> shell am start -n com.runpro.wear/com.runpro.mobil
 I dettagli della verifica su telefono (inclusa la visibilità in Samsung Health) sono nella sezione *Health Connect check*
 di `docs/FIELD_TESTING.md`.
 
+Per caricare le corse su **Strava** serve una build del telefono con le credenziali Strava (build privata, solo
+per te). Aggiungi al file `local.properties` (ignorato da git, nella cartella principale del progetto oppure in
+`mobile/local.properties`), mai in un file versionato o in una issue:
+
+```properties
+strava.clientId=205420
+strava.clientSecret=<da https://www.strava.com/settings/api>
+strava.callbackHost=localhost
+```
+
+Reinstalla l'app del telefono e apri **RunPro** dal launcher: tocca **Connect Strava** e autorizza il
+caricamento delle attività. Con **Upload new runs automatically** attivo ogni corsa ricevuta dall'orologio
+viene caricata come Corsa; altrimenti tocca **Upload pending runs** (serve anche per riprovare quelle fallite).
+Accanto a ogni corsa caricata c'è **Open on Strava**. La verifica completa è la sezione *Strava check*
+di `docs/FIELD_TESTING.md`.
+
 ## 7. Impostazioni dell'orologio per correre con RunPro
 
 Da fare una volta dopo la prima installazione, e da ricontrollare dopo ogni aggiornamento di One UI Watch.

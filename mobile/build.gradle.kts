@@ -1,3 +1,4 @@
+import java.util.Properties
 import org.gradle.api.file.Directory
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.InputDirectory
@@ -40,6 +41,23 @@ val prepareRobolectricSdks = tasks.register<Sync>("prepareRobolectricSdks") {
 
 val robolectricSdksDir = layout.dir(prepareRobolectricSdks.map { it.destinationDir })
 
+// Strava credentials for the private owner-only build (ADR 0015): read from git-ignored local.properties
+// (the root file, then mobile/local.properties overriding it). Absent keys leave Strava disabled, so CI and
+// ./rp check build without secrets. Never print these values.
+val stravaProperties = Properties().apply {
+    listOf(rootProject.file("local.properties"), file("local.properties"))
+        .filter { it.isFile }
+        .forEach { source -> source.inputStream().use { load(it) } }
+}
+
+fun stravaProperty(key: String, default: String = ""): String =
+    stravaProperties.getProperty(key)?.trim()?.takeIf { it.isNotEmpty() } ?: default
+
+fun javaStringLiteral(value: String): String =
+    "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+
+val stravaCallbackHost = stravaProperty("strava.callbackHost", "localhost")
+
 android {
     namespace = "com.runpro.mobile"
     compileSdk = 37
@@ -53,6 +71,22 @@ android {
         targetSdk = 37
         versionCode = 1
         versionName = "0.1.0"
+
+        buildConfigField(
+            "String",
+            "STRAVA_CLIENT_ID",
+            javaStringLiteral(stravaProperty("strava.clientId"))
+        )
+        buildConfigField(
+            "String",
+            "STRAVA_CLIENT_SECRET",
+            javaStringLiteral(stravaProperty("strava.clientSecret"))
+        )
+        buildConfigField("String", "STRAVA_CALLBACK_HOST", javaStringLiteral(stravaCallbackHost))
+        manifestPlaceholders["stravaCallbackHost"] = stravaCallbackHost
+    }
+    buildFeatures {
+        buildConfig = true
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
