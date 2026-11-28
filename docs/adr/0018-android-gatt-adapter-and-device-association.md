@@ -29,7 +29,15 @@ ADR 0013 already prefers fresh BLE samples over the wrist; nothing reached the e
     after the bond ends, within the unchanged discovery deadline (5 s since #120) (a timeout recovers as before and the
     held request is dropped by close). A platform rejection of the held request is reported as
     `STATUS_REJECTED` so it cannot hang. The bond state is logged at every discovery.
-  - `GattDevicePort` extends `GattPort` with `refreshServiceCache` and `bondState`; `BleLogLine` is the
+  - **stale bond** (#117): a session that closes before streaming on a disconnect with an
+    authentication or encryption status (`STALE_BOND_STATUSES`: 5, 6, 61, 137) while the device is
+    `BONDED` removes the bond, once per link, and the normal backoff reconnects without encryption. The
+    platform still holds keys the sensor has forgotten (the H10 had been paired in the watch settings),
+    so every reconnect would fail the same way and neither the cache refresh nor a retry helps. HR and
+    RSC need no bond. Once per link, so a sensor that really needs bonding cannot loop; a refused
+    removal logs the manual fix (forget the sensor in the watch Bluetooth settings).
+  - `GattDevicePort` extends `GattPort` with `refreshServiceCache`, `bondState` and `removeBond`
+    (the hidden `BluetoothDevice.removeBond()` by reflection, false when unavailable); `BleLogLine` is the
     sensor log line (transitions and notes, with source and session). #20 persists and exports it; until
     then it goes to logcat (`RunProBle`).
 - **Android adapter** (`:wear`, `ble` package, thin):
@@ -73,7 +81,9 @@ ADR 0013 already prefers fresh BLE samples over the wrist; nothing reached the e
   `Disconnected` and reconnect with `autoConnect=true` in under 10 s (R8), resubscription without
   events, stall reported as a disconnect, cache refresh after two setup failures and its reset, no
   refresh for normal drops, discovery held while bonding and released, bonding past the deadline,
-  rejected held discovery, stale/empty/unknown/malformed notifications, stop, logging, footpod RSC.
+  rejected held discovery, stale bond removed once on an encryption drop before streaming and kept
+  otherwise, refused removal logged, stale/empty/unknown/malformed notifications, stop, logging,
+  footpod RSC.
   `PairedSensorsTest`: codec, normalisation, one sensor per kind.
 - `AndroidGattPortTest` (Robolectric, API 30 and 34): one client per session, posted (never inline)
   completions, failed connect versus later disconnect, discovery and CCCD write, missing

@@ -25,6 +25,8 @@ import com.runpro.core.recording.exercise.ExerciseStatus
 import com.runpro.core.recording.imu.ImuCapture
 import com.runpro.core.recording.imu.ImuMode
 import com.runpro.core.recording.imu.ImuStatus
+import com.runpro.core.recording.location.FusedLocationController
+import com.runpro.core.recording.location.LocationStatus
 import com.runpro.core.recording.service.RunRecovery
 import com.runpro.core.recording.service.ServiceCommand
 import com.runpro.core.recording.service.ServiceStartPolicy
@@ -34,6 +36,7 @@ import com.runpro.wear.ble.WatchBle
 import com.runpro.wear.health.HealthServicesExercise
 import com.runpro.wear.imu.ImuPreferences
 import com.runpro.wear.imu.WatchImu
+import com.runpro.wear.location.WatchLocation
 import com.runpro.wear.sync.PhoneSync
 import com.runpro.wear.sync.WatchStorage
 import java.util.concurrent.Executors
@@ -54,11 +57,14 @@ import kotlinx.coroutines.flow.StateFlow
  * - Paired BLE sensors ([WatchBle], #17) connect on their own thread from the warm-up to the stop; their
  *   samples and connect/disconnect events go to the engine. A sensor that drops never pauses or stops the
  *   run (R4); the engine falls back to the wrist (R5).
+ * - Fused location ([FusedLocationController], #96, ADR 0019) runs on its own thread from the warm-up to
+ *   the stop when location is permitted. Its gated fixes back up the Health Services GPS: the engine's
+ *   arbitration prefers Health Services and records every hand-over (R5); losing it never affects the run.
  * - The IMU capture ([ImuCapture], #33) follows the run on its own thread into `files/imu`, apart from
  *   the journal; it never affects the run (ADR 0012).
  * - A warm-up left alone ends after [WarmUpTimeout.DEFAULT_LIMIT] (#82): the service resets the engine and
  *   leaves the foreground, so GPS and the notification do not stay on. A recording run is never affected (R1).
- * - The UI binds to it and only reads [LocalBinder.state] and [LocalBinder.exercise].
+ * - The UI binds to it and only reads [LocalBinder.state], [LocalBinder.exercise] and [LocalBinder.location].
  */
 class RecordingService : Service() {
     private lateinit var engine: RecordingEngine
@@ -76,6 +82,8 @@ class RecordingService : Service() {
     private lateinit var battery: WatchBattery
     private val bleThread = HandlerThread("runpro-ble").apply { start() }
     private lateinit var ble: WatchBle
+    private val locationThread = HandlerThread("runpro-location").apply { start() }
+    private lateinit var location: FusedLocationController
     private lateinit var debugTrace: DebugTrace
 
     internal var createSession: () -> RecordingSession = {
@@ -88,6 +96,9 @@ class RecordingService : Service() {
         HealthServicesExercise.create(this, ::now)
     }
     internal var createBle: (Looper) -> WatchBle = { looper -> WatchBle(this, looper, ::now) }
+    internal var createLocation: (Looper) -> FusedLocationController = { looper ->
+        WatchLocation.create(this, looper, ::now)
+    }
 
     // Match the journal's ordinary free-byte policy; reclaimable cache is not reserved capacity.
     @SuppressLint("UsableSpace")
@@ -117,6 +128,7 @@ class RecordingService : Service() {
         val failure: StateFlow<Throwable?> get() = engine.failure
         val exercise: StateFlow<ExerciseStatus> get() = this@RecordingService.exercise.status
         val imu: StateFlow<ImuStatus> get() = this@RecordingService.imu.status
+        val location: StateFlow<LocationStatus> get() = this@RecordingService.location.status
     }
 
     override fun onCreate() {
@@ -135,6 +147,7 @@ class RecordingService : Service() {
         foreground = ForegroundController(this, notification)
         exercise = createExercise().also { it.start(EngineFeed()) }
         ble = createBle(bleThread.looper).also { it.start(EngineFeed()) }
+        location = createLocation(locationThread.looper).also { it.start(EngineFeed()) }
         battery = WatchBattery(this) { percent ->
             engine.submit(EngineInput.Resources(now(), batteryPercent = percent))
         }.also { it.start() }
@@ -166,6 +179,10 @@ class RecordingService : Service() {
         exercise.stop()
         ble.close()
         bleThread.quitSafely()
+        // Unlike the exercise, location updates are not adopted after a restart: always remove them.
+        location.follow(RunPhase.IDLE)
+        location.stop()
+        locationThread.quitSafely()
         battery.close()
         ticker.shutdownNow()
         engine.close()
@@ -275,10 +292,14 @@ class RecordingService : Service() {
         val newlyFailed = state.journalFailed && !lastJournalFailed
         lastPhase = state.phase
         lastJournalFailed = state.journalFailed
-        // Non-blocking: the controller only queues requests to Health Services.
-        if (changed) exercise.follow(exercisePhase(state))
-        // Only posts to the BLE thread: paired sensors connect from the warm-up to the stop.
-        if (changed) ble.follow(state.phase)
+        if (changed) {
+            // Non-blocking: the controller only queues requests to Health Services.
+            exercise.follow(exercisePhase(state))
+            // Only posts to the BLE thread: paired sensors connect from the warm-up to the stop.
+            ble.follow(state.phase)
+            // Only posts to the location thread: fused updates from the warm-up to the stop.
+            location.follow(state.phase)
+        }
         // Only queues to the IMU thread, and only when something changed.
         imu.follow(state, imuMode)
         main.post {
@@ -310,7 +331,7 @@ class RecordingService : Service() {
         }
     }
 
-    /** Health Services and BLE samples and sensor events go to the engine, which journals both (#60). */
+    /** Health Services, fused location and BLE samples and events go to the engine, which journals both (#60). */
     private inner class EngineFeed : SensorListener {
         override fun onSample(sample: Sample) {
             engine.submit(EngineInput.SampleReceived(sample))

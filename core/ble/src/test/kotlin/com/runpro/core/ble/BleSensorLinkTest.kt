@@ -166,6 +166,71 @@ class BleSensorLinkTest {
     }
 
     @Test
+    fun `a bonded strap that drops on encryption before streaming loses its stale bond once`() {
+        // #117: the watch kept a system bond the H10 had forgotten (HCI_ERR_KEY_MISSING, status 5).
+        val rig = Rig()
+        rig.port.bond = BondState.BONDED
+        rig.link.start(rig.listener, rig.time())
+        rig.completeUntil(GattOperation.DISCOVER_SERVICES)
+        rig.link.disconnected(rig.session, 5, rig.time())
+        assertEquals(BleConnectionState.BACKOFF, rig.link.state)
+        assertEquals(1, rig.port.calls.count { it == "removeBond" })
+        assertTrue(rig.log.any { it.message.contains("removed the stale bond (status=5)") })
+        assertTrue(rig.events.isEmpty())
+
+        rig.advance(1_000)
+        assertTrue(rig.port.requests.last().autoConnect)
+        rig.ready()
+        rig.notify(bytes(0x00, 0x8C))
+        assertEquals(1, rig.samples.size)
+
+        // Once per link: a later failure of the same kind does not remove again.
+        rig.link.disconnected(rig.session, 8, rig.time())
+        rig.advance(1_000)
+        rig.port.bond = BondState.BONDED
+        rig.completeUntil(GattOperation.DISCOVER_SERVICES)
+        rig.link.disconnected(rig.session, 5, rig.time())
+        assertEquals(1, rig.port.calls.count { it == "removeBond" })
+    }
+
+    @Test
+    fun `the bond is kept for other drops, unbonded devices and streaming links`() {
+        val other = Rig()
+        other.port.bond = BondState.BONDED
+        other.link.start(other.listener, other.time())
+        other.completeUntil(GattOperation.DISCOVER_SERVICES)
+        other.link.disconnected(other.session, 8, other.time())
+
+        val unbonded = Rig()
+        unbonded.link.start(unbonded.listener, unbonded.time())
+        unbonded.completeUntil(GattOperation.DISCOVER_SERVICES)
+        unbonded.link.disconnected(unbonded.session, 5, unbonded.time())
+
+        val streaming = Rig()
+        streaming.port.bond = BondState.BONDED
+        streaming.link.start(streaming.listener, streaming.time())
+        streaming.ready()
+        streaming.link.disconnected(streaming.session, 5, streaming.time())
+
+        listOf(other, unbonded, streaming).forEach { rig ->
+            assertTrue(rig.port.calls.none { it == "removeBond" })
+            assertEquals(BleConnectionState.BACKOFF, rig.link.state)
+        }
+    }
+
+    @Test
+    fun `a bond that cannot be removed is logged with the manual fix`() {
+        val rig = Rig()
+        rig.port.bond = BondState.BONDED
+        rig.port.bondRemovable = false
+        rig.link.start(rig.listener, rig.time())
+        rig.completeUntil(GattOperation.DISCOVER_SERVICES)
+        rig.link.disconnected(rig.session, 5, rig.time())
+        assertTrue(rig.log.any { it.message.contains("cannot remove the stale bond") })
+        assertEquals(BleConnectionState.BACKOFF, rig.link.state)
+    }
+
+    @Test
     fun `stale, empty, unknown and malformed notifications produce no samples`() {
         val rig = Rig()
         rig.link.start(rig.listener, rig.time())
@@ -343,6 +408,14 @@ class BleSensorLinkTest {
         }
 
         override fun bondState(): BondState = bond
+
+        var bondRemovable = true
+
+        override fun removeBond(): Boolean {
+            calls += "removeBond"
+            if (bondRemovable) bond = BondState.NONE
+            return bondRemovable
+        }
     }
 
     private companion object {

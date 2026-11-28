@@ -29,6 +29,13 @@ value class SourceId(val value: String) {
         /** Everything Health Services reports: wrist HR, GPS location, distance, speed, steps cadence, elevation. */
         val HEALTH_SERVICES = SourceId("watch:health-services")
 
+        /**
+         * Google Play services `FusedLocationProviderClient` on the watch: GNSS assisted by the paired
+         * phone. Backs up the Health Services location, distance and speed behind an accuracy gate
+         * (ADR 0019).
+         */
+        val FUSED_LOCATION = SourceId("watch:fused-location")
+
         /** The raw watch accelerometer. */
         val WATCH_IMU = SourceId("watch:imu")
 

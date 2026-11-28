@@ -25,9 +25,11 @@ import com.runpro.core.recording.RunPhase
 import com.runpro.core.recording.RunState
 import com.runpro.core.recording.exercise.ExerciseStatus
 import com.runpro.core.recording.imu.ImuMode
+import com.runpro.core.recording.location.LocationStatus
 import com.runpro.core.recording.service.BatteryAdvice
 import com.runpro.core.recording.service.RunPermission
 import com.runpro.core.recording.service.ServiceCommand
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -41,10 +43,14 @@ fun RunProScreen(
     runState: StateFlow<RunState>,
     exercise: StateFlow<ExerciseStatus>,
     actions: SetupActions,
+    location: StateFlow<LocationStatus> = MutableStateFlow(LocationStatus()),
     screens: DataScreens = DataScreens.DEFAULT
 ) {
     val state by runState.collectAsState()
-    val status by exercise.collectAsState()
+    val exerciseStatus by exercise.collectAsState()
+    val locationStatus by location.collectAsState()
+    // GPS is ready when Health Services or the fused provider has a fix (ADR 0019).
+    val status = exerciseStatus.withLocation(locationStatus.readiness)
     // Per run: a new run shows its own summary, and the stop confirmation never carries over.
     val runKey = state.run?.id?.value.orEmpty()
     var summaryDismissed by rememberSaveable(runKey) { mutableStateOf(false) }
