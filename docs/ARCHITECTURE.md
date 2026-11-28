@@ -159,7 +159,8 @@ removed once when a bonded device drops on encryption before streaming (#117). T
 completes inline and closed sessions stay silent; the first connect uses `autoConnect=false`, reconnects
 `true`. `WatchBle` follows the run phases: links from the warm-up to the stop. Pairing (**Sensors** on
 the setup screen) uses a `CompanionDeviceManager` association where the watch supports it, which also
-grants the companion background rights, and a short filtered scan otherwise. Decisions: ADR 0018.
+grants the companion background rights, and a short filtered scan otherwise or when the chooser fails
+or closes (#115). Decisions: ADR 0018.
 
 ## Journal format (`:core:journal`)
 
@@ -311,3 +312,14 @@ readings can auto-pause/resume; sensor silence cannot pause recording. Health Se
 collect speed during automatic pauses. The countdown remains in warm-up until START is sent.
 `DebugTrace` writes optional raw replay JSONL on a bounded, separate worker to `files/traces` and fails
 independently of recording. Units change presentation; measurements/export remain SI. ADR 0017.
+
+## Configurable data screens (`:wear`, #23)
+
+`DataScreens` holds 1–10 ordered pages of 1–5 catalogue fields. The pre-run watch editor saves stable
+field names in separate display preferences, with a bounded parser and default fallback. `DataPage`
+reads the existing `RunState` snapshot, formats active-run units/profile and wraps pages with rotary,
+horizontal swipes or arrows. Vertical touch scrolling retains access to the run controls; stop still
+requires confirmation. No layout setting or navigation action is sent to the engine. Current power
+joins the snapshot using the same admitted-sample/source-silence path as other metrics; journal and
+export formats are unchanged. HR zones are display-only max-HR bands (50/60/70/80/90%, zone 0 below
+50%); a missing profile never produces an assumed zone. Custom zones and alerts are separate work.

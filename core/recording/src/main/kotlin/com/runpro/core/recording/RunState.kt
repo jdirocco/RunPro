@@ -10,6 +10,8 @@ import com.runpro.core.model.HeartRateSample
 import com.runpro.core.model.Lap
 import com.runpro.core.model.Metric
 import com.runpro.core.model.Pace
+import com.runpro.core.model.Power
+import com.runpro.core.model.PowerSample
 import com.runpro.core.model.Run
 import com.runpro.core.model.Sample
 import com.runpro.core.model.SourceId
@@ -94,7 +96,8 @@ data class CurrentValues(
     val heartRate: HeartRate? = null,
     val cadence: Cadence? = null,
     val speed: Speed? = null,
-    val elevation: Elevation? = null
+    val elevation: Elevation? = null,
+    val power: Power? = null
 ) {
     val pace: Pace? get() = speed?.pace()
 
@@ -103,6 +106,7 @@ data class CurrentValues(
         Metric.CADENCE -> copy(cadence = null)
         Metric.SPEED -> copy(speed = null)
         Metric.ELEVATION -> copy(elevation = null)
+        Metric.POWER -> copy(power = null)
         else -> this
     }
 
@@ -115,6 +119,8 @@ data class CurrentValues(
         is SpeedSample -> copy(speed = sample.speed)
 
         is ElevationSample -> copy(elevation = sample.elevation)
+
+        is PowerSample -> copy(power = sample.power)
 
         else -> this
     }

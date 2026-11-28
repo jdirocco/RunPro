@@ -204,3 +204,24 @@ strava.callbackHost=localhost
    relevant traces to a field report; the diagnostics/export screen is a separate backlog task.
 
 Record the watch observations in a field report. No physical result for these steps is claimed by JVM tests.
+
+## Data screens check (#23)
+
+1. Before **Get ready**, open **Data screens**. Select a page, tap a numbered field and choose from the
+   catalogue. Add/remove fields (1–5); add/remove pages (1–10), and move pages earlier/later. Changes save
+   immediately. Recreate the owner's Gear Tracker layout, then close/reopen the app and verify the
+   field and page order. Check layouts with each of 1, 2, 3, 4 and 5 fields on the round watch.
+2. Start a run. Each page must fit its fields together. Turn the bezel in both directions, swipe
+   horizontally, or use the arrows: page numbers wrap at the ends. Swipe vertically to reach lap,
+   pause/resume and Stop; Stop must still ask for confirmation. Check navigation while paused and after
+   leaving/reopening the activity. Verify readability while running and with long timers (> 1 hour).
+3. Compare current pace, average pace and lap pace; mark a lap and check only lap values reset. Check
+   Metric and Imperial display units on separate runs. Cadence is steps/min, power is watts, elevation
+   is absolute altitude (m/ft), clock is local 24-hour time, battery is watch percentage.
+4. HR zone uses the saved maximum HR: zone 0 below 50%, then zones 1–5 starting at 50/60/70/80/90%.
+   Without maximum HR or current HR it reads `--`. Missing/stale sensor values, including power without
+   a compatible sensor, must also read `--`; no dropout may pause or stop recording. Power ingestion
+   from a real footpod still depends on its sensor support.
+
+Record the reproduced Gear Tracker layout and actual readability/navigation observations in a field
+report. JVM/Robolectric coverage does not claim physical acceptance or bezel timing on the watch.

@@ -140,4 +140,36 @@
     <string name="unit_mi">mi</string>
     <string name="unit_pace_mi">min/mi</string>
     <string name="summary_average_pace_mi">average min/mi</string>
+    <string name="data_screens_title">Data screens</string>
+    <plurals name="data_page_fields">
+        <item quantity="one">Page %1$d · %2$d field</item>
+        <item quantity="other">Page %1$d · %2$d fields</item>
+    </plurals>
+    <string name="data_page">%1$d / %2$d</string>
+    <string name="data_slot">Field %1$d: %2$s</string>
+    <string name="data_add_page">Add page</string>
+    <string name="data_remove_page">Remove page</string>
+    <string name="data_add_field">Add field</string>
+    <string name="data_remove_field">Remove last field</string>
+    <string name="data_move_up">Move page earlier</string>
+    <string name="data_move_down">Move page later</string>
+    <string name="field_time">Time</string>
+    <string name="field_lap_time">Lap time</string>
+    <string name="field_distance">Distance</string>
+    <string name="field_current_pace">Pace</string>
+    <string name="field_average_pace">Avg pace</string>
+    <string name="field_lap_pace">Lap pace</string>
+    <string name="field_heart_rate">HR</string>
+    <string name="field_hr_zone">HR zone</string>
+    <string name="field_cadence">Cadence</string>
+    <string name="field_power">Power</string>
+    <string name="field_elevation">Elevation</string>
+    <string name="field_clock">Clock</string>
+    <string name="field_battery">Battery</string>
+    <string name="field_spm">spm</string>
+    <string name="field_watts">W</string>
+    <string name="field_feet">ft</string>
+    <string name="field_meters">m</string>
+    <string name="data_previous_page">Previous page</string>
+    <string name="data_next_page">Next page</string>
 </resources>

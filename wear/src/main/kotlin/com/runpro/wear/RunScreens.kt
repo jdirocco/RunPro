@@ -72,36 +72,18 @@ private fun SensorLine(name: String, readiness: Readiness) {
     )
 }
 
-/** Time, distance, pace and heart rate in large type; lap and pause in reach, stop behind a confirmation. */
+/** Configured pages with the existing lap, pause and confirmed stop controls. */
 internal fun ScalingLazyListScope.runItems(
     state: RunState,
     actions: SetupActions,
+    screens: DataScreens,
     askToStop: () -> Unit
 ) {
     val paused = state.phase == RunPhase.PAUSED
-    val units = state.workoutSettings.runSettings.units
-    val imperial = units == DisplayUnits.IMPERIAL
     resourceItems(state, beforeStart = false)
     if (paused) item { Paragraph(stringResource(R.string.run_paused)) }
-    item {
-        Text(clock(state.totals.timer), style = MaterialTheme.typography.displayLarge)
-    }
-    if (state.workout != null) {
-        item { WorkoutCountdown(state) }
-    }
-    item {
-        Metric(
-            displayDistance(state.totals.distance, units.distance),
-            stringResource(if (imperial) R.string.unit_mi else R.string.unit_km)
-        )
-    }
-    item {
-        Metric(
-            pace(state.current.pace, units.distance),
-            stringResource(if (imperial) R.string.unit_pace_mi else R.string.unit_pace)
-        )
-    }
-    item { Metric(heartRate(state.current.heartRate), stringResource(R.string.unit_bpm)) }
+    item { DataPage(state, screens) }
+    if (state.workout != null) item { WorkoutCountdown(state) }
     item { HeartRateSource(state) }
     state.laps.lastOrNull()?.let { lap ->
         item {

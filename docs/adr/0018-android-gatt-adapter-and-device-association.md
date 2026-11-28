@@ -66,7 +66,10 @@ ADR 0013 already prefers fresh BLE samples over the wrist; nothing reached the e
     optimisation, which the watch has no screen for, see #10). API 33+ uses the executor callback and
     `AssociationInfo` (MAC, display name, id); older APIs the handler callback and the selected
     `ScanResult`. Where companion setup is missing, `BleScan` runs a 15 s low-latency scan filtered on
-    the same UUID and lists the devices. Replacing or forgetting a sensor drops its association.
+    the same UUID and lists the devices; it also runs when the chooser fails or closes without an
+    association, and the screen then scans directly. On the Galaxy Watch 5 Pro (API 36) the platform refuses
+    every third-party association ("3p apps are not allowed to create associations on watch", #115), so
+    the scan is the path in practice and the companion background rights are not obtained. Replacing or forgetting a sensor drops its association.
     `PairedSensors` (pure) stores the choice as one preference string, one sensor per kind, with the
     upper-case address as the stable `ble:<address>` source id.
 - No new dependency. Stryd (CPS and extra metrics, #21) and the diagnostics screen / sensor-log export
