@@ -162,6 +162,7 @@
     <string name="field_lap_pace">Lap pace</string>
     <string name="field_heart_rate">HR</string>
     <string name="field_hr_zone">HR zone</string>
+    <string name="field_pace_zone">Pace zone</string>
     <string name="field_cadence">Cadence</string>
     <string name="field_power">Power</string>
     <string name="field_elevation">Elevation</string>
@@ -173,4 +174,37 @@
     <string name="field_meters">m</string>
     <string name="data_previous_page">Previous page</string>
     <string name="data_next_page">Next page</string>
+
+    <string name="settings_lthr">LTHR: %1$s</string>
+    <string name="settings_threshold_pace">Threshold pace: %1$s</string>
+    <string name="zones_alerts_title">Zones and alerts</string>
+    <string name="zones_hr_method">HR zones: %1$s</string>
+    <string name="zones_method_max_hr">Max HR</string>
+    <string name="zones_method_lthr">LTHR</string>
+    <string name="zones_hr_heading">HR zones (%1$s)</string>
+    <string name="zones_hr_missing_max">Set Max HR in Settings to compute HR zones.</string>
+    <string name="zones_hr_missing_lthr">Set LTHR in Settings to compute HR zones.</string>
+    <string name="zones_hr_band">Z%1$d · %2$d–%3$d bpm</string>
+    <string name="zones_hr_band_open">Z%1$d · %2$d+ bpm</string>
+    <string name="zones_pace_heading">Pace zones</string>
+    <string name="zones_pace_missing">Set threshold pace in Settings to compute pace zones.</string>
+    <string name="zones_pace_band">Z%1$d · %2$s–%3$s</string>
+    <string name="zones_pace_band_slow">Z%1$d · slower than %2$s</string>
+    <string name="zones_pace_band_fast">Z%1$d · faster than %2$s</string>
+    <string name="alert_hr_high_setting">HR high: %1$s</string>
+    <string name="alert_hr_low_setting">HR low: %1$s</string>
+    <string name="alert_pace_fast_setting">Pace fast: %1$s</string>
+    <string name="alert_pace_slow_setting">Pace slow: %1$s</string>
+    <string name="alert_sensor_setting">Sensor alerts: %1$s</string>
+    <string name="alert_gps_setting">GPS alerts: %1$s</string>
+    <string name="alert_cooldown_setting">Alert cooldown: %1$s</string>
+    <string name="alert_hr_high_title">HR high</string>
+    <string name="alert_hr_low_title">HR low</string>
+    <string name="alert_pace_fast_title">Pace too fast</string>
+    <string name="alert_pace_slow_title">Pace too slow</string>
+    <string name="alert_sensor_lost_title">Sensor lost</string>
+    <string name="alert_sensor_back_title">Sensor back</string>
+    <string name="alert_gps_lost_title">GPS lost</string>
+    <string name="alert_gps_back_title">GPS back</string>
+    <string name="alert_banner_value">%1$s\n%2$s</string>
 </resources>

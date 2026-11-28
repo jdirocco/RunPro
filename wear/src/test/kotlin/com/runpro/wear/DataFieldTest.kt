@@ -5,7 +5,9 @@ import com.runpro.core.model.DisplayUnits
 import com.runpro.core.model.Distance
 import com.runpro.core.model.Elevation
 import com.runpro.core.model.HeartRate
+import com.runpro.core.model.HrZoneMethod
 import com.runpro.core.model.Lap
+import com.runpro.core.model.Pace
 import com.runpro.core.model.Power
 import com.runpro.core.model.RunSettings
 import com.runpro.core.model.Speed
@@ -41,7 +43,11 @@ class DataFieldTest {
             Power(240)
         ),
         resources = ResourceState(batteryPercent = 81),
-        workoutSettings = WorkoutSettings(runSettings = RunSettings(profile = UserProfile(200)))
+        workoutSettings = WorkoutSettings(
+            runSettings = RunSettings(
+                profile = UserProfile(maxHeartRate = 200, thresholdPace = Pace(300.0))
+            )
+        )
     )
 
     @Test
@@ -50,7 +56,7 @@ class DataFieldTest {
         Locale.setDefault(Locale.US)
         try {
             val expected = listOf(
-                "25:00", "2:00", "5.00", "5:00", "5:00", "4:00", "150", "3", "174", "240",
+                "25:00", "2:00", "5.00", "5:00", "5:00", "4:00", "150", "3", "4", "174", "240",
                 "100", "13:04", "81%"
             )
             val now = Instant.parse("2026-11-28T12:04:00Z")
@@ -68,12 +74,16 @@ class DataFieldTest {
         val empty = RunState()
         listOf(
             DataField.LAP_TIME, DataField.CURRENT_PACE, DataField.AVERAGE_PACE, DataField.LAP_PACE,
-            DataField.HEART_RATE, DataField.HR_ZONE, DataField.CADENCE, DataField.POWER,
-            DataField.ELEVATION, DataField.BATTERY
+            DataField.HEART_RATE, DataField.HR_ZONE, DataField.PACE_ZONE, DataField.CADENCE,
+            DataField.POWER, DataField.ELEVATION, DataField.BATTERY
         ).forEach { assertEquals(NO_VALUE, fieldValue(it, empty)) }
         assertEquals(
             NO_VALUE,
             fieldValue(DataField.HR_ZONE, state.copy(workoutSettings = WorkoutSettings()))
+        )
+        assertEquals(
+            NO_VALUE,
+            fieldValue(DataField.PACE_ZONE, state.copy(workoutSettings = WorkoutSettings()))
         )
     }
 
@@ -98,5 +108,52 @@ class DataFieldTest {
                     )
                 )
             }
+    }
+
+    @Test
+    fun `lthr hr zones and threshold pace zones format correctly`() {
+        val lthrState = state.copy(
+            workoutSettings = WorkoutSettings(
+                runSettings = RunSettings(
+                    profile = UserProfile(
+                        lactateThresholdHeartRate = 170,
+                        thresholdPace = Pace(300.0)
+                    ),
+                    hrZoneMethod = HrZoneMethod.LTHR
+                )
+            )
+        )
+        listOf(110 to "0", 111 to "1", 145 to "2", 153 to "3", 162 to "4", 170 to "5")
+            .forEach { (hr, zone) ->
+                assertEquals(
+                    zone,
+                    fieldValue(
+                        DataField.HR_ZONE,
+                        lthrState.copy(current = CurrentValues(HeartRate(hr)))
+                    )
+                )
+            }
+        listOf(
+            400.0 to "1",
+            360.0 to "2",
+            330.0 to "3",
+            300.0 to "4",
+            270.0 to "5"
+        ).forEach { (secPerKm, zone) ->
+            assertEquals(
+                zone,
+                fieldValue(
+                    DataField.PACE_ZONE,
+                    lthrState.copy(current = CurrentValues(speed = Pace(secPerKm).toSpeed()))
+                )
+            )
+        }
+        assertEquals(
+            NO_VALUE,
+            fieldValue(
+                DataField.PACE_ZONE,
+                lthrState.copy(current = CurrentValues(speed = Speed.ZERO))
+            )
+        )
     }
 }

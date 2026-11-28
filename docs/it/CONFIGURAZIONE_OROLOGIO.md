@@ -269,10 +269,18 @@ La prova sul campo è F9 in `docs/FIELD_TESTING.md`; i risultati fisici devono a
 ### Impostazioni e profilo
 
 Prima di **Preparati**, apri **Impostazioni**: scegli unità metriche (km, min/km, kg) o imperiali
-(mi, min/mi, lb), frequenza cardiaca massima e a riposo, peso, pausa automatica, conto alla rovescia e
+(mi, min/mi, lb), frequenza cardiaca massima, FC soglia (LTHR), FC a riposo, passo soglia, peso,
+**Zone e avvisi**, pausa automatica, conto alla rovescia e
 traccia di debug. Per i valori del profilo usa **Aumenta/Diminuisci**, poi **Salva**; **Annulla** scarta la
 modifica e **Rimuovi valore** lo lascia sconosciuto. Il profilo serve alle funzioni che lo richiedono;
 RunPro non inventa valori mancanti. Le scelte restano salvate e valgono per la prossima corsa.
+
+In **Impostazioni → Zone e avvisi** scegli il metodo delle zone FC (**FC max**: 50/60/70/80/90%, oppure
+**FC soglia**: 65/85/90/95/100%), vedi le 5 zone FC e le 5 zone passo (calcolate dal passo soglia) e
+imposti gli avvisi con vibrazioni distinte: **FC alta/bassa**, **Passo veloce/lento**, **Avvisi sensori**
+(fascia/footpod perso e riconnesso), **Avvisi GPS** (segnale perso e ritrovato) e l'**Intervallo avvisi**
+(rate limit in secondi). Gli avvisi vibrano solo mentre la corsa è attiva (mai in pausa) e non fermano
+mai la registrazione. La prova fisica è *Zones and alerts check (#25)* in `docs/FIELD_TESTING.md`.
 
 La **pausa automatica** è disattivata all'inizio. Se attiva, richiede velocità sotto 0,5 m/s per almeno
 5 secondi di misure recenti e consecutive; riparte a 1 m/s. Una pausa manuale richiede **Riprendi**.
@@ -308,9 +316,9 @@ Il tempo e il tempo giro escludono le pause; passo medio e passo giro usano temp
 La quota è l'altitudine in m o ft, la cadenza è in passi/min, la potenza in W, l'ora locale in formato
 24 ore e la batteria è quella dell'orologio. Le unità seguono le impostazioni della corsa.
 
-La zona FC richiede la frequenza massima nel profilo: zona 0 sotto il 50%, zone da 1 a 5 a partire dal
-50/60/70/80/90% della massima. Non sono ancora zone personalizzabili. Senza massima o battito attuale
-compare `--`. Anche gli altri valori mancanti, per esempio la potenza senza sensore compatibile,
+La zona FC usa il metodo scelto in **Zone e avvisi** (FC massima o FC soglia); la **Zona passo** usa il
+passo soglia del profilo (zone 1–5). Senza il valore di profilo o la misura attuale compare `--`. Anche
+gli altri valori mancanti, per esempio la potenza senza sensore compatibile,
 restano `--`. La prova fisica, inclusa la leggibilità della disposizione di Gear Tracker, è
 *Data screens check (#23)* in `docs/FIELD_TESTING.md`.
 

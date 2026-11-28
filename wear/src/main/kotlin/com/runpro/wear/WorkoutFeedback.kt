@@ -32,19 +32,24 @@ internal class WorkoutFeedback(context: Context) {
     private val vibrator = context.getSystemService(Vibrator::class.java)
     private var runId: RunId? = null
     private var closedLaps = 0
+    private var lastAlertId = 0L
     private var countdown: Pair<Int, Int>? = null
 
     fun update(state: RunState) {
         val id = state.run?.id ?: return
         val closed = state.laps.count { !it.lap.isOpen }
+        val latestAlert = state.alerts.lastOrNull()
         if (id != runId) {
             runId = id
             closedLaps = closed
+            lastAlertId = latestAlert?.id ?: 0L
             countdown = null
             return
         }
         val lapChanged = closed > closedLaps
         closedLaps = closed
+        val newAlert = latestAlert?.takeIf { it.id > lastAlertId }
+        if (latestAlert != null) lastAlertId = latestAlert.id
         val remaining = state.workout?.remainingTime?.let {
             ceil(it.inWholeMilliseconds / MILLIS_PER_SECOND).toInt()
         }
@@ -56,6 +61,10 @@ internal class WorkoutFeedback(context: Context) {
                         longArrayOf(0, LAP_PULSE, LAP_GAP, LAP_PULSE),
                         -1
                     )
+                )
+            } else if (newAlert != null) {
+                vibrator?.vibrate(
+                    VibrationEffect.createWaveform(AlertFeedback.waveform(newAlert.kind), -1)
                 )
             } else if (remaining in 1..COUNTDOWN_SECONDS && key != countdown) {
                 vibrator?.vibrate(

@@ -250,3 +250,25 @@ Record the watch observations in a field report. No physical result for these st
 
 Record the reproduced Gear Tracker layout and actual readability/navigation observations in a field
 report. JVM/Robolectric coverage does not claim physical acceptance or bezel timing on the watch.
+
+## Zones and alerts check (#25)
+
+1. Before **Get ready**, open **Settings**. Set **Max HR**, **LTHR**, and **Threshold pace**; open
+   **Zones and alerts** and check the computed Z1–Z5 HR bands for **Max HR** and **LTHR** as well as
+   the five pace zones (verify Metric and Imperial formatting).
+2. Add **HR zone** and **Pace zone** to a data screen and verify both update during a run (`--` when
+   stopped or without the corresponding profile value).
+3. Configure tight **HR high/low** and **Pace fast/slow** alert limits with a short **Alert cooldown**
+   (e.g., 15 s) and keep **Sensor alerts** and **GPS alerts** on. Start a run:
+   - Cross the HR high and low limits and verify distinct vibration patterns and the 4 s on-screen
+     alert popup (tap dismisses); stay out of range and confirm repeats wait for the cooldown.
+   - Cross the fast and slow pace limits and verify distinct vibrations and popups.
+   - Take the paired HR strap off (or walk out of range) and put it back on: confirm one **Sensor
+     lost** vibration/popup and one **Sensor back** vibration/popup without pausing the run.
+   - Enter a tunnel or indoor area until GPS is lost, then step back outside: confirm **GPS lost**
+     and **GPS back** vibrations/popups (when no fused location backup remains).
+   - Pause the run and verify no alert vibrates while paused.
+4. Close and reopen the watch app mid-run: confirm old alerts do not re-vibrate.
+
+Report actual vibration distinguishability, screen-off behaviour and alert timing in a field report.
+JVM/Robolectric and replay tests do not claim physical watch results.

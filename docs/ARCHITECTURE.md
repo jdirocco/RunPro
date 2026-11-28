@@ -347,5 +347,19 @@ reads the existing `RunState` snapshot, formats active-run units/profile and wra
 horizontal swipes or arrows. Vertical touch scrolling retains access to the run controls; stop still
 requires confirmation. No layout setting or navigation action is sent to the engine. Current power
 joins the snapshot using the same admitted-sample/source-silence path as other metrics; journal and
-export formats are unchanged. HR zones are display-only max-HR bands (50/60/70/80/90%, zone 0 below
-50%); a missing profile never produces an assumed zone. Custom zones and alerts are separate work.
+export formats are unchanged. `HR_ZONE` and `PACE_ZONE` read the run's configured zones from the
+immutable snapshot; a missing profile value never produces an assumed zone.
+
+## Zones and alerts (`:core:model` / `:core:recording` / `:wear`, #25)
+
+`UserProfile` holds optional `lactateThresholdHeartRate` and `thresholdPace` alongside `maxHeartRate`.
+`RunSettings` adds `hrZoneMethod` (`MAX_HR`: 50/60/70/80/90%, or `LTHR`: 65/85/90/95/100%) and
+`alerts: AlertSettings` (optional HR high/low and pace fast/slow limits, sensor/GPS alert toggles,
+and monotonic `cooldownSeconds`). `PaceZones` derives five zones from threshold pace
+(129/114/106/99%). `AlertMonitor` inside `RecordingStateMachine` emits transient `RunAlert` values
+on `RunState.alerts` while `RUNNING` for fresh live HR/pace excursions, per-device BLE dropouts and
+recoveries (disconnect, stall or 0 bpm), and GPS loss/recovery (respecting fused-location backup).
+Alerts are rate-limited on monotonic time, never pause/stop recording (R4), and are not replayed
+from journals on crash recovery. `WorkoutFeedback` vibrates eight distinct waveforms on the main
+thread (R6); `AlertPopup` shows the latest alert for 4 s (tap to dismiss). Pre-run configuration
+lives under **Settings → Zones and alerts**. Decisions: ADR 0020.

@@ -37,6 +37,8 @@ private fun sensorValue(field: DataField, state: RunState): String? = when (fiel
 
     DataField.HR_ZONE -> hrZone(state)?.toString()
 
+    DataField.PACE_ZONE -> paceZone(state)?.toString()
+
     DataField.CADENCE -> state.current.cadence?.stepsPerMinute?.roundToInt()?.toString()
 
     DataField.POWER -> state.current.power?.watts?.toString()
@@ -49,17 +51,16 @@ private fun sensorValue(field: DataField, state: RunState): String? = when (fiel
     else -> null
 }
 
-/** Five max-HR bands; zone 0 below 50%. Unknown maximum means unknown zone. */
+/** Five HR zones from configured Max HR or LTHR; unknown profile or 0 bpm stays unknown. */
 private fun hrZone(state: RunState): Int? {
-    val maximum = state.workoutSettings.runSettings.profile.maxHeartRate
-    val heartRate = state.current.heartRate?.bpm?.takeIf { it > 0 }
-    return if (maximum == null || heartRate == null) {
-        null
-    } else {
-        val percent = heartRate * 100 / maximum
-        HR_BOUNDARIES.count { percent >= it }
-    }
+    val heartRate = state.current.heartRate ?: return null
+    return state.workoutSettings.runSettings.hrZones()?.zoneFor(heartRate)
 }
 
-private val HR_BOUNDARIES = listOf(50, 60, 70, 80, 90)
+/** Five pace zones from configured threshold pace; stopped or invalid pace stays unknown. */
+private fun paceZone(state: RunState): Int? = state.current.pace
+    ?.takeIf { it.secondsPerKilometer <= MAX_DISPLAY_PACE_SECONDS_PER_KM }
+    ?.let { state.workoutSettings.runSettings.paceZones()?.zoneFor(it) }
+
+private const val MAX_DISPLAY_PACE_SECONDS_PER_KM = 1800.0
 private val CLOCK_FORMAT = DateTimeFormatter.ofPattern("HH:mm")

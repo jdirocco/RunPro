@@ -13,6 +13,7 @@ enum class DataField(val label: Int) {
     LAP_PACE(R.string.field_lap_pace),
     HEART_RATE(R.string.field_heart_rate),
     HR_ZONE(R.string.field_hr_zone),
+    PACE_ZONE(R.string.field_pace_zone),
     CADENCE(R.string.field_cadence),
     POWER(R.string.field_power),
     ELEVATION(R.string.field_elevation),

@@ -31,6 +31,7 @@ class RecordingStateMachine(
     private var settings = WorkoutSettings()
     private var workout = WorkoutController(settings)
     private val autoPause = AutoPause()
+    private val alerts = AlertMonitor(settings.runSettings.alerts)
     private var phase = RunPhase.IDLE
     private var run: Run? = null
     private var metrics: RunMetrics? = null
@@ -65,7 +66,8 @@ class RecordingStateMachine(
                 resources = resources,
                 workoutSettings = settings,
                 workout = workout.progress(metrics.totals(now)),
-                activeSources = gate.activeSources
+                activeSources = gate.activeSources,
+                alerts = alerts.alerts
             )
         }
 
@@ -83,6 +85,7 @@ class RecordingStateMachine(
                     if (allowed) {
                         settings = input.settings
                         workout = WorkoutController(settings)
+                        alerts.configure(settings.runSettings.alerts)
                     }
                 }
 
@@ -158,6 +161,7 @@ class RecordingStateMachine(
             metrics = RunMetrics(config, time)
             workout = WorkoutController(settings)
             autoPause.reset()
+            alerts.reset(settings.runSettings.alerts)
             now = time
         }
         return started
@@ -171,6 +175,7 @@ class RecordingStateMachine(
             now = null
             gate = SampleGate(config.sourcePolicy)
             current = CurrentValues()
+            alerts.reset(settings.runSettings.alerts)
         }
         return reset
     }
@@ -263,7 +268,11 @@ class RecordingStateMachine(
         val accepted = gate.admit(sample)
         // A late sample of a still silent source counts but is too old to show.
         if (accepted) {
-            applySample(sample, display = gate.isLive(sample.metric))
+            val live = gate.isLive(sample.metric)
+            applySample(sample, display = live)
+            if (run != null) {
+                alerts.onAdmittedSample(sample, time, live, emit = phase == RunPhase.RUNNING)
+            }
             if (settings.runSettings.autoPause && sample is SpeedSample) {
                 autoPause.command(sample, state, time)?.let { command ->
                     markAutomaticLaps(command.time)
@@ -286,8 +295,23 @@ class RecordingStateMachine(
 
     private fun onSensor(event: SensorEvent): Boolean {
         if (!advanceClock(event.time)) return false
+        val time = requireNotNull(now)
+        val emit = phase == RunPhase.RUNNING
         gate.sensor(event)
-        arbitrate(requireNotNull(now))
+        when (event) {
+            is SensorEvent.Disconnected -> alerts.onBleLost(event.source, time, emit)
+            is SensorEvent.Connected -> alerts.onBleActive(event.source, time, emit)
+            else -> Unit
+        }
+        arbitrate(time)
+        when (event) {
+            is SensorEvent.GpsLost ->
+                if (Metric.LOCATION !in gate.activeSources) alerts.onGpsLost(time, emit)
+
+            is SensorEvent.GpsAcquired -> alerts.onGpsAcquired(time, emit)
+
+            else -> Unit
+        }
         return true
     }
 
@@ -301,16 +325,33 @@ class RecordingStateMachine(
                 restoreEvent(event.copy(time = maxOf(event.time, run!!.events.last().time)))
             }
         }
+        if (run != null) {
+            alerts.onArbitration(
+                time,
+                decisions,
+                gate.activeSources,
+                emit = phase == RunPhase.RUNNING
+            )
+        }
     }
 
     /** Journal decisions are authoritative: do not recompute switches from an admitted-only history. */
     internal fun restoreSample(sample: Sample): Boolean = gate.restoreSample(sample).also {
-        if (it) applySample(sample)
+        if (it) {
+            applySample(sample)
+            alerts.onAdmittedSample(sample, sample.time, live = true, emit = false)
+        }
     }
 
     internal fun restoreSensor(event: SensorEvent) {
         gate.sensor(event)
         advanceClock(event.time)
+        when (event) {
+            is SensorEvent.Disconnected -> alerts.onBleLost(event.source, event.time, emit = false)
+            is SensorEvent.Connected -> alerts.onBleActive(event.source, event.time, emit = false)
+            is SensorEvent.GpsLost -> alerts.onGpsLost(event.time, emit = false)
+            is SensorEvent.GpsAcquired -> alerts.onGpsAcquired(event.time, emit = false)
+        }
     }
 
     internal fun restoreClock(time: Timestamp) {

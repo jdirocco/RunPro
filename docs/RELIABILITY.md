@@ -277,3 +277,20 @@ Every real failure seen in the field gets a row here, a recorded trace in `testd
   duplicate fields, safe fallback, page/field limits, editing, units, separate lap/run metrics and
   unknown sensor/profile values. Physical Gear Tracker reproduction/readability is the owner
   *Data screens check (#23)* in `FIELD_TESTING.md`; no field result is claimed.
+
+## Zones and alerts evidence (#25, ADR 0020)
+
+- `ZonesAndAlertsTest` (`:core:model`) checks Max HR, LTHR and threshold-pace zone boundaries,
+  validation, zone-to-alert helpers and additive JSON compatibility with legacy journals (R2).
+- `AlertMonitorTest` (`:core:recording`) checks HR high/low, pace fast/slow, BLE sensor lost/back
+  (disconnect, silent stall, 0 bpm, multi-metric deduplication), GPS lost/back (respecting fused
+  backup and indoor runs), freshness/paused filtering, monotonic rate limiting across wall-clock
+  jumps, and journal recovery without historical alert replay (R2/R4).
+- `AlertsReplayTest` (`:tools:replay`) replays committed `strap-dropout` and `intervals-6x3min`
+  traces plus chaos `BleDisconnect`, `SilentStall`, `GpsLoss` and `ClockJump` through real
+  journals: alerts fire and respect cooldowns while recording never pauses or stops, and journals
+  save and rebuild identically (R2/R3/R4/R5).
+- `WorkoutFeedbackTest`, `DataFieldTest` and `ZonesAndAlertsScreenTest` (`:wear`) verify eight
+  distinct vibration waveforms on the main thread (R6), silence on bind/pause, alert popups, LTHR
+  and pace-zone formatting, and pre-run UI editing. Watch vibration feel and readability are the
+  owner *Zones and alerts check (#25)* in `FIELD_TESTING.md`; no field result is claimed.
