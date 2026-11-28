@@ -179,8 +179,9 @@ può leggere dall'app: RunPro te la ricorda finché non tocchi **Fatto, controll
    (**⋮ → Rimuovi**) e aggiungila ad **Applicazioni mai in sospensione**.
 
 **Come si registra una corsa.** Tocca **Preparati**: RunPro cerca il GPS e il battito e mostra se sono
-pronti. Aspetta **GPS: pronto** e tocca **Avvia** (puoi avviare anche prima: la distanza parte quando arriva il
-GPS) oppure **Indietro** per rinunciare. Se dopo **Preparati** non tocchi **Avvia** entro 10 minuti, RunPro
+pronti (**GPS: pronto** appena il GPS dell'orologio o la posizione fusa hanno il segnale). Aspetta
+**GPS: pronto** e tocca **Avvia** (puoi avviare anche prima: la distanza parte quando arriva il GPS) oppure
+**Indietro** per rinunciare. Se dopo **Preparati** non tocchi **Avvia** entro 10 minuti, RunPro
 rinuncia da solo: spegne GPS e notifica per non scaricare la batteria (una corsa avviata non viene mai
 interrotta). Durante la corsa vedi tempo, distanza, passo e battito, con **Giro**,
 **Pausa**/**Riprendi** e **Stop**. Stop chiede conferma: **Continua a correre** è la prima scelta, la corsa
@@ -192,7 +193,11 @@ toccala per tornare all'app. La notifica fissa esiste ma il Galaxy Watch non la 
 notifiche (scorrendo da sinistra): la mostra come quell'icona. Se l'icona sparisce a corsa in corso,
 l'orologio ha chiuso RunPro: segnalalo con una issue **Field report**.
 
-**Posizione**: **Impostazioni → Posizione** attiva. RunPro usa solo il GPS dell'orologio.
+**Posizione**: **Impostazioni → Posizione** attiva. RunPro usa il GPS dell'orologio e, accanto, la posizione
+"fusa" di Google Play services, che con il telefono collegato via Bluetooth trova il segnale anche vicino
+ai palazzi, dove il GPS dell'orologio resta in ricerca. Le posizioni imprecise (Wi-Fi o rete cellulare, più
+di 20 m di errore) vengono scartate, così stando fermi la distanza non cresce. Quando il GPS dell'orologio
+ha il segnale, RunPro usa quello; ogni passaggio tra le due fonti è registrato nella corsa.
 
 **Batteria e spazio durante la registrazione.** Anche in pausa, RunPro mostra un avviso quando la
 batteria è al 15% o meno e quando restano meno di 50 MB (50.000.000 byte) liberi nella memoria dei
@@ -345,6 +350,7 @@ Segui `docs/FIELD_TESTING.md`. In breve:
 | `more than one device` durante l'installazione | Usa `ANDROID_SERIAL` (punto 6) |
 | La fascia non viene trovata | È collegata a un altro dispositivo o app (punto 7); toglila e rimettila per riattivarla |
 | La fascia è associata ma il battito resta del polso | Permesso **Dispositivi nelle vicinanze** mancante o Bluetooth spento; guarda `adb logcat -s RunProBle` |
+| Nel log `disconnect status=5` subito dopo `bond=BONDED` | La fascia era abbinata nelle impostazioni Bluetooth dell'orologio e ha perso le chiavi: RunPro toglie da sé il vecchio abbinamento al primo errore (`removed the stale bond`). Se il log dice `cannot remove the stale bond`, dimentica la fascia in **Impostazioni → Connessioni → Bluetooth** |
 | La registrazione si interrompe a schermo spento | RunPro è tra le app in sospensione (punto 7, Batteria) |
 
 ## 10. A fine sessione di sviluppo

@@ -216,6 +216,12 @@ class AndroidGattPortTest {
     }
 
     @Test
+    fun `removing a bond never throws`() {
+        shadowOf(device).setBondState(BluetoothDevice.BOND_BONDED)
+        port.removeBond()
+    }
+
+    @Test
     fun `a cache refresh never throws`() {
         connect()
         port.refreshServiceCache(1)

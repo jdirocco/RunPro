@@ -23,7 +23,8 @@ Android code in `:wear` and `:mobile` is a thin adapter layer.
 ## Domain model (`:core:model`)
 
 - `Sample`: one reading of one `Metric` (heart rate, location, distance, speed, cadence, power, elevation,
-  acceleration) from one `SourceId` (`watch:health-services`, `watch:imu`, `ble:<address>`, `derived`).
+  acceleration) from one `SourceId` (`watch:health-services`, `watch:fused-location`, `watch:imu`, `ble:<address>`,
+  `derived`).
 - `Timestamp`: monotonic `elapsedRealtimeNanos` (durations, ordering within one boot) plus wall clock millis.
 - `Run`: the ordered `RunEvent`s (started, paused, resumed, lap, source switched, sensor connected/lost,
   stopped); laps, start and stop are derived from them.
@@ -39,6 +40,7 @@ Android code in `:wear` and `:mobile` is a thin adapter layer.
 
 ```
 Health Services ExerciseClient ─┐
+FusedLocationProvider (gated) ──┤
 Android GATT (strap, footpod) ──┴─► SensorSource flows ─► RecordingEngine ─► Journal (disk)
                                                            │                    │
                                                            ▼                    ▼
@@ -66,7 +68,8 @@ SensorManager accel/gyro 50 Hz ─► ImuCapture (runpro-imu) ◄┘ ─► IMU 
   `PREPARING` (R1). Running/paused:
   time, distance, pace, heart rate, lap, pause/resume; **Stop** asks for a confirmation whose first choice
   keeps running. Stopped: a summary that says whether the journal was saved.
-- Source arbitration: per metric a priority list (e.g. HR: strap → wrist). A source is *stale* after a
+- Source arbitration: per metric a priority list (e.g. HR: strap → wrist; location: Health Services →
+  fused location, ADR 0019). A source is *stale* after a
   timeout; the engine switches to the next one and writes a source-switch event (R5). `SourcePolicy`
   configures priorities/timeouts independently; fresh BLE measurements win by default. With no
   other eligible source a stale source keeps its metric while *silent*: the value and icon clear, no
@@ -153,7 +156,8 @@ RecordingService ─► WatchBle (runpro-ble thread, 100 ms tick) ──┘
 
 `BleSensorLink` (pure) adds to the controller what is policy: samples only while streaming and from the
 current session, connect/disconnect `SensorEvent`s, a GATT cache refresh before discovery after two
-consecutive sessions that never streamed, and discovery held while the device is bonding. The Android
+consecutive sessions that never streamed, discovery held while the device is bonding, and a stale bond
+removed once when a bonded device drops on encryption before streaming (#117). The Android
 `AndroidGattPort` posts every `BluetoothGattCallback` (one per session) to the BLE thread, so nothing
 completes inline and closed sessions stay silent; the first connect uses `autoConnect=false`, reconnects
 `true`. `WatchBle` follows the run phases: links from the warm-up to the stop. Pairing (**Sensors** on
@@ -231,6 +235,29 @@ engine phase ─► ExerciseController.follow ─► ExerciseSession.next ─►
   `ExerciseStatus`, loses the GPS fix and never pauses or stops the run (R4).
 - The mapper drops invalid readings and sums distance deltas into the cumulative `DistanceSample`.
   Decisions: ADR 0011.
+
+## Fused location (`:core:recording` location / `:wear` location)
+
+Health Services binds to the watch's own `gps` provider and can stay acquiring near buildings; the fused
+provider gets a phone-assisted fix there (#96). `FusedLocationController` is the `SensorSource` of
+`watch:fused-location`: from the warm-up to the stop, with the location permission, it requests updates
+through `LocationPort` (`:wear` `FusedLocationPort`: `PRIORITY_HIGH_ACCURACY`, 1 Hz, no batching, on the
+`runpro-location` thread, R6).
+
+```
+FusedLocationProviderClient ─► FusedLocationPort ─► LocationFixGate (per run) ─► location/distance/speed
+         (runpro-location)          │ LocationFix         │ rejected: coarse > 20 m, stale, mock, jump
+                                    ▼                     ▼
+                            GpsAcquired / GpsLost    engine arbitration: BLE → Health Services → fused
+```
+
+- The gate admits fixes with accuracy ≤ 20 m, measured ≤ 10 s before arrival, newer than the last one and
+  at a plausible speed (a jump needs 3 agreeing fixes and then adds no distance). It derives its own
+  cumulative distance: every fix while the Doppler speed says moving, otherwise only displacements beyond
+  twice the combined accuracy, so standing still adds nothing.
+- Arbitration (ADR 0013) prefers Health Services; every hand-over is a recorded switch (R5) and
+  distance baselines restart, so the counters never add up. The warm-up GPS line shows the better of the
+  two (`ExerciseStatus.withLocation`). Decisions: ADR 0019.
 
 ## Low resources (`:core:recording` / `:core:journal`)
 

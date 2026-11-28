@@ -25,6 +25,7 @@ import com.runpro.core.recording.RunState
 import com.runpro.core.recording.Totals
 import com.runpro.core.recording.exercise.ExerciseStatus
 import com.runpro.core.recording.exercise.Readiness
+import com.runpro.core.recording.location.LocationStatus
 import com.runpro.core.recording.service.RunPermission
 import com.runpro.core.recording.service.ServiceCommand
 import com.runpro.core.recording.service.ServicePermissions
@@ -50,6 +51,7 @@ class RunProScreenTest {
     private val runState = MutableStateFlow(RunState())
     private val exercise = MutableStateFlow(ExerciseStatus())
     private var strapPaired = false
+    private val location = MutableStateFlow(LocationStatus())
 
     private fun show() {
         val setup = SetupState(
@@ -67,7 +69,7 @@ class RunProScreenTest {
             openHistory = { historyOpened++ },
             openDataScreens = { dataScreensOpened++ }
         )
-        compose.setContent { RunProScreen(setup, runState, exercise, actions) }
+        compose.setContent { RunProScreen(setup, runState, exercise, actions, location) }
     }
 
     private fun click(text: String) = compose.onNodeWithText(text).performClick()
@@ -88,6 +90,18 @@ class RunProScreenTest {
         show()
         click("Get ready")
         assertEquals(listOf(ServiceCommand.PREPARE), commands)
+    }
+
+    @Test
+    fun `the warm-up GPS is ready when only the fused provider has a fix`() {
+        runState.value = RunState(phase = RunPhase.PREPARING)
+        exercise.value = ExerciseStatus(gps = Readiness.WAITING, heartRate = Readiness.READY)
+        show()
+        shows("GPS: searching")
+        location.value = LocationStatus(readiness = Readiness.READY)
+        shows("GPS: ready")
+        location.value = LocationStatus(readiness = Readiness.WAITING)
+        shows("GPS: searching")
     }
 
     @Test

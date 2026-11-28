@@ -180,7 +180,9 @@ Gaps, real rate and battery cost on the Galaxy Watch 5 Pro are field results (F1
 - R8: `BleSensorLinkTest` reconnects a strap after GATT 133 with `autoConnect=true` and streams again in
   < 10 s through the link (events, parsing and the bond/cache checks in the path). A cache refresh after
   repeated setup failures and discovery held while bonding stay within the controller's deadlines, so
-  neither can stall recovery; a rejected held discovery recovers instead of hanging.
+  neither can stall recovery; a rejected held discovery recovers instead of hanging. A stale bond
+  (encryption drop before streaming while bonded, #117) is removed once and the next backoff step
+  reconnects, so it costs one retry of the budget instead of every one.
 - R4: the link and `WatchBle` only produce samples and `Connected` / `Disconnected(status)` events.
   `RecordingServiceBleTest` streams strap HR into a real service run (it becomes the active HR source),
   drops it with GATT 133 and checks the run keeps recording; missing permission, adapter or pairing
@@ -213,6 +215,24 @@ Gaps, real rate and battery cost on the Galaxy Watch 5 Pro are field results (F1
   same run (R4/R2). A source with no eligible replacement keeps its metric while silent, so loss of all
   sources is no longer a recorded switch; real switches are still FIT events (R5). Policy: ADR 0016.
 
+## Fused location evidence (#96, ADR 0019)
+
+- R4/R5: `FusedLocationArbitrationTest` covers fused location while Health Services is acquiring, the
+  hand-over when Health Services fixes and the take-back when it loses the fix: three recorded switches
+  per metric, no pause, no double counted distance; a footpod keeps distance; a silent fused source
+  records no switch. `FusedLocationReplayTest` runs the field timeline (waits among Wi-Fi/cell fixes,
+  a run with a Health Services fix in the middle) through the real gate, engine and journal: no distance
+  while standing still, exactly the 1 km auto-lap, no coarse fix in the journal and identical recovery
+  (R2/R3).
+- Gate: `LocationFixGateTest` rejects coarse (> 20 m), missing-accuracy, mock, invalid, cached and
+  out of order fixes and unconfirmed jumps; standing still with jitter adds no distance with or without
+  Doppler speed. `FusedLocationControllerTest`: lifecycle, permission, acquired/lost events, failures
+  reported and never thrown, late callbacks ignored.
+- R6: `FusedLocationPort` posts every call to the `runpro-location` thread and Play services calls back
+  there. `RecordingServiceLocationTest` (Robolectric) feeds gated fixes to a real service run and checks
+  updates are removed on stop and never requested without the location permission.
+- Not covered off the watch: the real fused provider near buildings, accuracy and battery cost (F13).
+
 ## Failure catalogue
 
 Every real failure seen in the field gets a row here, a recorded trace in `testdata/traces/`, and a test.
@@ -225,7 +245,9 @@ Every real failure seen in the field gets a row here, a recorded trace in `testd
 | 2026-11-27 | #12 | Warm-up screen: tapping "Start" ("Avvia") did nothing on the Galaxy Watch 5 Pro while "Back" returned to the start screen, leaving a 0-byte `.journal` file in `files/journals`. `FileJournalOutput.availableBytes` called `Files.getFileStore(path)`, which scans `/proc/mounts` and throws `IOException` ("Mount point not found") on Android `/data/user/0/...` before `RunStarted` is written; `RecordingSession` caught it, set `journalFailed` and stayed in `PREPARING` with no error shown on the warm-up screen. `FileJournalOutput` now queries `File.usableSpace` (`statvfs`), the warm-up screen shows storage errors, and `Reset` replaces a failed warm-up session. | none (pre-start storage check, no sensor data) | `ReservedStorageTest`, `JournalFailureTest`, `RunProScreenTest` |
 | 2026-11-28 | #12 | Warm-up logged `W/ExerciseUpdateListener: Availability received without any requested DataTypes` on the Galaxy Watch 5 Pro and dropped initial availability events. `ExerciseController` called `setUpdateCallback` right after `inspect`, before `prepareExerciseAsync` / `startExerciseAsync` populated `ServiceBackedExerciseClient.requestedDataTypes`. The controller now registers the listener once `prepare` or `start` completes (or immediately when adopting an already-active exercise). | none (Health Services warm-up handshake, no sensor data) | `ExerciseControllerTest` |
 | 2026-11-28 | #105 | IMU capture never started on the Galaxy Watch 5 Pro: at run start `ImuCapture` logged `state=OFF, problem=SENSOR_FAILED, error=SecurityException: getFileStore` and `files/imu` stayed empty, while the run itself was recorded and synced. The default `freeBytes` of `ImuCapture` called `Files.getFileStore(path).usableSpace`, the call already fixed for the journal in #12. It now queries `File.usableSpace` (`statvfs`); the Android-like file system used by both tests moved to `:tools:replay` (`noFileStorePath`) so new storage code can be checked against it. | none (pre-capture storage check, no sensor data) | `ImuCaptureTest`, `ReservedStorageTest` |
+| 2026-11-28 | #96 | Warm-up near buildings during #12 on the Galaxy Watch 5 Pro: Health Services, bound to the watch's own `gps` provider, stayed in `ACQUIRING` with no location (`GnssLocationProvider_ex: SV Count: 0/2`), while Gear Tracker (fused provider, phone assisted) had `hAcc` about 14 m within 6 s. RunPro now adds `watch:fused-location` behind an accuracy gate (≤ 20 m, fresh, no jumps) as a backup that Health Services replaces when it has a fix; every hand-over is a recorded switch. | none (no field trace recorded; synthetic timeline in the test) | `FusedLocationReplayTest`, `LocationFixGateTest`, `FusedLocationArbitrationTest` |
 | 2026-11-28 | #115 | Sensors → "Pair HR strap" on the Galaxy Watch 5 Pro: the search showed for a fraction of a second, then the screen came back with "Not paired". The watch reports `companion_device_setup`, so `SensorActivity` used only `CompanionDeviceManager`, which refuses third-party apps on Wear OS (`CDM_AssociationRequestsProcessor: 3p apps are not allowed to create associations on watch.`, API 36) and reported a failure at once; the `BleScan` fallback ran only without the feature. A failed or closed chooser now falls back to the filtered scan, which the screen then uses directly, and the reason is logged (`RunProBle`). Verified on the watch: the H10 was found and paired through the scan. | none (UI pairing, no sensor data) | `SensorActivityTest` |
+| 2026-11-28 | #117 | Warm-up with a Polar H10 paired through the RunPro scan (#115): every session connected, logged `bond=BONDED`, then dropped during service discovery with `disconnect status=5`; after three sessions the warm-up ended without strap HR. The H10 was still in the watch's system bonded devices from an earlier pairing, but had forgotten the keys: the stack logged `Encryption failure 6` / `HCI_ERR_KEY_MISSING` and disconnected. The GATT cache refresh could not help. `BleSensorLink` now removes the bond once per link when a bonded device drops with an authentication or encryption status before streaming, and logs the manual fix when removal is refused. Verified on the watch: `removeBond()` worked (`BOND_BONDED => BOND_NONE`), the next session streamed, and the H10 later re-bonded with valid keys. | none (GATT setup, no samples; logcat excerpt in #117) | `BleSensorLinkTest`, `AndroidGattPortTest` |
 
 ## Settings evidence
 
